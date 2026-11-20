@@ -38,6 +38,7 @@ struct RootView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             Color.paper.ignoresSafeArea()
+            SettingsOpener()
             if ws.root == nil {
                 WelcomeView(ws: ws)
             } else {
@@ -132,6 +133,7 @@ struct RootView: View {
                     Spacer()
                 }
                 syncDot.padding(.trailing, 6)
+                if let s = ws.obsidianSync { SyncBadge(sync: s).padding(.trailing, 6) }
                 if let g = ws.git { GitBadge(git: g) { ws.toggleSidebar(.git) }.padding(.trailing, 6) }
                 if ws.currentPath != nil {
                     Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)

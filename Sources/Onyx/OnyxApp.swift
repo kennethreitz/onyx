@@ -133,10 +133,10 @@ struct OnyxApp: App {
             MainActor.assumeIsolated { ws.flushSave(); ws.git?.commitNow() }
         }
         nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.git?.syncNow() }
+            MainActor.assumeIsolated { ws.git?.syncNow(); ws.obsidianSync?.syncNow() }
         }
         nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.flushSave(); ws.git?.finishForQuit() }
+            MainActor.assumeIsolated { ws.flushSave(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
         }
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).

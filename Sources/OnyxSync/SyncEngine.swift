@@ -15,6 +15,9 @@ public struct SyncStatus: Equatable, Sendable {
     public var phase: SyncPhase
     public var lastSynced: Date?
     public var initialMerge: Bool
+    public init(phase: SyncPhase, lastSynced: Date?, initialMerge: Bool) {
+        self.phase = phase; self.lastSynced = lastSynced; self.initialMerge = initialMerge
+    }
 }
 
 /// Exponential reconnect backoff, Obsidian's `NA(0, 300 s, 5 s, jitter)`.

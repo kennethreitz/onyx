@@ -10,7 +10,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "OnyxCore", path: "Sources/OnyxCore"),
-        .executableTarget(name: "Onyx", dependencies: ["OnyxCore"], path: "Sources/Onyx"),
+        .executableTarget(name: "Onyx", dependencies: ["OnyxCore", "OnyxSync"], path: "Sources/Onyx"),
         .testTarget(name: "OnyxCoreTests", dependencies: ["OnyxCore"], path: "Tests/OnyxCoreTests"),
         // Obsidian Sync protocol (reverse-engineered; see docs/obsidian-sync-protocol.md).
         .target(name: "OnyxSync", path: "Sources/OnyxSync"),

@@ -166,3 +166,11 @@ Not built yet: the sync engine (local index, debounce, merge, conflict copies, c
 - laurensramandt/rev-obsidian-sync (reimplemented server) — https://github.com/laurensramandt/rev-obsidian-sync
 - acheong08/obi-sync (self-hosted server) — https://github.com/acheong08/obi-sync
 - brendongl/obsidian-sync-headless (early notes) — https://github.com/brendongl/obsidian-sync-headless
+
+## Onyx implementation (Phase 2)
+
+- `OnyxSync.SyncEngine` ports Obsidian's sync loop: pending server records → remote deletions (deepest first) → folder uploads (shallowest first) → file uploads (smallest first); synctime debounce (10/20/30 s by size), per-file retry backoff (2^n×5 s, max 300 s), reconnect backoff (5 s base, 300 s max, jitter), periodic rescan every 30 s.
+- Markdown merges run Obsidian's own algorithm (diff-match-patch 1.0.5 embedded verbatim, executed in JavaScriptCore) and are checked against 47 vectors generated from Obsidian 1.15.1's merge function. Conflict copies: `X (Conflicted copy <device> <yyyyMMddHHmm>).md`. `.obsidian/*.json` conflicts shallow-merge; `core-plugins.json` keeps `sync` on.
+- Default filters match Obsidian (images/audio/pdf/video, app/appearance/hotkeys/core plugins; never `workspace.json`, never dot-paths).
+- Safety beyond Obsidian: sync is opt-in per vault; the first connect is an "initial merge" that never deletes on either side (differing files are kept twice) and is previewed in a confirm sheet; mass remote deletions (>20 files and >25% of the vault) or a folder emptied at once pause sync until confirmed; local deletes go to the Trash; text overwritten by a merge/download is backed up under `~/Library/Application Support/Onyx/Sync/Backups/`.
+- State lives outside the vault in `~/Library/Application Support/Onyx/Sync/<hash>.json`. The token and vault keys go in the Keychain (service `md.onyx.sync`). User-Agent `Onyx/<version>`; sign-in keeps the `Origin: https://obsidian.md` preflight. `ONYX_NO_SYNC=1` disables sync at launch.

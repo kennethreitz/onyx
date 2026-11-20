@@ -3,7 +3,11 @@ import Foundation
 /// Obsidian account/vault REST API (`https://api.obsidian.md`). Every call is a JSON POST; a 2xx body
 /// containing an `"error"` key is a failure. Endpoints/fields transcribed from Obsidian 1.15.1 `app.js`.
 public struct ObsidianAPI: Sendable {
-    public struct APIError: Error, CustomStringConvertible { public let message: String; public var description: String { message } }
+    public struct APIError: Error, CustomStringConvertible {
+        public let message: String
+        public var description: String { message }
+        public init(message: String) { self.message = message }
+    }
     public struct HTTPError: Error { public let status: Int }
 
     public var baseURL: URL
