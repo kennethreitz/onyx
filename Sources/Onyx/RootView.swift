@@ -605,8 +605,18 @@ struct WindowConfigurator: NSViewRepresentable {
         guard let f = idFile else { return }
         // Screenshot runs on a machine someone is using: ONYX_SHOT_QUIET=1 parks the window off
         // screen and deaf to the pointer, so it neither covers their work nor sprouts hover cards.
+        // It must never save that frame: the shot app shares the real app's defaults, and a saved
+        // off-screen frame would open the next real window off screen. So: no autosave, no
+        // restoration, then park it (at the --size asked for, which a restored frame would override).
         if ProcessInfo.processInfo.environment["ONYX_SHOT_QUIET"] == "1", !w.ignoresMouseEvents {
+            w.setFrameAutosaveName("")
+            w.isRestorable = false
             w.ignoresMouseEvents = true
+            let a = CommandLine.arguments
+            if let i = a.firstIndex(of: "--size"), a.indices.contains(i + 1) {
+                let p = a[i + 1].split(separator: "x").compactMap { Double($0) }
+                if p.count == 2 { w.setContentSize(NSSize(width: p[0], height: p[1])) }
+            }
             w.setFrameOrigin(NSPoint(x: -w.frame.width - 3000, y: 0))
         }
         try? String(w.windowNumber).write(toFile: f, atomically: true, encoding: .utf8)
