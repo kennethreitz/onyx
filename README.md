@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.png" alt="Onyx: a typeset typography note beside its focus graph" width="100%">
+  <img src="docs/logo.png" alt="Onyx" width="128">
 </p>
 
 <h1 align="center">Onyx</h1>
@@ -7,6 +7,10 @@
 <p align="center"><b>Notes, typeset.</b><br>
 A native macOS notes app for plain Markdown.<br>
 Obsidian-compatible, quiet, and fast. Your vault stays yours.</p>
+
+<p align="center">
+  <img src="docs/hero.png" alt="Onyx: a typeset typography note beside its focus graph" width="100%">
+</p>
 
 ---
 

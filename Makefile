@@ -33,7 +33,7 @@ test:
 	node --test Tests/reader
 
 icon:
-	@[ -f build/Onyx.icns ] || swift scripts/make-icon.swift build
+	@test -f Resources/AppIcon.icns || { echo "missing Resources/AppIcon.icns"; exit 1; }
 
 # A disposable copy of the neutral parts of ~/Notes for testing (read-only on the source).
 demo-vault:
