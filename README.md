@@ -95,3 +95,7 @@ graph layout) and `Onyx` (SwiftUI + AppKit, with a WKWebView reader). Design not
 
 Early, and moving fast. It is tested against a real vault of a few thousand notes, but expect
 rough edges. Back up your vault (or point Onyx at a copy) while it settles.
+
+## License
+
+Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
