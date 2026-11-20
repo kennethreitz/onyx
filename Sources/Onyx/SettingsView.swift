@@ -71,6 +71,14 @@ struct SettingsView: View {
                 Text("⌃⌘F toggles focus mode any time; Esc leaves it.").font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { header("Focus") }
 
+            if ws.root != nil {
+                Section {
+                    Toggle("Open the atlas on startup", isOn: Binding(get: { ws.atlasOnStartup }, set: { ws.atlasOnStartup = $0 }))
+                    Text(ws.obsidianHomeIsGraph ? "On by default here: this vault's Obsidian Homepage opens the graph." : "The graph opens over your notes at launch; click a note to start.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                } header: { header("Startup (this vault)") }
+            }
+
             ObsidianSyncSettings(ws: ws)
         }
         .formStyle(.grouped)

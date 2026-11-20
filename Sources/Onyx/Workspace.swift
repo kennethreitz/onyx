@@ -149,7 +149,13 @@ final class Workspace {
                 self.indexMillis = ms
                 self.isIndexing = false
                 if let n = initialNote { self.openNote(n) }
-                else if self.currentPath == nil { self.openHome() }
+                else if self.currentPath == nil {
+                    self.openHome()
+                    // like Obsidian's Homepage "Graph view": the atlas is the first thing you see
+                    if self.atlasOnStartup && ProcessInfo.processInfo.environment["ONYX_NO_STARTUP_GRAPH"] == nil {
+                        self.graphAtlas = true; self.show(.graph)
+                    }
+                }
             }
         }
         watcher = FileWatcher(root: root) { [weak self] paths in
@@ -163,12 +169,20 @@ final class Workspace {
         guard let root, let d = try? Data(contentsOf: root.appendingPathComponent(".obsidian/\(name)")) else { return nil }
         return try? JSONSerialization.jsonObject(with: d)
     }
+    /// Obsidian Homepage plugin set to open the graph on startup (Kenneth's ~/Notes).
+    private(set) var obsidianHomeIsGraph = false
+    /// Open the atlas as the home view at launch. Per vault; defaults to the Homepage plugin's choice.
+    var atlasOnStartup: Bool {
+        get { UserDefaults.standard.object(forKey: key("atlasOnStartup")) as? Bool ?? obsidianHomeIsGraph }
+        set { UserDefaults.standard.set(newValue, forKey: key("atlasOnStartup")) }
+    }
     private func loadObsidianSettings() {
         if let d = obsidianJSON("daily-notes.json") as? [String: Any], let f = d["folder"] as? String { dailyFolder = f }
         if let a = obsidianJSON("app.json") as? [String: Any], let m = a["defaultViewMode"] as? String { mode = m == "source" ? .edit : .read }
         if let h = obsidianJSON("plugins/homepage/data.json") as? [String: Any],
            let hp = (h["homepages"] as? [String: Any])?.values.first as? [String: Any], let v = hp["value"] as? String {
             homePath = v.hasSuffix(".md") ? v : v + ".md"
+            obsidianHomeIsGraph = (hp["kind"] as? String) == "Graph view" && (hp["openOnStartup"] as? Bool ?? false)
         }
     }
     private func obsidianIgnore() -> [String] {
@@ -1001,6 +1015,8 @@ struct Pane: Identifiable, Equatable {
     var mode: ViewMode
     var history: [NavEntry] = []
     var historyIndex = -1
+    /// A docked graph: lives beside notes and stays open; never takes the editor's focus.
+    var isGraph = false
 }
 
 /// One stop in back/forward: a note (with where you were in it and how you were viewing it)
@@ -1060,7 +1076,7 @@ extension Workspace {
 
     /// Click or ⌃⇥: hand the live editor state to another pane.
     func focusPane(_ i: Int) {
-        guard isSplit, panes.indices.contains(i), i != focusedPane else { return }
+        guard isSplit, panes.indices.contains(i), i != focusedPane, !panes[i].isGraph else { return }
         flushSave()
         captureFocused()
         focusedPane = i
@@ -1073,7 +1089,38 @@ extension Workspace {
     }
     func focusNextPane(_ step: Int = 1) {
         guard isSplit else { return }
-        focusPane((focusedPane + step + panes.count) % panes.count)
+        var j = focusedPane
+        for _ in panes.indices {
+            j = (j + step + panes.count) % panes.count
+            if !panes[j].isGraph { break }
+        }
+        focusPane(j)
+    }
+
+    var graphPaneIndex: Int? { panes.firstIndex(where: \.isGraph) }
+    /// The graph as a pane beside the notes (focus graph follows the note you're on).
+    func openGraphPane(atlas: Bool) {
+        graphAtlas = atlas
+        if overlay == .graph { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .none } }
+        guard graphPaneIndex == nil else { return }
+        flushSave()
+        if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)]; focusedPane = 0 }
+        guard panes.count < 4 else { toast = "Four panes is the limit"; return }
+        captureFocused()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            if panes.count == 1 { splitAxis = .vertical }
+            panes.append(Pane(id: UUID(), path: nil, text: "", mode: mode, isGraph: true))
+        }
+    }
+    func closeGraphPane() {
+        guard let g = graphPaneIndex else { return }
+        captureFocused()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            panes.remove(at: g)
+            if focusedPane > g { focusedPane -= 1 }
+            focusedPane = min(focusedPane, max(0, panes.count - 1))
+            if panes.count == 1 { panes = []; focusedPane = 0 }
+        }
     }
 
     /// ⌘W with panes: close the focused one. Returns false when there is nothing to close
@@ -1081,10 +1128,13 @@ extension Workspace {
     @discardableResult
     func closePane() -> Bool {
         guard isSplit else { return false }
+        // ⌘W with one note beside a docked graph closes the graph, never the last note
+        if panes.filter({ !$0.isGraph }).count == 1, graphPaneIndex != nil { closeGraphPane(); return true }
         flushSave()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             panes.remove(at: focusedPane)
             focusedPane = min(focusedPane, panes.count - 1)
+            if panes[focusedPane].isGraph, let n = panes.indices.filter({ !panes[$0].isGraph }).min(by: { abs($0 - focusedPane) < abs($1 - focusedPane) }) { focusedPane = n }
         }
         let p = panes[focusedPane]
         if let path = p.path, path != currentPath { openNote(path, recordHistory: false) }

@@ -239,3 +239,13 @@ Folders sort by their newest modification / oldest creation inside. Saved per va
 Right of the forward chevron: click opens the focus graph for the current note (⌘G); ⇧-click or
 the right-click menu opens the atlas (⇧⌘G). Hovering it for 400 ms shows the current note's graph
 card. The footer's graph icon remains.
+
+
+## Graph pane and startup atlas
+
+The graph can stay open as a pane beside notes: the overlay's "keep open as a pane" button, ⌥⌘G, or
+`openGraphPane`. A graph pane is a `Pane` with `isGraph`; it never takes the editor's focus (focus
+cycling and clicks skip it), its focus graph follows the note you're on, it zooms only under the
+pointer, and keys stay with the editor. ⌘W next to a single note closes the graph pane first.
+"Open the atlas on startup" (Settings, per vault) shows the atlas over the home note at launch; it
+defaults to on when the vault's Obsidian Homepage plugin opens "Graph view" on startup (~/Notes does).

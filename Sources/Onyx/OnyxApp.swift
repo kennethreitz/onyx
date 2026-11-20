@@ -195,6 +195,8 @@ struct OnyxApp: App {
             Divider()
             Button("Focus Graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }.keyboardShortcut("g")
             Button("Atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }.keyboardShortcut("g", modifiers: [.command, .shift])
+            Button(ws.graphPaneIndex == nil ? "Graph in a Pane" : "Close Graph Pane") { ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane() }
+                .keyboardShortcut("g", modifiers: [.command, .option])
         }
         CommandMenu("Pane") {
             Button("Split Side by Side") { ws.split(.vertical) }.keyboardShortcut("d")

@@ -251,6 +251,11 @@ struct RootView: View {
     }
 
     @ViewBuilder func paneView(_ i: Int, _ pane: Pane) -> some View {
+        if pane.isGraph {
+            GraphView(ws: ws, docked: true).id("\(pane.id)-g").padding(.top, 28)
+        } else { notePane(i, pane) }
+    }
+    @ViewBuilder func notePane(_ i: Int, _ pane: Pane) -> some View {
         let focused = i == ws.focusedPane
         let mode = focused ? ws.mode : pane.mode
         let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
@@ -527,7 +532,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas (also the title bar's graph button; ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

@@ -33,6 +33,10 @@ struct Camera: Equatable { var zoom: Double; var pan: SIMD2<Double> }
 
 struct GraphView: View {
     @Bindable var ws: Workspace
+    /// In a pane beside notes rather than over the window: keys stay with the editor, scroll only
+    /// zooms under the pointer, and the focus graph follows the note you're on.
+    var docked = false
+    @State private var frameInWindow: CGRect = .zero
     var store: GraphStore { ws.graphStore }
 
     // focus state
@@ -78,11 +82,16 @@ struct GraphView: View {
                     header
                     if !ws.graphAtlas && !trail.isEmpty { breadcrumbs }
                     Spacer()
-                    legend
+                    if !docked { legend }
                 }
             }
-            .onAppear { size = geo.size; start() }
+            .onAppear { size = geo.size; frameInWindow = geo.frame(in: .global); start() }
             .onChange(of: geo.size) { size = geo.size; refit(animated: false) }
+            .onChange(of: geo.frame(in: .global)) { frameInWindow = geo.frame(in: .global) }
+            .onChange(of: ws.currentPath) {
+                guard docked, !ws.graphAtlas, let p = ws.currentPath, let g = store.index, let i = g.index[p], i != focus else { return }
+                setFocus(i)
+            }
         }
         .onDisappear { monitors.forEach { NSEvent.removeMonitor($0) }; monitors = [] }
         .onChange(of: ws.graphAtlas) { refit(animated: true); Task { await loadAtlas() } }
@@ -637,7 +646,7 @@ struct GraphView: View {
 
     var header: some View {
         HStack(spacing: 12) {
-            NavChevrons(ws: ws)
+            if !docked { NavChevrons(ws: ws) }
             Picker("", selection: $ws.graphAtlas) {
                 Text("Focus").tag(false)
                 Text("Atlas").tag(true)
@@ -654,22 +663,29 @@ struct GraphView: View {
                 TextField("Highlight notes", text: $query).textFieldStyle(.plain).font(.system(size: 12)).focused($searchFocused)
                     .onSubmit { jumpToMatch() }
             }
-            .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 180)
+            .padding(.horizontal, 8).padding(.vertical, 5).frame(width: docked ? 130 : 180)
             .background(Color.paper, in: RoundedRectangle(cornerRadius: 6)).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.hairline))
-            HStack(spacing: 6) {
+            if !docked { HStack(spacing: 6) {
                 Image(systemName: "clock").font(.system(size: 10.5)).foregroundStyle(Color.faint)
                 Slider(value: $recency, in: 0...0.995).frame(width: 110).controlSize(.mini)
                 Text(recencyLabel).font(.system(size: 10.5)).foregroundStyle(Color.faint).frame(width: 92, alignment: .leading)
-            }
-            Spacer()
-            if let g = store.index {
+            } }
+            Spacer(minLength: 0)
+            if let g = store.index, !docked {
                 Text(statusText(g)).font(.system(size: 10.5)).foregroundStyle(Color.faint)
             }
-            Button { ws.show(.graph) } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }
-                .buttonStyle(.plain).help("Close (Esc)")
+            if docked {
+                Button { ws.closeGraphPane() } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }
+                    .buttonStyle(.plain).help("Close graph pane (⌘W)")
+            } else {
+                Button { ws.openGraphPane(atlas: ws.graphAtlas) } label: { Image(systemName: "rectangle.righthalf.inset.filled").font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }
+                    .buttonStyle(.plain).help("Keep open as a pane beside your notes")
+                Button { ws.show(.graph) } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }
+                    .buttonStyle(.plain).help("Close (Esc)")
+            }
         }
         .controlSize(.small)
-        .padding(.leading, 84).padding(.trailing, 18).padding(.top, 6).frame(height: 40)
+        .padding(.leading, docked ? 12 : 84).padding(.trailing, docked ? 10 : 18).padding(.top, 6).frame(height: 40)
     }
 
     var filterMenu: some View {
@@ -801,8 +817,13 @@ struct GraphView: View {
     func installMonitors() {
         guard monitors.isEmpty else { return }
         if let m = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { e in
-            guard ws.overlay == .graph else { return e }
-            let loc = e.window.map { w -> CGPoint in let p = e.locationInWindow; return CGPoint(x: p.x, y: (w.contentView?.bounds.height ?? 0) - p.y) } ?? .zero
+            var loc = e.window.map { w -> CGPoint in let p = e.locationInWindow; return CGPoint(x: p.x, y: (w.contentView?.bounds.height ?? 0) - p.y) } ?? .zero
+            if docked {
+                guard ws.overlay == .none, frameInWindow.contains(loc) else { return e }
+                loc = CGPoint(x: loc.x - frameInWindow.minX, y: loc.y - frameInWindow.minY)
+            } else {
+                guard ws.overlay == .graph else { return e }
+            }
             let base = camera(Date())
             if e.modifierFlags.contains(.command) || !e.hasPreciseScrollingDeltas {
                 zoom(by: exp(Double(e.scrollingDeltaY) * (e.hasPreciseScrollingDeltas ? 0.01 : 0.1)), around: loc, base: base)
@@ -812,7 +833,7 @@ struct GraphView: View {
             return nil
         }) { monitors.append(m) }
         if let m = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { e in
-            guard ws.overlay == .graph, !(NSApp.keyWindow?.firstResponder is NSTextView) else { return e }
+            guard !docked, ws.overlay == .graph, !(NSApp.keyWindow?.firstResponder is NSTextView) else { return e }
             // Exact modifiers only, so ⌘↩ (read/edit), ⇧⌘F (vault search) and ⌃⌘F (focus mode)
             // still reach the menu while the graph is open.
             let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])

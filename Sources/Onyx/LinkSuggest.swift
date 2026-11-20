@@ -183,6 +183,11 @@ enum TypeSelfTest {
             }
         case "rows": print("[rows] \(ws.visibleTreePaths())")
         case "sortsaved": print("[sortsaved] \(UserDefaults.standard.data(forKey: "onyx.\(ws.root?.path ?? "").treeSort").map { String(decoding: $0, as: UTF8.self) } ?? "-")")
+        case "graphpane": ws.openGraphPane(atlas: arg == "atlas")
+        case "closegraph": ws.closeGraphPane()
+        case "closepane": print("[closepane] \(ws.closePane())")
+        case "nextpane": ws.focusNextPane()
+        case "panes": print("[panes] \(ws.panes.map { $0.isGraph ? "graph" : ($0.path ?? "-") }) focused=\(ws.focusedPane) current=\(ws.currentPath ?? "-") overlay=\(ws.overlay) atlas=\(ws.graphAtlas)")
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":
