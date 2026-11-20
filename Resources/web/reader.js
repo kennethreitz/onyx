@@ -579,6 +579,8 @@
       if (g.size) r.setProperty('--font-text-size', g.size + 'pt');
       let st = document.getElementById('onyx-page');
       if (!st) { st = document.createElement('style'); st.id = 'onyx-page'; document.head.appendChild(st); }
+      // A long listing may run across pages (TeX would break it too); short ones stay whole.
+      page.querySelectorAll('pre, .table-wrap').forEach(b => { if (b.textContent.split('\n').length > 14) b.classList.add('may-break'); });
       if (g.paper) st.textContent = `@page { size: ${g.paper[0]}pt ${g.paper[1]}pt; margin: ${g.margin.map(m => m + 'pt').join(' ')}; }`;
       layoutSidenotes();
     },

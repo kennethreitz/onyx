@@ -86,8 +86,9 @@ body.typeset :is(em, i) abbr.sc { font-style: italic; }
 body.typeset .lead-in { font-family: var(--font-caps); letter-spacing: 0.035em; }
 body.typeset.face-et .lead-in { font-variant-caps: small-caps; }
 body.typeset p.has-dropcap .lead-in { font-family: inherit; letter-spacing: 0; }
+body.typeset p.has-dropcap { hanging-punctuation: none; }
 body.typeset p.has-dropcap::first-letter {
-  -webkit-initial-letter: 3 2; initial-letter: 3 2;            /* three lines tall, sunk two */
+  -webkit-initial-letter: 3; initial-letter: 3;                /* three lines, sunk three */
   font-family: var(--font-text); font-weight: 400; margin-right: 0.08em; color: var(--text-normal);
 }
 body.typeset .callout-title { font-family: var(--font-caps); font-variant-caps: normal; text-transform: lowercase; letter-spacing: 0.05em; }
@@ -155,6 +156,10 @@ body.print :is(h1, h2, h3, h4, h5, h6) { break-after: avoid; page-break-after: a
 body.print :is(figure, table, pre, blockquote, .callout, .mermaid, img, .sidenote, li) { break-inside: avoid; page-break-inside: avoid; }
 body.print :is(p, li) { orphans: 2; widows: 2; }
 body.print pre { white-space: pre-wrap; overflow: visible; }
+body.print :is(pre, .table-wrap, .table-wrap table).may-break, body.print .table-wrap.may-break table { break-inside: auto; page-break-inside: auto; }
 body.print .table-wrap { overflow: visible; }
 body.print .kanban { margin: 1em 0; flex-wrap: wrap; overflow: visible; }
 body.print .footnotes { break-before: auto; }
+
+/* Note references ride on the baseline grid: a raised figure must not open up its line. */
+body.typeset .markdown-preview-view sup, body.typeset .sidenote .num { line-height: 0; }

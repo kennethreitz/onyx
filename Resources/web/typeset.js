@@ -150,6 +150,8 @@
       if (/[,;:.!?\u2014\u2026]$/.test(m[0])) break;
     }
     if (!lead.trim()) return;
+    // A drop cap wants a letter; a paragraph that opens on a quote gets the lead-in instead.
+    if (mode === 'dropcap' && !/^\s*[\p{L}\p{N}]/u.test(lead)) mode = 'smallcaps';
     el.classList.add('opening', mode === 'dropcap' ? 'has-dropcap' : 'has-lead-in');
     const span = document.createElement('span');
     span.className = 'lead-in';
