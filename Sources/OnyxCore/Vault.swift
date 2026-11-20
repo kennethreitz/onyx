@@ -134,6 +134,7 @@ public struct VaultSnapshot: Sendable {
         guard let sources = backlinks[path] else { return [] }
         var out: [(String, [Backlink])] = []
         for s in sources.sorted(by: { (notes[$0]?.name ?? $0).localizedStandardCompare(notes[$1]?.name ?? $1) == .orderedAscending }) {
+            if canvases[s] != nil { out.append((s, [Backlink(source: s, line: 0, context: "Canvas")])); continue }
             guard let note = notes[s] else { continue }
             let ns = note.content as NSString
             var lineStarts: [Int] = [0]

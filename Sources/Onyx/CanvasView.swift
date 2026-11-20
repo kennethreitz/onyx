@@ -187,7 +187,7 @@ enum CanvasPayload {
                     let body = (note.content as NSString).substring(from: note.summary.frontmatter.bodyOffset)
                     text = ReaderPayload.section(body, heading: String(sub.dropFirst()))
                 }
-                let reader = ReaderPayload.build(text: text, path: r, snap: snap, dark: false, sidenotes: false, keepScroll: false)
+                let reader = ReaderPayload.build(text: text, path: r, snap: snap, dark: false, sidenotes: false, keepScroll: false, preview: true)
                 let obj = (try? JSONSerialization.jsonObject(with: Data(reader.utf8))) as? [String: Any] ?? [:]
                 out[key] = ["type": "note", "path": r, "name": name, "reader": obj]
             } else if r.isCanvasPath {
@@ -209,7 +209,7 @@ enum CanvasPayload {
             for n in v["nodes"]?.array ?? [] where n["type"]?.string == "text" { if let t = n["text"]?.string { texts.append(t) } }
         }
         // links and embeds inside text cards resolve like a note sitting next to the canvas
-        let reader = ReaderPayload.build(text: texts.joined(separator: "\n\n"), path: path, snap: snap, dark: dark, sidenotes: false, keepScroll: false)
+        let reader = ReaderPayload.build(text: texts.joined(separator: "\n\n"), path: path, snap: snap, dark: dark, sidenotes: false, keepScroll: false, preview: true)
         let r = (try? JSONSerialization.jsonObject(with: Data(reader.utf8))) as? [String: Any] ?? [:]
         return ["links": r["links"] ?? [:], "embeds": r["embeds"] ?? [:], "base": r["base"] ?? "",
                 "files": files(for: fileRefs(text), canvas: path, snap: snap)]

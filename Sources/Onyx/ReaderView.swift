@@ -157,7 +157,7 @@ struct ReaderView: NSViewRepresentable {
             if preview, !["open", "url", "tag"].contains(type) { return }   // a preview only navigates
             switch type {
             case "open":
-                if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil {
+                if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil || ws.snapshot?.canvases[p] != nil {
                     GraphPreviewController.shared.close()
                     if let line = body["line"] as? Int { ws.openNote(p, line: line) }
                     else { ws.openNote(p, heading: body["heading"] as? String) }
@@ -252,7 +252,7 @@ enum ReaderPayload {
         let folder = (path as NSString).deletingLastPathComponent
         // Backlinks under the note, like Obsidian's backlinkInDocument (unlinked load on demand).
         let mentions: [[String: Any]] = preview ? [] : snap.linkedMentions(to: path).map { m in
-            ["path": m.source, "name": snap.notes[m.source]?.name ?? m.source, "folder": (m.source as NSString).deletingLastPathComponent,
+            ["path": m.source, "name": snap.notes[m.source]?.name ?? ((m.source as NSString).lastPathComponent as NSString).deletingPathExtension, "folder": (m.source as NSString).deletingLastPathComponent,
              "lines": m.lines.map { ["line": $0.line, "text": snippet($0.context)] as [String: Any] }]
         }
         let obj: [String: Any] = [
