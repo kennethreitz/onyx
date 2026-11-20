@@ -60,6 +60,34 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | ⌃⌘F | Focus mode |
 | Esc | Put away the topmost layer (overlay → floating panel → inspector → focus mode) |
 
+## Canvas
+
+- **Obsidian canvases** (`.canvas`, JSON Canvas 1.0) open from the sidebar, ⌘O, links,
+  backlinks and the graph into the pane, in place of the reader/editor (⌘E does nothing there).
+- **Drawing**: paper cards with hairline borders; Obsidian colors 1–6 (red, orange, yellow,
+  green, cyan, purple, muted) and hex colors become a tinted border and a faint wash. Text
+  cards are typeset by the reader's Markdown (links, embeds, highlights); file cards show the
+  note (or its `#heading` subpath), an image, a PDF, or a quiet "not found". Link cards show
+  the host and URL (no live web page). Groups are tinted regions with their label above.
+  Edges are curves leaving each side along its normal, with arrows (`toEnd` defaults to
+  arrow), labels and colors; missing sides are picked from the cards' positions.
+- **Moving around**: two-finger scroll pans, pinch zooms (⌘-scroll for a mouse wheel), drag
+  on empty space pans, ⇧1 zooms to fit (⇧2 to the selection), + − ⤢ sit faint at bottom
+  right. A canvas opens fitted. Scrolling inside a selected card scrolls the card.
+- **Editing**: click selects (⇧ adds), ⇧-drag on empty space draws a selection box; drag
+  moves (a group carries the cards inside it); drag any edge or corner to resize; double-click
+  empty space for a new card, a text card (or ↩) to type in it (Esc or ⌘↩ to finish), a file
+  card to open it, a group's label to rename it, an edge to label it. Drag from the dots on a
+  card's sides to connect; drop on empty space to make a connected card. ⌫ deletes, arrows
+  nudge (⇧ for more), ⌘Z / ⇧⌘Z undo and redo. Right-click: add card, add note… (the ⌘O
+  matcher), group, colors, arrows, delete.
+- **Saving**: the page sends `JSON.stringify(doc)`; Swift rewrites it in Obsidian's layout
+  (tab-indented, one node or edge per line, no trailing newline) through the usual
+  conflict-safe save, so ids, key order and unknown fields survive and Obsidian reads it
+  unchanged. A canvas that can't be parsed is shown as such and never written.
+- **Links**: file cards and `[[links]]` in text cards count as the canvas linking to those
+  notes (backlinks, graph). Moving or renaming a note rewrites file cards pointing at it.
+
 ## Graph
 
 - **Focus graph** (⌘G): the note at the center, direct links on the first ring (out filled,

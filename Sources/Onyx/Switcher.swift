@@ -300,12 +300,15 @@ enum PaletteCommands {
         }
         if q.trimmingCharacters(in: .whitespaces).isEmpty {
             // recent notes; a fresh vault falls back to the most recently edited
-            var paths = ws.recent.filter { snap.notes[$0] != nil }
+            var paths = ws.recent.filter { snap.notes[$0] != nil || snap.canvases[$0] != nil }
             if paths.count < 12 {
                 let edited = snap.notes.values.sorted { $0.mtime > $1.mtime }.map(\.path)
                 for p in edited where !paths.contains(p) { paths.append(p); if paths.count >= 12 { break } }
             }
-            return paths.prefix(12).compactMap { p in snap.notes[p].map { item(p, $0.name, $0.folder) } }
+            return paths.prefix(12).compactMap { p in
+                if let n = snap.notes[p] { return item(p, n.name, n.folder) }
+                return snap.canvases[p] == nil ? nil : item(p, ((p as NSString).lastPathComponent as NSString).deletingPathExtension, (p as NSString).deletingLastPathComponent)
+            }
         }
         return ws.quickIndex.search(q, recent: ws.recent).map { h in
             var i = item(h.entry.path, h.entry.name.text, h.entry.folder.text)

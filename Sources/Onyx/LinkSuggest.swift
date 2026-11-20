@@ -141,7 +141,7 @@ enum TypeSelfTest {
             if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
         case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view
             let m: NSEvent.ModifierFlags = line.hasPrefix("shift") ? .shift : line.hasPrefix("cmd") ? .command : []
-            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") { ws.openNote(arg) } }
+            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") || arg.isCanvasPath { ws.openNote(arg) } }
         case "expand": ws.expanded.insert(arg)
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
@@ -226,6 +226,16 @@ enum TypeSelfTest {
         case "closepane": print("[closepane] \(ws.closePane())")
         case "nextpane": ws.focusNextPane()
         case "panes": print("[panes] \(ws.panes.map { $0.isGraph ? "graph" : ($0.path ?? "-") }) focused=\(ws.focusedPane) current=\(ws.currentPath ?? "-") overlay=\(ws.overlay) atlas=\(ws.graphAtlas)")
+        case "webshot":   // webshot <png>: the page as the web view draws it (reader or canvas)
+            func find(_ v: NSView) -> WKWebView? { if let w = v as? WKWebView { return w }; for s in v.subviews { if let r = find(s) { return r } }; return nil }
+            if let w = MainWindow.current?.contentView.flatMap(find) {
+                w.takeSnapshot(with: nil) { img, e in
+                    if let img, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
+                        try? png.write(to: URL(fileURLWithPath: arg)); print("[webshot] \(arg)")
+                    } else { print("[webshot] failed \(e.map { "\($0)" } ?? "")") }
+                    fflush(stdout)
+                }
+            } else { print("[webshot] no web view") }
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":

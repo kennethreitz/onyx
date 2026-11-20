@@ -48,6 +48,10 @@ public struct VaultSnapshot: Sendable {
     public var root: URL
     public var notes: [String: NoteRecord] = [:]
     public var attachments: [String: Date] = [:]
+    /// Obsidian canvases (also listed in `attachments`): what each one links to.
+    public var canvases: [String: CanvasSummary] = [:]
+    /// Resolved outgoing links of each canvas (file nodes and [[links]] in its cards).
+    public private(set) var canvasLinks: [String: [String]] = [:]
     public var folders: Set<String> = []
     public private(set) var namesIndex: [String: [String]] = [:]
     public private(set) var pathIndex: [String: String] = [:]
@@ -102,6 +106,7 @@ public struct VaultSnapshot: Sendable {
         guard let sources = backlinks[path] else { return [] }
         var out: [Backlink] = []
         for s in sources.sorted() {
+            if canvases[s] != nil { out.append(Backlink(source: s, line: 0, context: "Canvas")); continue }
             guard let note = notes[s] else { continue }
             let lines = note.content.components(separatedBy: "\n")
             var found = false
@@ -187,6 +192,7 @@ public struct VaultSnapshot: Sendable {
                 mdURLs.append((rel, url, mtime, v?.creationDate ?? mtime, v?.fileSize ?? 0))
             } else {
                 snap.attachments[rel] = mtime
+                if rel.isCanvasPath, let d = try? Data(contentsOf: url) { snap.canvases[rel] = CanvasFile.summarize(String(decoding: d, as: UTF8.self)) }
             }
         }
         // Read + parse concurrently.
@@ -224,11 +230,12 @@ public struct VaultSnapshot: Sendable {
             var isDir: ObjCBool = false
             let exists = fm.fileExists(atPath: url.path, isDirectory: &isDir)
             if !exists {
-                notes[rel] = nil; attachments[rel] = nil
+                notes[rel] = nil; attachments[rel] = nil; canvases[rel] = nil
                 if folders.contains(rel) {
                     folders = folders.filter { $0 != rel && !$0.hasPrefix(rel + "/") }
                     notes = notes.filter { !$0.key.hasPrefix(rel + "/") }
                     attachments = attachments.filter { !$0.key.hasPrefix(rel + "/") }
+                    canvases = canvases.filter { !$0.key.hasPrefix(rel + "/") }
                 }
                 continue
             }
@@ -243,6 +250,7 @@ public struct VaultSnapshot: Sendable {
                         notes[n2.path] = n2
                     }
                     for (p, d) in sub.attachments { attachments[rel + "/" + p] = d }
+                    for (p, c) in sub.canvases { canvases[rel + "/" + p] = c }
                 }
                 continue
             }
@@ -254,6 +262,7 @@ public struct VaultSnapshot: Sendable {
                 }
             } else {
                 attachments[rel] = mtime
+                if rel.isCanvasPath, let d = try? Data(contentsOf: url) { canvases[rel] = CanvasFile.summarize(String(decoding: d, as: UTF8.self)) }
             }
             var parent = (rel as NSString).deletingLastPathComponent
             while !parent.isEmpty && !folders.contains(parent) { folders.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
@@ -263,6 +272,12 @@ public struct VaultSnapshot: Sendable {
 
     /// Update one note from in-memory content (after Onyx saves it).
     public mutating func update(path: String, content: String) {
+        if path.isCanvasPath {
+            attachments[path] = Date()
+            canvases[path] = CanvasFile.summarize(content)
+            rebuildDerived()
+            return
+        }
         let old = notes[path]
         notes[path] = VaultSnapshot.makeRecord(rel: path, content: content, mtime: Date(), ctime: old?.ctime ?? Date(), size: content.utf8.count)
         rebuildDerived()
@@ -306,6 +321,17 @@ public struct VaultSnapshot: Sendable {
             }
             for t in n.summary.tags { tg[t, default: []].insert(p) }
         }
+        var cl: [String: [String]] = [:]
+        for (p, c) in canvases {
+            var seen = Set<String>(), out: [String] = []
+            for f in c.files + c.links {
+                guard let t = resolve(f, from: p), t != p, seen.insert(t).inserted else { continue }
+                out.append(t)
+                bl[t, default: []].insert(p)
+            }
+            cl[p] = out
+        }
+        canvasLinks = cl
         backlinks = bl; unresolved = unres; tags = tg; relationsOut = rout; relationsIn = rin
         tree = buildTree()
     }

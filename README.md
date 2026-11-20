@@ -56,6 +56,12 @@ The *focus graph* (<kbd>⌘G</kbd>) puts the current note at the center with its
 
 <kbd>⌥⌘G</kbd>, or the dock button on the graph overlay, keeps the graph open as a pane beside your notes. A docked focus graph follows the note you’re on, never steals the editor’s focus, and <kbd>⌘W</kbd> closes it first when it’s the extra pane. Settings has “Open the atlas on startup,” remembered per vault; it defaults to on when the vault’s Obsidian Homepage plugin opens Graph view at launch.
 
+## Canvas
+
+Obsidian's `.canvas` boards (JSON Canvas) open from the sidebar, <kbd>⌘O</kbd>, links, backlinks, and the graph. Text cards are typeset like the reader; note cards show the note (or one heading of it), and images, PDFs, links, and groups are drawn quietly, with Obsidian's six colors as tints. Connections curve out of the side they leave from, with arrows, labels, and colors.
+
+Two-finger scroll pans, pinch zooms, and <kbd>⇧1</kbd> zooms to fit. Everything is editable: drag to move (a group carries its cards), drag an edge to resize, double-click empty space for a card, double-click a card to type in it or open its note, drag from the dots on a card's sides to connect, <kbd>⌫</kbd> to delete, <kbd>⌘Z</kbd> to undo. Right-click adds cards, notes, and groups and sets colors and arrows. Canvases are saved in Obsidian's exact format, ids and unknown fields included, so both apps can share them, and they count as linking to their cards in backlinks and the graph.
+
 <p align="center">
   <img src="docs/focus-graph.png" alt="Focus graph centered on a note" width="49%">
   <img src="docs/title-path.png" alt="Title path revealing a folder in the sidebar" width="49%">

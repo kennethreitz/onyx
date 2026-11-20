@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="reader.css">
+<link rel="stylesheet" href="canvas.css">
+<script src="marked.js"></script>
+<script src="marked-footnote.js"></script>
+</head>
+<body class="theme-light canvas-page">
+<main id="page" hidden></main>
+<div id="stage">
+  <div id="world">
+    <div id="groups"></div>
+    <svg id="edges" width="1" height="1"></svg>
+    <div id="nodes"></div>
+    <div id="labels"></div>
+  </div>
+  <div id="marquee" hidden></div>
+</div>
+<div id="controls">
+  <button data-act="zoomIn" title="Zoom in">+</button>
+  <button data-act="zoomOut" title="Zoom out">−</button>
+  <button data-act="fit" title="Zoom to fit (⇧1)">⤢</button>
+</div>
+<div id="hint"></div>
+<div id="menu" hidden></div>
+<div id="picker" hidden><input id="pick-q" placeholder="Add a note to the canvas…" autocomplete="off" spellcheck="false"><div id="pick-list"></div></div>
+<script src="reader.js"></script>
+<script src="canvas.js"></script>
+</body>
+</html>

@@ -146,3 +146,13 @@ test('source-line markers still map the heading and body when footnotes exist', 
   assert.doesNotMatch(out, /<!--L0:1--><section/);
   assert.match(out, /<!--L0:1--><h1/);
 });
+
+test('canvas cards: fragment renders against the card context, without line markers', () => {
+  const out = ctx.window.Onyx.fragment('# Card\nSee [[Hecate]] and ==this==', { links: { hecate: { path: 'AI/Hecate.md', name: 'Hecate' } }, embeds: {} });
+  assert.match(out, /<h1>Card<\/h1>/);
+  assert.match(out, /data-path="AI\/Hecate\.md"/);
+  assert.match(out, /<mark>this<\/mark>/);
+  assert.doesNotMatch(out, /<!--L\d/);
+  // the reader's own links are untouched afterwards
+  assert.doesNotMatch(ctx.window.Onyx._html('[[Hecate]]'), /AI\/Hecate/);
+});

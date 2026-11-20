@@ -86,7 +86,7 @@ struct RootView: View {
     var titleLine: some View {
         VStack(spacing: 0) {
             HStack(spacing: 5) {
-                if let n = ws.currentNote {
+                if let n = ws.titleParts {
                     NavChevrons(ws: ws, only: .back).padding(.trailing, 3)
                     let parts = n.folder.isEmpty ? [] : n.folder.split(separator: "/").map(String.init)
                     ForEach(Array(parts.enumerated()), id: \.offset) { i, name in
@@ -230,6 +230,8 @@ struct RootView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if ws.isSplit {
                 splitPanes
+            } else if ws.isCanvas {
+                CanvasView(ws: ws).transition(.opacity)
             } else if ws.mode == .edit {
                 EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
             } else {
@@ -272,7 +274,9 @@ struct RootView: View {
         let focused = i == ws.focusedPane
         let mode = focused ? ws.mode : pane.mode
         let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
-        if mode == .edit {
+        if (focused ? ws.currentPath : pane.path)?.isCanvasPath == true {
+            CanvasView(ws: ws, source: src).id("\(pane.id)-c")
+        } else if mode == .edit {
             EditorView(ws: ws, fontSize: editorSize, measure: measure, source: src, paneID: focused ? nil : pane.id).id("\(pane.id)-e")
         } else {
             ReaderView(ws: ws, fontSize: readerSize, measure: measure, source: src, paneID: focused ? nil : pane.id).id("\(pane.id)-r")
@@ -506,7 +510,7 @@ struct RootView: View {
                 if e.deltaX > 0 { ws.goBack(); return nil }
                 if e.deltaX < 0 { ws.goForward(); return nil }
             case .scrollWheel:
-                guard ws.overlay == .none, e.phase == .began, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
+                guard ws.overlay == .none, !ws.isCanvas, e.phase == .began, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
                       abs(e.scrollingDeltaX) > abs(e.scrollingDeltaY) * 2, ws.canGoBack || ws.canGoForward else { return e }
                 var fired = false
                 e.trackSwipeEvent(options: [.lockDirection, .clampGestureAmount],

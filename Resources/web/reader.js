@@ -405,6 +405,14 @@
       const s = page.querySelector('details[data-k=unlinked] summary');
       if (s) s.innerHTML = `Unlinked mentions <span class="bl-count">${list.length}</span>`;
     },
+    // Canvas cards: markdown → HTML against the card's own links/embeds (no line anchors).
+    fragment(md, ctx) {
+      const old = P;
+      P = Object.assign({ links: {}, embeds: {}, base: '' }, ctx || {});
+      try { return embedMarked.parse(stripComments(md || '')); }
+      catch (e) { return `<pre>${esc(md)}</pre>`; }
+      finally { P = old; }
+    },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
     scrollToHeading(i) {

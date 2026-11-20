@@ -20,14 +20,22 @@ public struct GraphIndex: Sendable {
 
     public static func build(_ snap: VaultSnapshot) -> GraphIndex {
         var g = GraphIndex()
-        g.ids = snap.notes.keys.sorted()
+        // Canvases join the graph as nodes linking to their file cards (as in Obsidian).
+        g.ids = (Array(snap.notes.keys) + snap.canvases.keys.filter { snap.notes[$0] == nil }).sorted()
         for (i, p) in g.ids.enumerated() { g.index[p] = i }
         g.out = Array(repeating: [], count: g.ids.count)
         g.inn = Array(repeating: [], count: g.ids.count)
         g.partOf = Array(repeating: [], count: g.ids.count)
         g.related = Array(repeating: [], count: g.ids.count)
         for (i, p) in g.ids.enumerated() {
-            let n = snap.notes[p]!
+            guard let n = snap.notes[p] else {
+                g.names.append(((p as NSString).lastPathComponent as NSString).deletingPathExtension)
+                g.folders.append((p as NSString).deletingLastPathComponent)
+                g.mtimes.append(snap.attachments[p] ?? .distantPast)
+                g.tags.append([])
+                g.out[i] = Set((snap.canvasLinks[p] ?? []).compactMap { g.index[$0] }).subtracting([i]).sorted()
+                continue
+            }
             g.names.append(n.name)
             g.folders.append(n.folder)
             g.mtimes.append(n.mtime)
