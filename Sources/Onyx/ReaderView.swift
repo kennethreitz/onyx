@@ -43,6 +43,13 @@ struct ReaderView: NSViewRepresentable {
     /// A hover preview: compact, no backlinks, no nested previews, never edits.
     var preview = false
     @Environment(\.colorScheme) var scheme
+    // Observed so a Settings ▸ Typesetting change re-renders at once (values are read in Typeset).
+    @AppStorage(Typeset.on) private var tsOn = true
+    @AppStorage(Typeset.oldstyle) private var tsOldstyle = true
+    @AppStorage(Typeset.hyphens) private var tsHyphens = true
+    @AppStorage(Typeset.smallCaps) private var tsSmallCaps = true
+    @AppStorage(Typeset.face) private var tsFace = "lm"
+    @AppStorage(Typeset.opening) private var tsOpening = "smallcaps"
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
     var text: String { source?.text ?? ws.text }
@@ -79,9 +86,10 @@ struct ReaderView: NSViewRepresentable {
         c.handler?.vaultRoot = ws.root
         if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
-        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text {
+        let typeset = Typeset.signature
+        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset {
             let sameNote = c.renderedPath == path
-            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text
+            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset
             c.render(keepScroll: sameNote)
         }
         if c.typeKey != "\(fontSize)/\(measure)" {
@@ -111,6 +119,7 @@ struct ReaderView: NSViewRepresentable {
         var dark = false
         var sidenotes = true
         var typeKey = ""
+        var typeset = ""
         var paneID: UUID?
         var preview = false
         var startLine: Double = 0
@@ -196,7 +205,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -254,7 +263,7 @@ enum ReaderPayload {
         let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let folder = (path as NSString).deletingLastPathComponent
         // Backlinks under the note, like Obsidian's backlinkInDocument (unlinked load on demand).
-        let mentions: [[String: Any]] = preview ? [] : snap.linkedMentions(to: path).map { m in
+        let mentions: [[String: Any]] = preview || !backlinks ? [] : snap.linkedMentions(to: path).map { m in
             ["path": m.source, "name": snap.notes[m.source]?.name ?? ((m.source as NSString).lastPathComponent as NSString).deletingPathExtension, "folder": (m.source as NSString).deletingLastPathComponent,
              "lines": m.lines.map { ["line": $0.line, "text": snippet($0.context)] as [String: Any] }]
         }
@@ -263,6 +272,7 @@ enum ReaderPayload {
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
+            "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]
