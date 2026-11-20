@@ -89,7 +89,12 @@ struct FileTreeView: View {
                 }
                 .padding(.vertical, 6)
             }
-            .onAppear { if let p = ws.currentPath { DispatchQueue.main.async { proxy.scrollTo(p, anchor: .center) } } }
+            .onAppear { if let p = ws.selectedFolder ?? ws.currentPath { DispatchQueue.main.async { proxy.scrollTo(p, anchor: .center) } } }
+            .onChange(of: ws.revealToken) {
+                guard let f = ws.selectedFolder else { return }
+                // let the expansion lay out first, then glide to the folder
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(f, anchor: .center) } }
+            }
         }
     }
 }
@@ -101,7 +106,9 @@ struct TreeNodeView: View {
     @State private var hover = false
 
     var isOpen: Bool { ws.expanded.contains(node.path) }
-    var isCurrent: Bool { ws.currentPath == node.path || (node.folderNote != nil && ws.currentPath == node.folderNote) }
+    var isCurrent: Bool {
+        ws.currentPath == node.path || (node.folderNote != nil && ws.currentPath == node.folderNote) || (node.isFolder && ws.selectedFolder == node.path)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {

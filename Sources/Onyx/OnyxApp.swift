@@ -108,8 +108,8 @@ struct OnyxApp: App {
                 case "outline": ws.toggleInspector(.outline)
                 case "switcher": ws.show(.switcher)
                 case "palette": ws.show(.palette)
-                case "graph": ws.graphLocal = false; ws.show(.graph)
-                case "local-graph": ws.graphLocal = true; ws.show(.graph)
+                case "graph": ws.graphAtlas = false; ws.show(.graph)
+                case "atlas": ws.graphAtlas = true; ws.show(.graph)
                 case "workspace": ws.toggleWorkspaceLayout()
                 case "daily": ws.openDaily()
                 default: break
@@ -124,7 +124,7 @@ struct OnyxApp: App {
             Button("Open Vault…") { openVault() }.keyboardShortcut("o", modifiers: [.command, .shift])
             Divider()
             Button("Quick Switcher…") { ws.show(.switcher) }.keyboardShortcut("o")
-            Button("Command Palette…") { ws.show(.palette) }.keyboardShortcut("p")
+            Button("Command Palette…  (also ⇧⌘P)") { ws.show(.palette) }.keyboardShortcut("p")
         }
         CommandGroup(after: .saveItem) {
             Button("Save") { ws.flushSave() }.keyboardShortcut("s")
@@ -141,8 +141,8 @@ struct OnyxApp: App {
             Button("Forward") { ws.goForward() }.keyboardShortcut(.rightArrow, modifiers: [.command, .option])
             Button("Homepage") { ws.openHome() }.keyboardShortcut("h", modifiers: [.command, .shift])
             Divider()
-            Button("Graph") { ws.graphLocal = false; ws.show(.graph) }.keyboardShortcut("g")
-            Button("Local Graph") { ws.graphLocal = true; ws.show(.graph) }.keyboardShortcut("g", modifiers: [.command, .shift])
+            Button("Focus Graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }.keyboardShortcut("g")
+            Button("Atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }.keyboardShortcut("g", modifiers: [.command, .shift])
         }
         CommandGroup(after: .toolbar) {
             Button(ws.mode == .read ? "Edit Note" : "Read Note") { ws.toggleMode() }.keyboardShortcut("e")

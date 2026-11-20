@@ -33,7 +33,9 @@ enum InspectorTab: String, CaseIterable, Identifiable {
 final class Workspace {
     // Vault
     private(set) var root: URL?
-    private(set) var snapshot: VaultSnapshot?
+    private(set) var snapshot: VaultSnapshot? { didSet { snapshotGen += 1 } }
+    private(set) var snapshotGen = 0
+    let graphStore = GraphStore()
     private(set) var isIndexing = false
     private(set) var indexMillis = 0
     var dailyFolder = "Daily"
@@ -52,18 +54,21 @@ final class Workspace {
     var renderToken = 0                  // bump to make the reader re-render
 
     // Chrome — quiet by default; focus mode (⌃⌘F) takes it all away.
-    var sidebarVisible = UserDefaults.standard.object(forKey: "onyx.sidebarOpen") as? Bool ?? true
+    var sidebarVisible = UserDefaults.standard.object(forKey: "onyx.sidebarOpen") as? Bool ?? true { didSet { if sidebarVisible != oldValue { chromeLog("sidebarVisible=\(sidebarVisible)") } } }
     var sidebarPinned = UserDefaults.standard.object(forKey: "onyx.sidebarOpen") as? Bool ?? true
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
     var sidebarTab: SidebarTab = .files
-    var inspectorVisible = false
-    var inspectorPinned = false
+    var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
+    var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
+    var copiedFlash = 0                  // bump to flash "Copied" in the title line
+    var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
+    var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
     var inspectorTab: InspectorTab = .outline
     var overlay: Overlay = .none
     var searchQuery = ""
     var focusSearch = 0
-    var graphLocal = false
+    var graphAtlas = false
     var rhymesOn = false
     var sidenotes = true
     var externalPulse: Date? = nil
@@ -155,6 +160,7 @@ final class Workspace {
     }
 
     func openNote(_ path: String, heading: String? = nil, recordHistory: Bool = true) {
+        selectedFolder = nil
         guard let snap = snapshot, let note = snap.notes[path] else { return }
         flushSave()
         currentPath = path
@@ -387,14 +393,21 @@ final class Workspace {
             if !sidebarVisible { sidebarPinned = false }
         }
     }
+    /// ⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             if let tab, inspectorVisible, inspectorTab != tab { inspectorTab = tab; return }
             if let tab { inspectorTab = tab }
-            inspectorVisible.toggle()
-            if !inspectorVisible { inspectorPinned = false }
+            if inspectorVisible { hideInspector(animated: false) }
+            else { if focusMode { toggleFocusMode() }; inspectorVisible = true; inspectorPinned = true; persistInspector() }
         }
     }
+    func hideInspector(animated: Bool = true) {
+        let body = { self.inspectorVisible = false; self.inspectorPinned = false }
+        if animated { withAnimation(.spring(response: 0.3, dampingFraction: 0.9), body) } else { body() }
+        persistInspector()
+    }
+    func persistInspector() { UserDefaults.standard.set(inspectorVisible && inspectorPinned, forKey: "onyx.inspectorOpen") }
     func show(_ o: Overlay) {
         withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = overlay == o ? .none : o }
     }
@@ -402,8 +415,9 @@ final class Workspace {
     func dismissTop() -> Bool {
         let anim = Animation.spring(response: 0.3, dampingFraction: 0.9)
         if overlay != .none { withAnimation(anim) { overlay = .none }; return true }
-        if inspectorVisible && !inspectorPinned { withAnimation(anim) { inspectorVisible = false }; return true }
+        if inspectorVisible && !inspectorPinned { hideInspector(); return true }
         if sidebarVisible && !sidebarPinned { withAnimation(anim) { sidebarVisible = false }; return true }
+        if inspectorVisible { hideInspector(); return true }      // Esc puts a docked inspector away too
         if focusMode { toggleFocusMode(); return true }
         return false
     }
@@ -443,6 +457,7 @@ final class Workspace {
             if on { focusMode = false }
         }
         UserDefaults.standard.set(sidebarPinned, forKey: "onyx.sidebarOpen")
+        persistInspector()
     }
     func toggleMode() {
         flushSave()
@@ -460,9 +475,35 @@ final class Workspace {
         c.queryItems = [URLQueryItem(name: "vault", value: root.lastPathComponent), URLQueryItem(name: "file", value: p)]
         if let u = c.url { NSWorkspace.shared.open(u) }
     }
+    /// Title-path click: open the folder's note if it has one (folder-notes convention),
+    /// then dock the sidebar on Files, expand down to the folder, select and scroll to it.
+    func revealFolder(_ folder: String) {
+        let note = folder + "/" + (folder as NSString).lastPathComponent + ".md"
+        if snapshot?.notes[note] != nil, currentPath != note { openNote(note) }
+        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+            focusMode = false
+            sidebarTab = .files
+            if !sidebarVisible || !sidebarPinned {
+                sidebarVisible = true; sidebarPinned = true
+                UserDefaults.standard.set(true, forKey: "onyx.sidebarOpen")
+            }
+            var p = folder
+            while !p.isEmpty { expanded.insert(p); p = (p as NSString).deletingLastPathComponent }
+            selectedFolder = folder
+        }
+        revealToken += 1
+    }
+
     func copyWikilink() {
         guard let n = currentNote else { return }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString("[[\(n.name)]]", forType: .string)
         toast = "Copied [[\(n.name)]]"
     }
+}
+
+
+func chromeLog(_ s: String) {
+    guard ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil else { return }
+    let st = Thread.callStackSymbols.dropFirst(2).prefix(6).map { l in l.split(separator: " ", omittingEmptySubsequences: true).dropFirst(3).first.map(String.init) ?? l }
+    FileHandle.standardError.write("[chrome] \(s)  ← \(st.joined(separator: " ← "))\n".data(using: .utf8)!)
 }

@@ -6,6 +6,7 @@ import OnyxCore
 /// itself, and a docked file list you can put away. Everything else is
 /// summoned (⌘O ⌘P ⌘K ⌘I ⌘G, or the window edges); ⌃⌘F is pure text.
 struct RootView: View {
+    @State private var copied = false
     @Bindable var ws: Workspace
     var appearance: (String) -> Void
     @AppStorage(Prefs.readerSize) private var readerSize = 19.0
@@ -13,6 +14,7 @@ struct RootView: View {
     @AppStorage(Prefs.measure) private var measure = 41.0
     @State private var leftEdgeHover = false
     @State private var rightEdgeHover = false
+    @State private var leftEdgeArmed = true   // disarmed by a hide until the pointer leaves the edge
     @State private var hoverSummonedSidebar = false
     @State private var hoverSummonedInspector = false
     @State private var footerHover = false
@@ -59,22 +61,35 @@ struct RootView: View {
 
     var titleLine: some View {
         VStack {
-            HStack(spacing: 6) {
+            HStack(spacing: 5) {
                 if let n = ws.currentNote {
-                    if !n.folder.isEmpty {
-                        Text(n.folder.replacingOccurrences(of: "/", with: " / ") + " /").foregroundStyle(Color.faint.opacity(0.8))
+                    let parts = n.folder.isEmpty ? [] : n.folder.split(separator: "/").map(String.init)
+                    ForEach(Array(parts.enumerated()), id: \.offset) { i, name in
+                        PathSegment(text: name, color: Color.faint.opacity(0.85), help: "Reveal \(name) in the sidebar") {
+                            ws.revealFolder(parts[0...i].joined(separator: "/"))
+                        }
+                        Text("/").foregroundStyle(Color.faint.opacity(0.55))
                     }
-                    Text(n.name).foregroundStyle(Color.muted)
-                    if ws.isDirty { Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity) }
+                    PathSegment(text: n.name, color: Color.muted, help: "Copy [[\(n.name)]]") {
+                        ws.copyWikilink(); ws.copiedFlash += 1
+                    }
+                    if copied {
+                        Text("copied").foregroundStyle(Color.faint).transition(.opacity)
+                    } else if ws.isDirty {
+                        Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity)
+                    }
                 }
+            }
+            .onChange(of: ws.copiedFlash) {
+                withAnimation(.easeOut(duration: 0.15)) { copied = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation(.easeIn(duration: 0.3)) { copied = false } }
             }
             .font(.system(size: 12))
             .lineLimit(1).truncationMode(.head)
             .padding(.horizontal, 90)
             .frame(maxWidth: .infinity)
             .frame(height: 28)
-            .allowsHitTesting(false)
-            Spacer()
+            Spacer().allowsHitTesting(false)
         }
     }
 
@@ -86,7 +101,7 @@ struct RootView: View {
             HStack(spacing: 2) {
                 FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
                 FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
-                FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphLocal = false; ws.show(.graph) }
+                FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
                 FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
                 FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
                 FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
@@ -211,16 +226,13 @@ struct RootView: View {
             Color.clear.frame(width: 8).contentShape(Rectangle())
                 .onHover { inside in
                     leftEdgeHover = inside
-                    guard inside, !ws.sidebarVisible else { return }
+                    if !inside { leftEdgeArmed = true }
+                    guard inside, leftEdgeArmed, !ws.sidebarVisible else { return }
                     Task { try? await Task.sleep(nanoseconds: 220_000_000); if leftEdgeHover && !ws.sidebarVisible { hoverSummonedSidebar = true; ws.toggleSidebar(.files) } }
                 }
+            // No right-edge hover: a pointer parked at the window's right edge kept
+            // re-summoning the inspector the moment it was hidden. ⌘I / the footer button own it.
             Spacer()
-            Color.clear.frame(width: 8).contentShape(Rectangle())
-                .onHover { inside in
-                    rightEdgeHover = inside
-                    guard inside, !ws.inspectorVisible else { return }
-                    Task { try? await Task.sleep(nanoseconds: 260_000_000); if rightEdgeHover && !ws.inspectorVisible { hoverSummonedInspector = true; ws.toggleInspector() } }
-                }
         }
         .padding(.top, 40).padding(.bottom, 40)
     }
@@ -262,7 +274,7 @@ struct RootView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .onChange(of: ws.sidebarVisible) { if !ws.sidebarVisible { hoverSummonedSidebar = false } }
+        .onChange(of: ws.sidebarVisible) { if !ws.sidebarVisible { hoverSummonedSidebar = false; if leftEdgeHover { leftEdgeArmed = false } } }
         .onChange(of: ws.inspectorVisible) { if !ws.inspectorVisible { hoverSummonedInspector = false } }
     }
 
@@ -312,6 +324,17 @@ struct RootView: View {
 
     func installMonitors() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            // ⇧⌘P: the command palette too, for VS Code hands (⌘P is the menu item)
+            let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
+            if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
+                ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
+            }
+            // ⌘I: the inspector, even while the editor has focus (NSTextView otherwise
+            // swallows ⌘I before the menu sees it, so a docked inspector couldn't be put away).
+            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "i", e.window?.isKeyWindow == true,
+               !(e.window is NSPanel) {
+                ws.toggleInspector(); return nil
+            }
             if e.keyCode == 53 { // Esc
                 if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
                 return ws.dismissTop() ? nil : e
@@ -348,9 +371,9 @@ struct FooterButton: View {
 
 enum ShortcutHints {
     static let all: [(String, String)] = [
-        ("⌘O", "Find or create a note"), ("⌘P", "Every command"), ("⌘K", "Files"), ("⇧⌘F", "Search the vault"),
+        ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Files"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Graph"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 
@@ -405,5 +428,27 @@ struct WelcomeView: View {
         let p = NSOpenPanel()
         p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"
         if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
+    }
+}
+
+
+/// One clickable piece of the title path: quiet until hovered, then underlined with a pointer.
+struct PathSegment: View {
+    let text: String
+    let color: Color
+    let help: String
+    let action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Text(text)
+            .foregroundStyle(hover ? Color.ink.opacity(0.75) : color)
+            .underline(hover, color: Color.faint.opacity(0.7))
+            .contentShape(Rectangle())
+            .onHover { h in
+                hover = h
+                if h { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .onTapGesture(perform: action)
+            .help(help)
     }
 }

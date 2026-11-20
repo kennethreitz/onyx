@@ -65,3 +65,44 @@ extension Color {
     static let hairline = Color(nsColor: Theme.border)
     static let cursorBlue = Color(nsColor: Theme.cursor)
 }
+
+/// Stable, muted cluster colors: a folder or tag name hashes into a palette of
+/// ink-like hues (terracotta, ochre, olive, sage, teal, violet, plum, rose, umber, moss).
+/// Slate blue is reserved for the current note's accent.
+enum ClusterPalette {
+    // ordered around the hue wheel so "far apart in the list" means "far apart in hue"
+    static let pairs: [(UInt32, UInt32)] = [
+        (0xA0573A, 0xDE9474), // terracotta
+        (0x94741C, 0xD6B65E), // ochre
+        (0x667634, 0xB0C072), // olive
+        (0x3F7A5C, 0x82C49E), // sage
+        (0x2C7775, 0x72C3BF), // teal
+        (0x6A5A9A, 0xAE9EE0), // violet
+        (0x8E4F7E, 0xD08FC0), // plum
+        (0xA34B5C, 0xE38E9E), // rose
+    ]
+    static func index(_ key: String) -> Int {
+        var h: UInt64 = 0xcbf29ce484222325
+        for b in key.lowercased().utf8 { h ^= UInt64(b); h = h &* 0x100000001b3 }
+        return Int(h % UInt64(pairs.count))
+    }
+    /// Collision-free slots for the regions currently on the map: largest first keeps its
+    /// hashed hue, later ones probe to the next unused hue, so neighbors never share a color.
+    nonisolated(unsafe) static var slots: [String: Int] = [:]
+    static func assign(_ keysBySize: [String]) {
+        let n = pairs.count
+        var used: [Int] = [], out = slots
+        func dist(_ a: Int, _ b: Int) -> Int { let d = abs(a - b) % n; return min(d, n - d) }
+        for k in keysBySize {
+            let h = index(k)
+            // prefer the hashed hue; otherwise the nearest slot that is ≥2 steps from every hue in use
+            let order = (0..<n).map { (h + $0) % n }
+            let pick = order.first { c in used.allSatisfy { dist($0, c) >= 2 } }
+                ?? order.first { !used.contains($0) } ?? h
+            used.append(pick); out[k.lowercased()] = pick
+        }
+        slots = out
+    }
+    static func nsColor(_ key: String) -> NSColor { let p = pairs[slots[key.lowercased()] ?? index(key)]; return Theme.dyn(p.0, p.1) }
+    static func color(_ key: String) -> Color { Color(nsColor: nsColor(key)) }
+}
