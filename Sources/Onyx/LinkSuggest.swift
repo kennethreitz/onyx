@@ -151,6 +151,13 @@ enum TypeSelfTest {
             if let snap = ws.snapshot { print("[relations] \(arg): parents=\(snap.parents(of: arg)) parts=\(snap.parts(of: arg)) related=\(snap.related(to: arg)) backlinks=\(snap.backlinks[arg]?.count ?? 0)") }
         case "preview":   // the same card a 400 ms hover opens, anchored to the window
             if let v = MainWindow.current?.contentView { GraphPreviewController.shared.show(ws: ws, path: arg, rect: CGRect(x: v.bounds.midX - 40, y: v.bounds.maxY - 120, width: 80, height: 20), in: v); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")") }
+        case "hoverbtn":   // what hovering the title-bar graph button does: schedule (400 ms) for the current note
+            func find(_ v: NSView) -> GraphPreviewTrigger.TriggerView? { if let t = v as? GraphPreviewTrigger.TriggerView, t.path == ws.currentPath { return t }; for s in v.subviews { if let r = find(s) { return r } }; return nil }
+            if let t = MainWindow.current?.contentView.flatMap(find) {
+                GraphPreviewController.shared.schedule(ws: ws, path: t.path, rect: t.bounds, in: t)
+                print("[hoverbtn] scheduled \(t.path) now=\(GraphPreviewController.shared.shownPath ?? "-")")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { print("[hoverbtn] after 600ms shown=\(GraphPreviewController.shared.shownPath ?? "-")"); fflush(stdout) }
+            } else { print("[hoverbtn] no trigger") }
         case "previewclose": GraphPreviewController.shared.close(); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")")
         case "cardshot":   // cardshot <note> -> <png>: renders only the card, never the screen
             let parts = arg.components(separatedBy: " -> ")
@@ -166,6 +173,16 @@ enum TypeSelfTest {
             if let w = MainWindow.current?.contentView.flatMap(find) {
                 w.evaluateJavaScript(arg) { r, e in print("[js] \(r.map { "\($0)" } ?? e.map { "error \($0)" } ?? "nil")"); fflush(stdout) }
             } else { print("[js] no reader") }
+        case "sort":   // sort name|modified|created [asc|desc] [nofolders] [in <folder>]
+            let w = arg.components(separatedBy: " in ")
+            let words = w[0].split(separator: " ").map(String.init)
+            if let k = words.first.flatMap(TreeSort.Key.init(rawValue:)) {
+                var s = TreeSort(key: k, foldersFirst: !words.contains("nofolders"))
+                if words.contains("asc") { s.ascending = true } else if words.contains("desc") { s.ascending = false }
+                ws.setSort(s, folder: w.count > 1 ? w[1] : nil)
+            }
+        case "rows": print("[rows] \(ws.visibleTreePaths())")
+        case "sortsaved": print("[sortsaved] \(UserDefaults.standard.data(forKey: "onyx.\(ws.root?.path ?? "").treeSort").map { String(decoding: $0, as: UTF8.self) } ?? "-")")
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":

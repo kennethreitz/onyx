@@ -91,6 +91,7 @@ struct RootView: View {
                         Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity)
                     }
                     NavChevrons(ws: ws, only: .forward).padding(.leading, 3)
+                    GraphButton(ws: ws).padding(.leading, 2)
                 }
             }
             .onChange(of: ws.copiedFlash) {
@@ -526,7 +527,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas (also the title bar's graph button; ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 
@@ -612,6 +613,38 @@ struct GitBadge: View {
         .buttonStyle(.plain)
         .help(git.help)
         .accessibilityLabel(git.help)
+    }
+}
+
+/// The title bar's graph button, right of the forward chevron: click for the focus graph of this
+/// note (⌘G), ⇧-click or right-click for the atlas (⇧⌘G); hovering shows this note's graph card.
+/// The footer's graph icon stays.
+struct GraphButton: View {
+    @Bindable var ws: Workspace
+    @State private var hover = false
+    func open(atlas: Bool) {
+        ws.graphAtlas = atlas
+        if ws.overlay != .graph { ws.show(.graph) }
+    }
+    var body: some View {
+        Button { GraphPreviewController.shared.close(); open(atlas: NSEvent.modifierFlags.contains(.shift)) } label: {
+            Image(systemName: "point.3.connected.trianglepath.dotted")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(hover ? Color.ink : Color.muted)
+                .frame(width: 20, height: 20)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.ink.opacity(hover ? 0.06 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        // hover ~400 ms: the same graph card as links, for the note you're on
+        .background { if let p = ws.currentPath { GraphPreviewTrigger(ws: ws, path: p) } }
+        .contextMenu {
+            Button("Focus Graph (This Note)  ⌘G") { open(atlas: false) }
+            Button("Atlas (Whole Vault)  ⇧⌘G") { open(atlas: true) }
+        }
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+        .help("Focus graph (⌘G) · ⇧-click or right-click for the atlas (⇧⌘G)")
+        .accessibilityLabel("Graph")
     }
 }
 

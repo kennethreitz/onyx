@@ -41,7 +41,7 @@ final class GraphPreviewController: NSObject, NSPopoverDelegate {
         popover?.contentViewController = host
         popover?.contentSize = NSSize(width: 340, height: 250)
         shownPath = path
-        popover?.show(relativeTo: rect.insetBy(dx: -1, dy: -1), of: view, preferredEdge: .maxY)
+        popover?.show(relativeTo: rect.insetBy(dx: -1, dy: -1), of: view, preferredEdge: view.isFlipped ? .maxY : .minY)   // below the link or button
     }
 
     func leaveLink() {

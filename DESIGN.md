@@ -223,3 +223,19 @@ spokes are firmer muted stems and related ones blue dotted lines. Hovering any r
 relation for 400 ms opens a card: the note's parents above, parts below (two staggered lanes, "+N more"),
 siblings faint at the side, related to the right, or its plain links when it has no fields. Click a node
 to open it, the card background for the note itself; leaving the link or the card closes it.
+
+
+## Sidebar sorting
+
+The sidebar header's ↑↓ menu sets the vault order: Name (natural, so "Note 2" precedes "Note 10"),
+Modified or Created, ascending or descending, and Folders on Top (default on). A folder's right-click
+"Sort This Folder By" overrides it for that folder's children ("Use Vault Order" clears it).
+Folders sort by their newest modification / oldest creation inside. Saved per vault
+(`onyx.<vault>.treeSort`). Overrides follow folder renames. ⇧-click ranges use the displayed order
+(`Workspace.treeChildren` feeds both the view and `visibleTreePaths`).
+
+## Title-bar graph button
+
+Right of the forward chevron: click opens the focus graph for the current note (⌘G); ⇧-click or
+the right-click menu opens the atlas (⇧⌘G). Hovering it for 400 ms shows the current note's graph
+card. The footer's graph icon remains.
