@@ -220,3 +220,19 @@ a.field-chip:hover { background: color-mix(in srgb, currentColor 12%, transparen
 a.field-chip.is-unresolved { border-bottom: 1px dotted currentColor; }
 .inline-field.is-line { display: block; margin: .15em 0; }
 .inline-field.is-line + br { display: none; }
+
+/* Backlinks under the note */
+.doc-backlinks { margin: 4em 0 2em; padding-top: 1.2em; border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent); font-family: var(--font-interface); font-size: 13px; }
+.doc-backlinks summary { cursor: pointer; color: var(--text-faint); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; margin: .8em 0 .4em; list-style: none; }
+.doc-backlinks summary::-webkit-details-marker { display: none; }
+.doc-backlinks summary::before { content: "\203A"; display: inline-block; width: 1em; transition: transform .15s; }
+.doc-backlinks details[open] > summary::before { transform: rotate(90deg); }
+.doc-backlinks .bl-count { font-weight: 400; margin-left: .3em; }
+.doc-backlinks ul { list-style: none; margin: 0; padding: 0; }
+.doc-backlinks li { margin: 0 0 .8em; padding: 0; }
+.doc-backlinks li::before { display: none; }
+.doc-backlinks a.bl-source { color: var(--text-normal); text-decoration: none; font-weight: 500; }
+.doc-backlinks .bl-folder { color: var(--text-faint); font-size: 11px; margin-left: .6em; }
+.doc-backlinks .bl-context { display: block; color: var(--text-muted); text-decoration: none; font-size: 12.5px; line-height: 1.45; margin: .2em 0 0 .1em; padding: .25em .6em; border-left: 2px solid color-mix(in srgb, currentColor 14%, transparent); }
+.doc-backlinks a.bl-context:hover { color: var(--text-normal); background: color-mix(in srgb, currentColor 5%, transparent); }
+.doc-backlinks .bl-empty { color: var(--text-faint); font-style: italic; }

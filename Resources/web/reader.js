@@ -209,6 +209,24 @@
     return `<div class="properties"><span class="toggle"></span><div class="rows"><table>${rows}</table></div></div>`;
   }
 
+  // Backlinks at the end of the note (Obsidian's "backlinks in document"); open state is remembered.
+  const blOpen = (k, d) => { const v = localStorage.getItem('onyx.bl.' + k); return v === null ? d : v === '1'; };
+  function backlinksHTML(list) {
+    const items = list.map(b => `<li><a class="internal-link bl-source" data-path="${esc(b.path)}">${esc(b.name)}</a>` +
+      (b.folder ? `<span class="bl-folder">${esc(b.folder)}</span>` : '') +
+      b.lines.filter(l => /[\p{L}\p{N}]/u.test(l.text)).map(l => `<a class="internal-link bl-context" data-path="${esc(b.path)}" data-line="${l.line}">${esc(l.text)}</a>`).join('') + '</li>').join('');
+    return `<section class="doc-backlinks">` +
+      `<details data-k="linked"${blOpen('linked', true) ? ' open' : ''}><summary>Linked mentions <span class="bl-count">${list.length}</span></summary>` +
+      (list.length ? `<ul>${items}</ul>` : `<p class="bl-empty">Nothing links here yet.</p>`) + `</details>` +
+      `<details data-k="unlinked"${blOpen('unlinked', false) ? ' open' : ''}><summary>Unlinked mentions</summary><ul class="bl-unlinked"><li class="bl-empty">…</li></ul></details></section>`;
+  }
+  document.addEventListener('toggle', e => {
+    const d = e.target;
+    if (!(d instanceof HTMLDetailsElement) || !d.dataset.k) return;
+    localStorage.setItem('onyx.bl.' + d.dataset.k, d.open ? '1' : '0');
+    if (d.dataset.k === 'unlinked' && d.open) post({ type: 'unlinked' });
+  }, true);
+
   function kanbanHTML(lanes) {
     return '<div class="kanban">' + lanes.map(l =>
       `<section class="lane"><h3>${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3>` +
@@ -278,12 +296,14 @@
       }
       page.classList.add('instant');
       if (!payload.keepScroll) page.classList.remove('shown');
-      page.innerHTML = props(payload.props) + html;
+      page.innerHTML = props(payload.props) + html + (payload.kanban ? '' : backlinksHTML(payload.backlinks || []));
       markLines();
       decorate();
       if (payload.sidenotes) sidenotes();
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
+      const ud = page.querySelector('details[data-k=unlinked]');
+      if (ud && ud.open) post({ type: 'unlinked' });
       if (payload.keepScroll) { window.scrollTo(0, y); }
       else if (payload.line > 0) {
         // Opened at a remembered spot (⌘↩ from the editor, or a split): no slide-in, just land there.
@@ -300,6 +320,14 @@
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');
     },
     scrollToLine(line) { restoreLine(line); },
+    setUnlinked(list) {
+      const ul = page.querySelector('.bl-unlinked');
+      if (!ul) return;
+      ul.innerHTML = list.length ? list.map(b => `<li><a class="internal-link bl-source" data-path="${esc(b.path)}">${esc(b.name)}</a><span class="bl-context">${esc(b.text)}</span></li>`).join('')
+        : '<li class="bl-empty">No unlinked mentions.</li>';
+      const s = page.querySelector('details[data-k=unlinked] summary');
+      if (s) s.innerHTML = `Unlinked mentions <span class="bl-count">${list.length}</span>`;
+    },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
     scrollToHeading(i) {
@@ -329,7 +357,9 @@
     if (a.classList.contains('tag')) { e.preventDefault(); post({ type: 'tag', tag: a.dataset.tag }); return; }
     if (a.classList.contains('internal-link')) {
       e.preventDefault();
-      post({ type: 'open', path: a.dataset.path || '', target: a.dataset.target || '', heading: a.dataset.heading || null });
+      const m = { type: 'open', path: a.dataset.path || '', target: a.dataset.target || '', heading: a.dataset.heading || null };
+      if (a.dataset.line) m.line = +a.dataset.line;
+      post(m);
       return;
     }
     const href = a.getAttribute('href') || '';

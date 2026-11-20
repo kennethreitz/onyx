@@ -349,6 +349,15 @@ final class Workspace {
         }
     }
 
+    /// Open a note at a source line (a backlink's context): the live view scrolls there once it has rendered.
+    func openNote(_ path: String, line: Int) {
+        openNote(path)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { [weak self] in
+            guard let self, self.currentPath == path else { return }
+            self.scrollRequest = ScrollRequest(line: Double(max(0, line - 1)), id: (self.scrollRequest?.id ?? 0) + 1)
+        }
+    }
+
     // MARK: Daily notes
 
     func openDaily(offset: Int = 0) {

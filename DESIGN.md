@@ -249,3 +249,11 @@ cycling and clicks skip it), its focus graph follows the note you're on, it zoom
 pointer, and keys stay with the editor. ⌘W next to a single note closes the graph pane first.
 "Open the atlas on startup" (Settings, per vault) shows the atlas over the home note at launch; it
 defaults to on when the vault's Obsidian Homepage plugin opens "Graph view" on startup (~/Notes does).
+
+
+## Backlinks in the reading view
+
+Below every note (not Kanban boards) the reader lists linked mentions, grouped by note with up to
+three context lines each. Field links count, wikilinks read as their alias, and table rows are flattened. Clicking
+a context opens the note at that line. "Unlinked mentions" loads on demand when expanded.
+Both sections collapse, and the open state is remembered.

@@ -147,7 +147,9 @@ struct ReaderView: NSViewRepresentable {
             switch type {
             case "open":
                 if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil {
-                    ws.openNote(p, heading: body["heading"] as? String)
+                    GraphPreviewController.shared.close()
+                    if let line = body["line"] as? Int { ws.openNote(p, line: line) }
+                    else { ws.openNote(p, heading: body["heading"] as? String) }
                 } else if let t = body["target"] as? String { ws.openLink(t) }
             case "preview":
                 if let p = body["path"] as? String, !p.isEmpty, let webView,
@@ -157,6 +159,11 @@ struct ReaderView: NSViewRepresentable {
                     GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView)
                 }
             case "previewEnd": GraphPreviewController.shared.leaveLink()
+            case "unlinked":
+                if let snap = ws.snapshot, let p = renderedPath {
+                    let items = snap.unlinkedMentions(of: p).map { ["path": $0.source, "name": snap.notes[$0.source]?.name ?? $0.source, "text": ReaderPayload.snippet($0.context)] }
+                    if let d = try? JSONSerialization.data(withJSONObject: items) { eval("Onyx.setUnlinked(\(String(decoding: d, as: UTF8.self)))") }
+                }
             case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
             case "tag":
                 if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
@@ -229,7 +236,13 @@ enum ReaderPayload {
         }
         let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let folder = (path as NSString).deletingLastPathComponent
+        // Backlinks under the note, like Obsidian's backlinkInDocument (unlinked load on demand).
+        let mentions: [[String: Any]] = snap.linkedMentions(to: path).map { m in
+            ["path": m.source, "name": snap.notes[m.source]?.name ?? m.source, "folder": (m.source as NSString).deletingLastPathComponent,
+             "lines": m.lines.map { ["line": $0.line, "text": snippet($0.context)] as [String: Any] }]
+        }
         let obj: [String: Any] = [
+            "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll,
@@ -268,6 +281,18 @@ enum ReaderPayload {
             ns = ns.replacingCharacters(in: f.range, with: html) as NSString
         }
         return ns.substring(from: fm.bodyOffset)
+    }
+
+    /// One line of context: inline markup stripped, long lines cut to a readable length.
+    static func snippet(_ line: String) -> String {
+        // [[path|Alias]] reads as "Alias", [[Folder/Note]] as "Note", before the usual inline stripping
+        var t = line.trimmingCharacters(in: .whitespaces)
+        t = t.replacingOccurrences(of: #"!?\[\[[^\]|]*\|([^\]]+)\]\]"#, with: "$1", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"!?\[\[(?:[^\]#]*/)?([^\]/#]+?)(?:#[^\]]*)?\]\]"#, with: "$1", options: .regularExpression)
+        t = NoteParser.stripInline(t)
+        if t.hasPrefix("|") { t = t.split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " · ") }   // table rows
+        t = t.replacingOccurrences(of: #"^([-*+]|\d+[.)]|#+|>)\s+"#, with: "", options: .regularExpression)
+        return t.count > 240 ? String(t.prefix(239)) + "…" : t
     }
 
     static func section(_ md: String, heading: String) -> String {

@@ -123,6 +123,32 @@ public struct VaultSnapshot: Sendable {
         return out
     }
 
+    /// Every linking line per source (up to `perSource`), for the backlinks under a note.
+    /// Field links count too (`partOf:: Knowledge`); frontmatter-only links show no context.
+    public func linkedMentions(to path: String, perSource: Int = 3) -> [(source: String, lines: [Backlink])] {
+        guard let sources = backlinks[path] else { return [] }
+        var out: [(String, [Backlink])] = []
+        for s in sources.sorted(by: { (notes[$0]?.name ?? $0).localizedStandardCompare(notes[$1]?.name ?? $1) == .orderedAscending }) {
+            guard let note = notes[s] else { continue }
+            let ns = note.content as NSString
+            var lineStarts: [Int] = [0]
+            for (i, ch) in note.content.utf16.enumerated() where ch == 10 { lineStarts.append(i + 1) }
+            func lineOf(_ loc: Int) -> Int { var lo = 0, hi = lineStarts.count - 1; while lo < hi { let m = (lo + hi + 1) / 2; if lineStarts[m] <= loc { lo = m } else { hi = m - 1 } }; return lo }
+            var seen = Set<Int>(), items: [Backlink] = []
+            for l in note.summary.links.sorted(by: { $0.range.location < $1.range.location }) where resolve(l.target, from: s) == path {
+                let i = lineOf(l.range.location)
+                guard !seen.contains(i), l.range.location >= note.summary.frontmatter.bodyOffset else { continue }
+                seen.insert(i)
+                let end = i + 1 < lineStarts.count ? lineStarts[i + 1] : ns.length
+                let text = ns.substring(with: NSRange(location: lineStarts[i], length: end - lineStarts[i])).trimmingCharacters(in: .whitespacesAndNewlines)
+                items.append(Backlink(source: s, line: i, context: text))
+                if items.count >= perSource { break }
+            }
+            out.append((s, items))
+        }
+        return out
+    }
+
     /// Notes mentioning this note's name in plain text without linking to it.
     public func unlinkedMentions(of path: String, limit: Int = 50) -> [Backlink] {
         guard let note = notes[path], note.name.count >= 3 else { return [] }
