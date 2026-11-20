@@ -45,6 +45,12 @@ struct RootView: View {
                 page
                     .padding(.leading, leftInset)
                     .padding(.trailing, rightInset)
+                if ws.finder.visible && ws.currentPath != nil {
+                    FindBar(ws: ws)
+                        .padding(.top, 36).padding(.trailing, rightInset + 18)
+                        .frame(maxWidth: .infinity, alignment: .topTrailing)
+                        .transition(.opacity)
+                }
                 if !ws.focusMode {
                     titleLine.padding(.leading, leftInset).padding(.trailing, rightInset)
                     footer.padding(.leading, leftInset).padding(.trailing, rightInset)
@@ -58,6 +64,13 @@ struct RootView: View {
             }
         }
         .ignoresSafeArea()
+        .onChange(of: ws.currentPath) { if ws.finder.visible { DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { ws.runFind(reveal: false) } } }
+        .onChange(of: ws.mode) {
+            if ws.finder.visible {
+                if ws.mode == .read { ws.finder.showReplace = false; ws.clearEditorFind() }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { ws.runFind(reveal: true, fromCaret: false) }
+            }
+        }
         .background(WindowConfigurator(showLights: !ws.focusMode || showLights || ws.anyChrome || ws.root == nil))
         .onAppear(perform: installMonitors)
         .onDisappear { [keyMonitor, moveMonitor, clickMonitor, navMonitor] in
@@ -426,6 +439,25 @@ struct RootView: View {
             }
             // ⇧⌘P: the command palette too, for VS Code hands (⌘P is the menu item)
             let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
+            // ⌘F find in the note · ⌥⌘F with replace (editor). While the find bar is open,
+            // ⌘G/⇧⌘G and ↩/⇧↩ (in its field) step through matches and Esc closes it;
+            // otherwise ⌘G is Focus graph.
+            if e.window != nil, e.window === MainWindow.current, ws.overlay == .none, ws.currentPath != nil {
+                let key = e.charactersIgnoringModifiers?.lowercased()
+                if key == "f", mods == [.command] || mods == [.command, .option] {
+                    ws.openFind(replace: mods.contains(.option)); return nil
+                }
+                if ws.finder.visible {
+                    if key == "g", mods == [.command] || mods == [.command, .shift] { ws.findStep(mods.contains(.shift) ? -1 : 1); return nil }
+                    if e.keyCode == 36 || e.keyCode == 76, ws.finder.fieldFocused, !(e.window?.firstResponder is OnyxTextView),
+                       mods == [.shift] || (mods.isEmpty && ws.finder.findFieldActive) {
+                        ws.findStep(mods == [.shift] ? -1 : 1); return nil
+                    }
+                    if e.keyCode == 53, !((e.window?.firstResponder as? OnyxTextView)?.suggestionsVisible ?? false) {
+                        ws.closeFind(); return nil
+                    }
+                }
+            }
             if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
                 ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
             }
@@ -532,7 +564,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

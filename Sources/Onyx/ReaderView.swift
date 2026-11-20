@@ -77,6 +77,7 @@ struct ReaderView: NSViewRepresentable {
         c.ws = ws
         c.paneID = paneID
         c.handler?.vaultRoot = ws.root
+        if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
         if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text {
             let sameNote = c.renderedPath == path
@@ -125,6 +126,11 @@ struct ReaderView: NSViewRepresentable {
             webView?.evaluateJavaScript(js, completionHandler: nil)
         }
 
+        func evalResult(_ js: String, _ done: @escaping (Any?) -> Void) {
+            guard ready, let webView else { return }
+            webView.evaluateJavaScript(js) { v, _ in done(v) }
+        }
+
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
             let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview)
@@ -165,6 +171,8 @@ struct ReaderView: NSViewRepresentable {
                     GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView, mode: nil, heading: h)
                 }
             case "previewEnd": GraphPreviewController.shared.leaveLink()
+            case "findCount":   // a re-render re-applied the find marks
+                if ws.liveReader === self, ws.finder.visible { ws.finder.count = body["count"] as? Int ?? 0; ws.finder.index = body["index"] as? Int ?? 0 }
             case "unlinked":
                 if let snap = ws.snapshot, let p = renderedPath {
                     let items = snap.unlinkedMentions(of: p).map { ["path": $0.source, "name": snap.notes[$0.source]?.name ?? $0.source, "text": ReaderPayload.snippet($0.context)] }

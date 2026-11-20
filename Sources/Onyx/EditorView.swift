@@ -396,6 +396,7 @@ struct EditorView: NSViewRepresentable {
         guard let tv = c.textView else { return }
         let live = source == nil
         if tv.isEditable != live { tv.isEditable = live }
+        if live { ws.liveEditor = tv }
         if live && !c.wasLive { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) } }
         c.wasLive = live
         if c.loadedToken != ws.renderToken || (tv.string != text && !c.isEditing) {
@@ -570,6 +571,10 @@ struct EditorView: NSViewRepresentable {
             highlighter.apply(to: ts)
             if parent.source == nil { parent.ws.text = tv.string }
             isEditing = false
+            if parent.source == nil, parent.ws.finder.visible, parent.ws.mode == .edit {   // keep the count and marks true while typing
+                let ws = parent.ws
+                DispatchQueue.main.async { ws.runFind(reveal: false, fromCaret: false) }
+            }
             updateRhymes(force: false)
         }
 

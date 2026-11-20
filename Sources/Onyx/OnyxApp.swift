@@ -233,6 +233,13 @@ struct OnyxApp: App {
             }
             Divider()
         }
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Find in Note…") { ws.openFind() }.keyboardShortcut("f")
+            Button("Find and Replace…") { ws.openFind(replace: true) }.keyboardShortcut("f", modifiers: [.command, .option])
+            Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)
+            Button("Find Previous (⇧⌘G while finding)") { ws.findStep(-1) }.disabled(!ws.finder.visible)
+        }
         CommandMenu("Note") {
             Button(ws.currentPath.map { ws.bookmarks.contains($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }.keyboardShortcut("d", modifiers: [.command, .option])
             Button("Copy Wikilink") { ws.copyWikilink() }.keyboardShortcut("l", modifiers: [.command, .shift])

@@ -20,6 +20,8 @@ enum Theme {
     static let border = dyn(0xdedcd2, 0x34332e)
     static let cursor = dyn(0x5a7a9e, 0x7aa8cc)
     static let selection = dyn(0xffdc28, 0xffdc28, 0.22, 0.14)
+    static let findMatch = dyn(0xffb020, 0xffb020, 0.20, 0.18)     // every ⌘F match
+    static let findCurrent = dyn(0xff8a00, 0xffa526, 0.45, 0.42)   // the one you're on
     static let activeLine = NSColor(name: nil) { ap in
         ap.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.025) : NSColor(red: 1, green: 0.86, blue: 0.16, alpha: 0.07)
     }

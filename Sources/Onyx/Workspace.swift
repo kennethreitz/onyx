@@ -46,6 +46,9 @@ final class Workspace {
     var text: String = "" { didSet { if text != oldValue { textDidChange() } } }
     private(set) var lastSaved: String = ""
     var mode: ViewMode = .read
+    let finder = FindModel()
+    @ObservationIgnored weak var liveEditor: OnyxTextView?
+    @ObservationIgnored weak var liveReader: ReaderView.Coordinator?
     /// Back/forward for the focused pane (each split pane keeps its own; see Pane).
     private(set) var history: [NavEntry] = []
     private(set) var historyIndex = -1

@@ -265,3 +265,13 @@ The card shows the target note rendered compactly and scrollable, or its local g
 switches between the two, and links remember the last choice (page by default). The title-bar graph button and the
 inspector's relation rows always open on the graph. `[[Note#Heading]]` previews just that section. Inside the preview,
 links navigate (and close the card) but do not nest further previews. Tasks are read-only there.
+
+## Find in note (⌘F)
+
+There is one find bar for the editor and the reader. It does a literal match, ignoring case by default (`Aa` toggles
+that). It shows "n of N", highlights every match and the current one more brightly, and scrolls to the current match.
+In the reader it searches the rendered text, skips the backlinks section, and opens a collapsed callout or details block
+when a match is inside one. **⌘G conflict:** ⌘G stays Focus graph, except while the find bar is open, when ⌘G/⇧⌘G go
+to the next/previous match (the Mac convention). ↩/⇧↩ in the field do the same, so the graph is always one Esc away. ⌥⌘F
+opens the replace row (editor only). ↩ there replaces the current match, and "All" replaces every match in one undo step.
+Switching edit and read, or changing notes, keeps the bar open and recounts.

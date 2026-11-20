@@ -178,6 +178,24 @@ enum TypeSelfTest {
                     print("[edhover] \(arg) at \(Int(b.midX)),\(Int(b.midY))")
                 } else { print("[edhover] not found") }
             }
+        case "find": ws.openFind(); ws.finder.query = arg; DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { print("[find] \(findState(ws))"); fflush(stdout) }
+        case "findstate": print("[find] \(findState(ws))")
+        case "findnext": ws.findStep(1); print("[find] \(findState(ws))")
+        case "findprev": ws.findStep(-1); print("[find] \(findState(ws))")
+        case "findcase": ws.finder.caseSensitive.toggle(); ws.runFind(reveal: false, fromCaret: false); print("[find] \(findState(ws))")
+        case "findrep": ws.finder.showReplace = true; ws.finder.replacement = arg; ws.replaceCurrent(); print("[find] \(findState(ws))")
+        case "findall": ws.finder.showReplace = true; ws.finder.replacement = arg; print("[findall] replaced=\(ws.replaceAll()) \(findState(ws))")
+        case "findclose": ws.closeFind(); print("[find] \(findState(ws))")
+        case "undo": ws.liveEditor?.undoManager?.undo(); print("[undo] done")
+        case "keyev":   // keyev cmd-g | shift-cmd-g | esc | cmd-f | opt-cmd-f | return | shift-return: through the app's key monitor
+            var f: NSEvent.ModifierFlags = []
+            if arg.contains("cmd") { f.insert(.command) }; if arg.contains("shift") { f.insert(.shift) }; if arg.contains("opt") { f.insert(.option) }
+            let (ch, code): (String, UInt16) = arg.hasSuffix("esc") ? ("\u{1b}", 53) : arg.hasSuffix("return") ? ("\r", 36) : arg.hasSuffix("-g") ? ("g", 5) : ("f", 3)
+            if let w = MainWindow.current, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: f, timestamp: ProcessInfo.processInfo.systemUptime,
+                                                                     windowNumber: w.windowNumber, context: nil, characters: ch, charactersIgnoringModifiers: ch, isARepeat: false, keyCode: code) {
+                NSApp.postEvent(e, atStart: false)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { print("[keyev] \(arg) → \(findState(ws)) overlay=\(ws.overlay)"); fflush(stdout) }
+            }
         case "previewclose": GraphPreviewController.shared.close(); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")")
         case "cardshot":   // cardshot <note> -> <png>: renders only the card, never the screen
             let parts = arg.components(separatedBy: " -> ")
@@ -216,6 +234,10 @@ enum TypeSelfTest {
         default: return false
         }
         return true
+    }
+    @MainActor static func findState(_ ws: Workspace) -> String {
+        let sel = ws.liveEditor.map { tv -> String in let r = tv.selectedRange(); return "sel=\(r.location)+\(r.length)" } ?? "sel=-"
+        return "visible=\(ws.finder.visible) q=\(ws.finder.query) \(ws.finder.count == 0 ? "0" : "\(ws.finder.index + 1)/\(ws.finder.count)") mode=\(ws.mode) \(sel) painted=\(ws.finder.painted.count) field=\(ws.finder.fieldFocused)"
     }
     @MainActor static func editor() -> OnyxTextView? {
         func find(_ v: NSView) -> OnyxTextView? {

@@ -306,6 +306,48 @@
     page.querySelectorAll('.onyx-inline-md').forEach(s => { s.innerHTML = embedMarked.parseInline(s.textContent); });
   }
 
+  // ⌘F in the reader: mark every match in the note (not the backlinks), the current one brighter.
+  let FIND = null;
+  function clearFind() {
+    page.querySelectorAll('mark.onyx-find').forEach(m => { const p = m.parentNode; p.replaceChild(document.createTextNode(m.textContent), m); p.normalize(); });
+  }
+  function applyFind(reveal) {
+    clearFind();
+    if (!FIND || !FIND.q) return { count: 0, index: 0 };
+    const q = FIND.cs ? FIND.q : FIND.q.toLowerCase();
+    const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode(n) {
+      const e = n.parentElement;
+      return !e || e.closest('script, style, svg, .doc-backlinks, .properties .toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    } });
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    const marks = [];
+    for (const n of nodes) {
+      const t = FIND.cs ? n.data : n.data.toLowerCase();
+      let i = t.indexOf(q), node = n, off = 0;
+      while (i >= 0) {
+        const hit = node.splitText(i - off);
+        const rest = hit.splitText(q.length);
+        const m = document.createElement('mark');
+        m.className = 'onyx-find';
+        hit.parentNode.replaceChild(m, hit);
+        m.appendChild(hit);
+        marks.push(m);
+        node = rest; off = i + q.length;
+        i = t.indexOf(q, off);
+      }
+    }
+    if (!marks.length) return { count: 0, index: 0 };
+    FIND.i = ((FIND.i % marks.length) + marks.length) % marks.length;
+    const cur = marks[FIND.i];
+    cur.classList.add('current');
+    if (reveal) {
+      const d = cur.closest('details'); if (d && !d.open) d.open = true;
+      cur.scrollIntoView({ block: 'center' });
+    }
+    return { count: marks.length, index: FIND.i };
+  }
+
   window.Onyx = {
     render(payload) {
       P = payload;
@@ -334,6 +376,7 @@
       if (payload.sidenotes) sidenotes();
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
+      if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
       const ud = page.querySelector('details[data-k=unlinked]');
       if (ud && ud.open) post({ type: 'unlinked' });
       if (payload.keepScroll) { window.scrollTo(0, y); }
@@ -352,6 +395,8 @@
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');
     },
     scrollToLine(line) { restoreLine(line); },
+    find(q, cs, i, reveal) { FIND = { q, cs, i }; return applyFind(reveal); },
+    findClear() { FIND = null; clearFind(); },
     setUnlinked(list) {
       const ul = page.querySelector('.bl-unlinked');
       if (!ul) return;

@@ -256,3 +256,7 @@ a.field-chip.is-unresolved { border-bottom: 1px dotted currentColor; }
 /* hover page preview: a compact page inside the card */
 body.preview .markdown-preview-view { padding: 4px 18px 28px; max-width: none; opacity: 1; transform: none; transition: none; }
 body.preview .fallback-title { display: none; }
+
+/* ⌘F matches */
+mark.onyx-find { background: rgba(255, 176, 32, .28); color: inherit; border-radius: 2px; padding: 0; }
+mark.onyx-find.current { background: rgba(255, 138, 0, .62); box-shadow: 0 0 0 1px rgba(255, 138, 0, .5); }
