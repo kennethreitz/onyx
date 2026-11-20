@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/hero.png" alt="Onyx: the atlas view of a vault, regions colored and typeset" width="100%">
+  <img src="docs/hero.png" alt="Onyx: a typeset typography note beside its focus graph" width="100%">
 </p>
 
 <h1 align="center">Onyx</h1>
