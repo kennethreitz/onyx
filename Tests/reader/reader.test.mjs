@@ -19,7 +19,13 @@ const ctx = vm.createContext({ window, document: stub(), console, setTimeout, cl
 ctx.self = ctx.globalThis = ctx; Object.assign(window, { document: ctx.document });
 for (const f of ['marked.js', 'marked-footnote.js', 'reader.js']) {
   vm.runInContext(fs.readFileSync(path.join(web, f), 'utf8'), ctx, { filename: f });
-  if (f !== 'reader.js') { Object.assign(ctx, window); }   // UMD builds hang their globals on window/self
+  if (f !== 'reader.js') {
+    Object.assign(ctx, window);   // UMD builds hang their globals on window/self
+    // In a browser globalThis === window; in this vm they are distinct, so the
+    // reader would skip marked-footnote unless we attach it to window too.
+    if (ctx.marked) window.marked = ctx.marked;
+    if (ctx.markedFootnote) window.markedFootnote = ctx.markedFootnote;
+  }
 }
 const html = (md) => ctx.window.Onyx._html(md).replace(/<!--L\d+:\d+-->/g, '');
 const marks = (md) => [...ctx.window.Onyx._html(md).matchAll(/<!--L(\d+):(\d+)-->/g)].map(m => [+m[1], +m[2]]);
@@ -68,4 +74,75 @@ test('wikilinks with aliases survive the break', () => {
 test('source-line markers are unchanged by line breaks (scroll mapping)', () => {
   const md = '# T\n\n**A**: 1\n**B**: 2\n**C**: 3\n\npara\n\n- x\n- y\n';
   assert.deepEqual(marks(md), [[0, 1], [2, 3], [6, 1], [8, 2]]);
+});
+
+// --- Footnotes / sidenotes ---------------------------------------------------
+// The fixture mirrors the structure of a long essay with five named footnotes
+// defined at the end (H1 first, named [^sn-…] refs in body paragraphs, one
+// def per line). It is synthetic; it does not use anyone's private text.
+
+const namedFixture = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/named-sidenotes.md'), 'utf8');
+
+function sectionIndex(out) {
+  return out.search(/<section[^>]*class="footnotes"/);
+}
+
+test('named footnotes at the end of the source become a notes section after the title, not before it', () => {
+  const out = html(namedFixture);
+  const fn = sectionIndex(out);
+  const h1 = out.indexOf('<h1');
+  assert.ok(fn >= 0, 'expected a footnotes section');
+  assert.ok(h1 >= 0, 'expected an h1');
+  assert.ok(h1 < fn, `footnotes section must come after the title (h1@${h1}, fn@${fn})`);
+  assert.equal((out.match(/data-footnote-ref/g) || []).length, 5);
+  assert.match(out, /id="footnote-sn-prodromal-signs"/);
+  assert.match(out, /id="footnote-sn-malachi-learning"/);
+  // definitions should not leak as raw paragraphs
+  assert.doesNotMatch(out, /\[\^sn-prodromal-signs\]:/);
+});
+
+test('numeric footnotes also stay below the body', () => {
+  const out = html('# Num\n\nHello.[^1] There.[^2]\n\n[^1]: first note\n[^2]: second note\n');
+  const fn = sectionIndex(out);
+  const h1 = out.indexOf('<h1');
+  const p = out.indexOf('<p>');
+  assert.ok(fn > h1 && fn > p, `section should follow body (h1@${h1}, p@${p}, fn@${fn})`);
+  assert.equal((out.match(/data-footnote-ref/g) || []).length, 2);
+});
+
+test('multi-paragraph and list-context footnotes still collect at the end', () => {
+  const out = html(`# T
+
+A claim in a list:
+
+- first item
+- second with a note.[^long]
+- third
+
+> A quote with a note.[^q]
+
+[^long]: First paragraph of the note.
+
+    Second paragraph, indented, continues the same note.
+
+[^q]: A short quoted-context note.
+`);
+  const fn = sectionIndex(out);
+  assert.ok(fn > out.indexOf('<h1'), 'section after title');
+  assert.ok(fn > out.indexOf('<ul'), 'section after the list');
+  assert.ok(fn > out.indexOf('<blockquote'), 'section after the quote');
+  assert.equal((out.match(/data-footnote-ref/g) || []).length, 2);
+  assert.match(out, /Second paragraph, indented/);
+});
+
+test('source-line markers still map the heading and body when footnotes exist', () => {
+  const md = '# T\n\nHello.[^1]\n\n[^1]: a note\n';
+  const m = marks(md);
+  assert.deepEqual(m[0], [0, 1]); // heading at line 0
+  assert.ok(m.some(([line]) => line === 2), `expected a marker at line 2, got ${JSON.stringify(m)}`);
+  // the collected footnotes section must not steal line 0
+  const raw = (md) => ctx.window.Onyx._html(md);
+  const out = raw(md);
+  assert.doesNotMatch(out, /<!--L0:1--><section/);
+  assert.match(out, /<!--L0:1--><h1/);
 });

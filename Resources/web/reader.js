@@ -126,11 +126,20 @@
   const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
   function parseWithLines(md, base) {
     const toks = mainMarked.lexer(md);
+    // marked-footnote injects a `footnotes` token at the start of the lexer
+    // list and moves it to the end in walkTokens — but only in that original
+    // array. We copy tokens into a new `out` list (and insert line-marker
+    // tokens in front of each block), so the move never takes effect and the
+    // notes section renders at the top of the page, above the title. Relocate
+    // it ourselves before numbering. The definition tokens stay put (they
+    // render as empty); only the collected section token is moved.
+    const body = [], notes = [];
+    for (const t of toks) (t.type === 'footnotes' ? notes : body).push(t);
     const out = [];
     let line = base;
-    for (const t of toks) {
+    for (const t of body.concat(notes)) {
       const raw = t.raw || '';
-      if (t.type !== 'space' && raw.trim()) {
+      if (t.type !== 'space' && t.type !== 'footnotes' && raw.trim()) {
         const lead = (raw.match(/^\n*/) || [''])[0].length;
         const span = raw.replace(/^\n+/, '').replace(/\n+$/, '').split('\n').length;
         out.push({ type: 'html', block: true, pre: false, raw: '', text: `<!--L${line + lead}:${span}-->` });
@@ -187,7 +196,7 @@
   window.addEventListener('scroll', reportTop, { passive: true });
   // Hold a restored position while late layout lands (fonts, Mermaid), unless the reader scrolls.
   // A resize (split, sidebar, window) reflows the page; hold the reading position by source line.
-  window.addEventListener('resize', () => { if (anchorLine > 0) restoreLine(anchorLine); });
+  window.addEventListener('resize', () => { layoutSidenotes(); if (anchorLine > 0) restoreLine(anchorLine); });
   function restoreLine(line) {
     anchorLine = line;
     const token = ++restoring;
@@ -235,18 +244,37 @@
   }
 
   function sidenotes() {
-    page.querySelectorAll('a[data-footnote-ref]').forEach((ref, i) => {
-      const id = (ref.getAttribute('href') || '').slice(1);
+    page.querySelectorAll('a[data-footnote-ref]').forEach((ref) => {
+      if (ref.closest('.sidenote')) return;
+      const href = ref.getAttribute('href') || '';
+      const id = decodeURIComponent((href.split('#')[1] || href.replace(/^#/, '')));
       const li = id && document.getElementById(id);
       if (!li) return;
       const clone = li.cloneNode(true);
       clone.querySelectorAll('[data-footnote-backref]').forEach(b => b.remove());
-      const s = document.createElement('span');
+      const s = document.createElement('aside');
       s.className = 'sidenote';
       s.innerHTML = `<span class="num">${ref.textContent}</span>` + clone.innerHTML;
       const sup = ref.closest('sup') || ref;
       sup.after(s);
     });
+    layoutSidenotes();
+  }
+
+  // Pack margin notes so a long one doesn't overlap the next. Floats in
+  // separate paragraphs don't always clear each other.
+  const NOTE_GAP = 8;
+  function layoutSidenotes() {
+    const notes = [...page.querySelectorAll('.sidenote')];
+    notes.forEach(s => { s.style.marginTop = ''; });
+    if (window.innerWidth < 1120) return;
+    let lastBottom = -Infinity;
+    for (const s of notes) {
+      const rect = s.getBoundingClientRect();
+      const overlap = lastBottom - rect.top;
+      if (overlap > 0) s.style.marginTop = overlap + NOTE_GAP + 'px';
+      lastBottom = s.getBoundingClientRect().bottom;
+    }
   }
 
   async function mermaids() {
@@ -367,7 +395,17 @@
       return;
     }
     const href = a.getAttribute('href') || '';
-    if (href.startsWith('#')) return; // footnote jumps
+    if (a.hasAttribute('data-footnote-ref')) {
+      e.preventDefault();
+      const note = (a.closest('sup') || a).nextElementSibling;
+      if (note && note.classList.contains('sidenote') && window.innerWidth < 1120) {
+        const open = note.classList.toggle('is-open');
+        page.querySelectorAll('.sidenote.is-open').forEach(s => { if (s !== note) s.classList.remove('is-open'); });
+        if (open) note.classList.add('is-open');
+      }
+      return;
+    }
+    if (href.startsWith('#')) return; // in-note jumps
     if (/^(https?|mailto|obsidian):/i.test(href)) { e.preventDefault(); post({ type: 'url', url: href }); }
   });
 })();

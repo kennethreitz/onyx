@@ -133,8 +133,13 @@ details.callout[open] > summary::after { content: " \25BE"; }
 .footnotes a[data-footnote-backref] { text-decoration: none; color: var(--text-faint); }
 sup a[data-footnote-ref] { text-decoration: none; }
 
-/* Tufte sidenotes in the right margin when the window is wide enough */
+/* Tufte sidenotes in the right margin when the window is wide enough.
+   Once converted, the leftover <section class="footnotes"> is taken out of
+   flow (it must not appear above the title if token order is wrong, and it
+   shouldn't duplicate the margin notes when order is right). */
+body.has-notes .footnotes { display: none; }
 .sidenote { display: none; }
+sup a[data-footnote-ref] { cursor: pointer; }
 @media (min-width: 1120px) {
   body.sidenotes.has-notes .markdown-preview-view { transform: translateX(-7.5rem); }
   body.sidenotes.has-notes .markdown-preview-view.shown { transform: translateX(-7.5rem); }
@@ -146,7 +151,18 @@ sup a[data-footnote-ref] { text-decoration: none; }
   }
   body.sidenotes .sidenote .num { font-size: 0.8em; vertical-align: super; margin-right: 0.25em; }
   body.sidenotes .sidenote p { display: inline; margin: 0; text-align: left; }
-  body.sidenotes .footnotes { display: none; }
+}
+/* Narrow pane: click a reference to expand that note under the line. */
+@media (max-width: 1119px) {
+  body.sidenotes .sidenote.is-open {
+    display: block; float: none; clear: both; width: auto;
+    margin: 0.5em 0 0.8em; padding: 0.35em 0 0.35em 0.8em;
+    border-left: 0.8px solid var(--text-normal);
+    font-family: var(--font-small), var(--font-text); font-size: 0.85em; line-height: 1.35;
+    text-align: left; -webkit-hyphens: manual; text-indent: 0;
+  }
+  body.sidenotes .sidenote.is-open .num { font-size: 0.8em; vertical-align: super; margin-right: 0.25em; }
+  body.sidenotes .sidenote.is-open p { display: inline; margin: 0; }
 }
 
 /* Tasks — a plain hairline square */
