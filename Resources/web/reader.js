@@ -178,6 +178,7 @@
     render(payload) {
       P = payload;
       document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '');
+      document.documentElement.classList.toggle('dark', !!payload.dark);
       const y = window.scrollY;
       const md = stripComments(payload.markdown);
       let html;
@@ -227,4 +228,31 @@
     if (href.startsWith('#')) return; // footnote jumps
     if (/^(https?|mailto|obsidian):/i.test(href)) { e.preventDefault(); post({ type: 'url', url: href }); }
   });
+})();
+
+
+// Scrollbar fade: show the thin thumb while scrolling or when the pointer nears the edge,
+// then ease it out after a beat of stillness.
+(function () {
+  const root = document.documentElement;
+  let a = 0, target = 0, raf = 0, idle = 0, hot = false;
+  const step = () => {
+    a += (target - a) * 0.22;
+    if (Math.abs(target - a) < 0.02) a = target;
+    root.style.setProperty('--sb-a', a.toFixed(3));
+    raf = a === target ? 0 : requestAnimationFrame(step);
+  };
+  const go = (t) => { target = t; if (!raf) raf = requestAnimationFrame(step); };
+  const wake = () => {
+    if (root.scrollHeight <= root.clientHeight + 1) return;
+    go(1); clearTimeout(idle);
+    idle = setTimeout(() => { if (!hot) go(0); }, 900);
+  };
+  window.addEventListener('scroll', wake, { passive: true });
+  window.addEventListener('mousemove', (e) => {
+    const near = e.clientX > window.innerWidth - 16;
+    if (near !== hot) { hot = near; root.classList.toggle('sb-hot', near); }
+    if (near) { go(1); clearTimeout(idle); } else if (target === 1) wake();
+  }, { passive: true });
+  document.addEventListener('mouseleave', () => { hot = false; root.classList.remove('sb-hot'); wake(); });
 })();

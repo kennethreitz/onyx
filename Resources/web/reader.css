@@ -193,3 +193,15 @@ audio, video { display: block; margin: 1em auto; max-width: 100%; }
 .card.done::before { content: "\2713\2002"; color: var(--text-faint); }
 
 @media print { .markdown-preview-view { padding: 0; } }
+
+/* Thin overlay scrollbars: a low-contrast thumb, no track. reader.js fades --sb-a in while
+   scrolling (or with the pointer near the edge) and back out when idle. */
+html { --sb-rgb: 0, 0, 0; --sb-a: 0; }
+html.dark { --sb-rgb: 255, 255, 255; }
+::-webkit-scrollbar { width: 9px; height: 9px; background: transparent; }
+::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background-color: rgba(var(--sb-rgb), calc(var(--sb-a) * 0.22));
+  border: 3px solid transparent; border-radius: 9px; background-clip: content-box; min-height: 36px;
+}
+html.sb-hot ::-webkit-scrollbar-thumb { border-width: 2px; background-color: rgba(var(--sb-rgb), calc(var(--sb-a) * 0.34)); }

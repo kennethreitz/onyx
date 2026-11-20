@@ -87,7 +87,7 @@ struct FileTreeView: View {
                     } else {
                         ProgressView().controlSize(.small).padding()
                     }
-                }
+                }.thinScrollers()
                 .padding(.vertical, 6)
             }
             .onAppear { if let p = ws.selectedFolder ?? ws.currentPath { DispatchQueue.main.async { proxy.scrollTo(p, anchor: .center) } } }
@@ -179,7 +179,7 @@ struct PathList: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(paths, id: \.self) { p in NoteRow(ws: ws, path: p) }
-                }.padding(.vertical, 6)
+                }.padding(.vertical, 6).thinScrollers()
             }
         }
     }
@@ -226,7 +226,7 @@ struct SearchPanel: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(hits) { h in NoteRow(ws: ws, path: h.path, detail: h.snippets.first ?? (h.path as NSString).deletingLastPathComponent) }
-                }
+                }.thinScrollers()
             }
         }
         .onAppear { focused = true; run() }
@@ -282,7 +282,7 @@ struct TagsPanel: View {
                     .padding(.horizontal, 12).frame(height: 24).contentShape(Rectangle())
                     .onTapGesture { ws.searchQuery = "tag:" + t.0; ws.sidebarTab = .search }
                 }
-            }.padding(.vertical, 6)
+            }.padding(.vertical, 6).thinScrollers()
         }
     }
 }
@@ -305,7 +305,7 @@ struct InspectorView: View {
                         case .properties: properties(note, snap)
                         }
                     }
-                }.padding(.vertical, 8)
+                }.padding(.vertical, 8).thinScrollers()
             }
         }
     }
@@ -407,7 +407,7 @@ struct GitPanel: View {
                                 Text(c.1).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
                             }.padding(.horizontal, 12).padding(.vertical, 3)
                         }
-                    }
+                    }.thinScrollers()
                 }
                 if changes.isEmpty { Text("Working tree clean.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(.horizontal, 12) }
                 TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)

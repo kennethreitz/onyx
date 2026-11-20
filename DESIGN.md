@@ -18,6 +18,11 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   a small grip and a resize cursor on hover). Sidebar 140–560pt (default 270), inspector
   150–600pt (default 300); widths persist (`onyx.sidebarWidth`, `onyx.inspectorWidth`), and a
   double-click on the edge resets to the default. Tab icons compress to fit narrow panels.
+- **Scrollbars**: thin and quiet everywhere. Editor and panels use `ThinScroller` (a 3pt
+  rounded thumb, 5pt under the pointer, no track, ~20% ink in light and ~26% white in dark)
+  that fades in while scrolling or on hover and out after ~0.9s idle; the reader styles
+  WebKit's scrollbar the same way and fades it from reader.js. `ONYX_SCROLL_TEST=1` scrolls
+  everything once after launch, for screenshots.
 - **Inspector** (outline, backlinks, properties): ⌘I or the footer button only, docked,
   remembered across launches (`onyx.inspectorOpen`). There is deliberately no right-edge
   hover: a pointer parked at the window's right edge kept re-summoning it ("stuck").

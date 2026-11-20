@@ -173,7 +173,7 @@ struct EditorView: NSViewRepresentable {
         scroll.documentView = tv
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
-        scroll.scrollerStyle = .overlay
+        ThinScroller.install(on: scroll)
         scroll.drawsBackground = true
         scroll.backgroundColor = Theme.paper
         scroll.automaticallyAdjustsContentInsets = false
