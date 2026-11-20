@@ -16,6 +16,7 @@ public struct KanbanBoard: Sendable, Equatable {
             let line = raw.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("%%") { inSettings.toggle(); if line.count > 2 && line.hasSuffix("%%") && line != "%%" { inSettings = false }; continue }
             if inSettings { continue }
+            if line == "***" { break }   // the archive (and settings) follow; not lanes
             if line.hasPrefix("## ") { lanes.append(Lane(title: String(line.dropFirst(3)), cards: [])); continue }
             guard !lanes.isEmpty else { continue }
             if line.hasPrefix("- [") && line.count >= 5 {

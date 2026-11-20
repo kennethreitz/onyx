@@ -133,7 +133,7 @@ struct ReaderView: NSViewRepresentable {
 
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
-            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview)
+            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview, kanbanEditable: paneID == nil && !preview)
             startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
@@ -171,6 +171,8 @@ struct ReaderView: NSViewRepresentable {
                     GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView, mode: nil, heading: h)
                 }
             case "previewEnd": GraphPreviewController.shared.leaveLink()
+            case "kanban":   // only the focused pane's board edits (it owns ws.text)
+                if paneID == nil, !preview { ws.kanbanEdit(body) }
             case "findCount":   // a re-render re-applied the find marks
                 if ws.liveReader === self, ws.finder.visible { ws.finder.count = body["count"] as? Int ?? 0; ws.finder.index = body["index"] as? Int ?? 0 }
             case "unlinked":
@@ -194,7 +196,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -245,8 +247,8 @@ enum ReaderPayload {
         }
         var kanban: Any = NSNull()
         if KanbanBoard.isBoard(fm) {
-            let b = KanbanBoard.parse(text)
-            kanban = b.lanes.map { ["title": $0.title, "cards": $0.cards.map { ["text": $0.text, "done": $0.done] }] as [String: Any] }
+            let d = KanbanDoc(text)   // the same indices the edit operations use
+            kanban = d.lanes.map { l in ["title": l.title, "cards": l.cards.map { ["text": d.cardText($0), "done": $0.done] }] as [String: Any] }
         }
         let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let folder = (path as NSString).deletingLastPathComponent
@@ -259,7 +261,7 @@ enum ReaderPayload {
             "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
-            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview,
+            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]

@@ -236,12 +236,95 @@
     if (d.dataset.k === 'unlinked' && d.open) post({ type: 'unlinked' });
   }, true);
 
+  // Kanban (obsidian-kanban format): drag cards between lanes or within one, check them off,
+  // double-click to edit, add, archive. Swift splices the file, so nothing else in it moves.
   function kanbanHTML(lanes) {
-    return '<div class="kanban">' + lanes.map(l =>
-      `<section class="lane"><h3>${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3>` +
-      l.cards.map(c => `<div class="card${c.done ? ' done' : ''}">${embedMarked.parseInline(c.text.replace(/\n/g, ' '))}</div>`).join('') +
-      '</section>').join('') + '</div>';
+    const editable = !P.preview && P.kanbanEditable;
+    return `<div class="kanban${editable ? ' editable' : ''}">` + lanes.map((l, li) =>
+      `<section class="lane" data-lane="${li}"><h3>${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3><div class="kb-cards">` +
+      l.cards.map((c, ci) => `<div class="card${c.done ? ' done' : ''}"${editable ? ' draggable="true"' : ''} data-lane="${li}" data-card="${ci}" data-raw="${esc(c.text)}">` +
+        (editable ? `<input type="checkbox" class="kb-check"${c.done ? ' checked' : ''} title="Done">` : '') +
+        `<div class="kb-text">${embedMarked.parseInline(c.text.replace(/\n/g, ' '))}</div>` +
+        (editable ? '<button class="kb-archive" title="Archive card">&#x2193;</button>' : '') + '</div>').join('') +
+      `</div>${editable ? '<button class="kb-add">+ Add a card</button>' : ''}</section>`).join('') + '</div>';
   }
+  const kb = (m) => post(Object.assign({ type: 'kanban' }, m));
+  function kbEditor(host, value, commit) {
+    const ta = document.createElement('textarea');
+    ta.className = 'kb-edit'; ta.value = value; ta.rows = Math.max(2, value.split('\n').length);
+    host.replaceChildren(ta); ta.focus(); ta.select();
+    let done = false;
+    const finish = (save) => { if (done) return; done = true; save ? commit(ta.value) : Onyx.render(P); };
+    ta.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); finish(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+    });
+    ta.addEventListener('blur', () => finish(true));
+    return ta;
+  }
+  document.addEventListener('click', e => {
+    const board = e.target.closest('.kanban.editable');
+    if (!board) return;
+    const card = e.target.closest('.card');
+    if (e.target.classList.contains('kb-check') && card) { e.preventDefault(); kb({ op: 'toggle', lane: +card.dataset.lane, card: +card.dataset.card }); e.stopPropagation(); }
+    else if (e.target.classList.contains('kb-archive') && card) { kb({ op: 'archive', lane: +card.dataset.lane, card: +card.dataset.card }); e.stopPropagation(); }
+    else if (e.target.classList.contains('kb-add')) {
+      const lane = e.target.closest('.lane'), host = document.createElement('div');
+      host.className = 'card adding'; lane.querySelector('.kb-cards').appendChild(host); e.target.style.display = 'none';
+      kbEditor(host, '', v => v.trim() ? kb({ op: 'add', lane: +lane.dataset.lane, text: v }) : Onyx.render(P));
+      e.stopPropagation();
+    }
+  }, true);
+  document.addEventListener('dblclick', e => {
+    const card = e.target.closest('.kanban.editable .card');
+    if (!card || e.target.closest('a') || e.target.classList.contains('kb-check')) return;
+    e.preventDefault();
+    card.draggable = false;
+    kbEditor(card.querySelector('.kb-text'), card.dataset.raw, v => {
+      if (!v.trim() || v === card.dataset.raw) return Onyx.render(P);
+      kb({ op: 'edit', lane: +card.dataset.lane, card: +card.dataset.card, text: v });
+    });
+  });
+  let DRAG = null;
+  function kbDropIndex(lane, y) {
+    const cards = [...lane.querySelectorAll('.kb-cards > .card:not(.dragging):not(.adding)')];
+    const i = cards.findIndex(c => { const r = c.getBoundingClientRect(); return y < r.top + r.height / 2; });
+    return { cards, index: i < 0 ? cards.length : i };
+  }
+  document.addEventListener('dragstart', e => {
+    const card = e.target.closest && e.target.closest('.kanban.editable .card');
+    if (!card) return;
+    DRAG = { lane: +card.dataset.lane, card: +card.dataset.card, el: card };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.raw);
+    requestAnimationFrame(() => card.classList.add('dragging'));
+  });
+  document.addEventListener('dragover', e => {
+    const lane = DRAG && e.target.closest && e.target.closest('.kanban.editable .lane');
+    if (!lane) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    const { cards, index } = kbDropIndex(lane, e.clientY);
+    let mark = document.querySelector('.kb-drop');
+    if (!mark) { mark = document.createElement('div'); mark.className = 'kb-drop'; }
+    const list = lane.querySelector('.kb-cards');
+    if (index < cards.length) list.insertBefore(mark, cards[index]); else list.appendChild(mark);
+  });
+  document.addEventListener('drop', e => {
+    const lane = DRAG && e.target.closest && e.target.closest('.kanban.editable .lane');
+    if (!lane) return;
+    e.preventDefault();
+    const { index } = kbDropIndex(lane, e.clientY);
+    const to = +lane.dataset.lane, d = DRAG;
+    DRAG = null;
+    document.querySelectorAll('.kb-drop').forEach(m => m.remove());
+    if (!(to === d.lane && index === d.card)) kb({ op: 'move', lane: d.lane, card: d.card, toLane: to, index });
+    else d.el.classList.remove('dragging');
+  });
+  document.addEventListener('dragend', () => {
+    if (DRAG) DRAG.el.classList.remove('dragging');
+    DRAG = null;
+    document.querySelectorAll('.kb-drop').forEach(m => m.remove());
+  });
 
   function sidenotes() {
     page.querySelectorAll('a[data-footnote-ref]').forEach((ref) => {
@@ -366,6 +449,7 @@
       }
       page.classList.add('instant');
       if (!payload.keepScroll) page.classList.remove('shown');
+      const kbx = (page.querySelector('.kanban') || {}).scrollLeft || 0;
       page.innerHTML = props(payload.props) + html + (payload.kanban || payload.preview ? '' : backlinksHTML(payload.backlinks || []));
       if (payload.preview) {   // the card header already names the note
         const h = page.querySelector('h1');
@@ -376,6 +460,7 @@
       if (payload.sidenotes) sidenotes();
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
+      if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;
       if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
       const ud = page.querySelector('details[data-k=unlinked]');
       if (ud && ud.open) post({ type: 'unlinked' });

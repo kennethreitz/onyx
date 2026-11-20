@@ -856,6 +856,24 @@ final class Workspace {
     }
 
     /// Toggle the n-th task checkbox (document order, outside code) from reading view.
+    /// A Kanban board edit from the reader; the file is spliced (see KanbanDoc), then saved.
+    @discardableResult
+    func kanbanEdit(_ b: [String: Any]) -> Bool {
+        var d = KanbanDoc(text)
+        let lane = b["lane"] as? Int ?? -1, card = b["card"] as? Int ?? -1
+        let ok: Bool
+        switch b["op"] as? String {
+        case "toggle": ok = d.toggle(lane: lane, card: card)
+        case "move": ok = d.move(lane: lane, card: card, toLane: b["toLane"] as? Int ?? -1, index: b["index"] as? Int ?? 0)
+        case "add": ok = d.add(lane: lane, text: b["text"] as? String ?? "")
+        case "edit": ok = d.edit(lane: lane, card: card, text: b["text"] as? String ?? "")
+        case "archive": ok = d.archive(lane: lane, card: card)
+        default: ok = false
+        }
+        if ok { text = d.text; flushSave() } else { renderToken += 1 }   // a no-op still redraws (drops an open editor)
+        return ok
+    }
+
     func toggleTask(index: Int) {
         let lines = text.components(separatedBy: "\n")
         var out = lines

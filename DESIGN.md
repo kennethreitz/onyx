@@ -303,3 +303,14 @@ when a match is inside one. **⌘G conflict:** ⌘G stays Focus graph, except wh
 to the next/previous match (the Mac convention). ↩/⇧↩ in the field do the same, so the graph is always one Esc away. ⌥⌘F
 opens the replace row (editor only). ↩ there replaces the current match, and "All" replaces every match in one undo step.
 Switching edit and read, or changing notes, keeps the bar open and recounts.
+
+## Editable Kanban
+
+Boards in the obsidian-kanban format (`kanban-plugin` frontmatter) can be edited in the reader. Drag a card within a lane or
+to another lane (a line marks where it will drop). Use the checkbox to check it off, double-click to edit (↩ saves, ⇧↩ adds a
+new line, Esc cancels), use "+ Add a card" to add one, and ↓ to archive one. `KanbanDoc` (OnyxCore) parses the file into line
+ranges and splices only the lines that change. Frontmatter, the `%% kanban:settings %%` block, spacing and card markup stay
+as they were. A board that is opened but not edited is never written. Lanes keep the plugin's layout (`## Lane`, a blank line, the cards,
+two blank lines). Archived cards go under `***` / `## Archive` ahead of the settings block, the way the plugin writes them.
+Only the focused pane's board can be edited. Split and preview copies are read-only. `ONYX_KANBAN_FILE=/tmp/…` runs the real-board
+round-trip test against a copy.
