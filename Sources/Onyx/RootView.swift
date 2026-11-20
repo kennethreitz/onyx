@@ -419,6 +419,7 @@ struct RootView: View {
                 ch == "[" ? ws.goBack() : ws.goForward(); return nil
             }
             if e.keyCode == 53 { // Esc
+                if let tv = MainWindow.current?.firstResponder as? OnyxTextView, tv.suggestionsVisible { return e }
                 if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
                 return ws.dismissTop() ? nil : e
             }

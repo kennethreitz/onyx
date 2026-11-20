@@ -216,6 +216,48 @@ final class Workspace {
         if overlay != .none { navigating = true; overlay = .none; navigating = false }
     }
 
+    // MARK: [[ suggestions (editor)
+
+    /// Rows for the editor's `[[` popup: notes through the ⌘O matcher (aliases, recency,
+    /// folders), or after `#` the target note's headings.
+    func linkSuggestions(_ part: LinkCompletion.Part, _ q: String) -> [LinkSuggestion] {
+        guard let snap = snapshot else { return [] }
+        switch part {
+        case .note:
+            let hits = quickIndex.search(q, recent: recent, limit: 12)
+            return hits.enumerated().map { i, h in
+                let path = h.entry.path
+                let name = h.entry.name.text
+                let unique = (snap.namesIndex[name.lowercased()]?.count ?? 1) <= 1
+                var insert = LinkCompletion.linkText(path: path, name: name, nameIsUnique: unique)
+                var title = name, hitsOut = h.nameHits
+                if let a = h.alias { insert += "|" + a; title = "\(name) · \(a)"; hitsOut = [] }
+                let folder = (path as NSString).deletingLastPathComponent
+                return LinkSuggestion(id: i, title: title, detail: folder, titleHits: hitsOut, insert: insert, exact: h.exact)
+            }
+        case .heading(let note):
+            guard let path = note.isEmpty ? currentPath : snap.resolve(note, from: currentPath),
+                  let n = snap.notes[path] else { return [] }
+            let toks = QuickMatch.tokens(q)
+            let fq = QuickMatch.fold(q.trimmingCharacters(in: .whitespaces))
+            var rows: [(Int, LinkSuggestion)] = []
+            for (i, h) in n.summary.headings.enumerated() {
+                let key = MatchKey(h.text)
+                var score = 0, hits: [Int] = [], ok = true
+                for t in toks {
+                    guard let m = QuickMatch.match(t, in: key) else { ok = false; break }
+                    score += m.score; hits += m.positions
+                }
+                guard ok else { continue }
+                let pad = String(repeating: "  ", count: max(0, h.level - 1))
+                rows.append((toks.isEmpty ? -i : score, LinkSuggestion(id: i, title: h.text, detail: pad + String(repeating: "#", count: h.level), titleHits: hits, insert: h.text, exact: !fq.isEmpty && QuickMatch.fold(h.text) == fq)))
+            }
+            return rows.sorted { $0.0 > $1.0 }.prefix(12).enumerated().map { i, r in var s = r.1; s = LinkSuggestion(id: i, title: s.title, detail: s.detail, titleHits: s.titleHits, insert: s.insert, exact: s.exact); return s }
+        case .block, .alias:
+            return []
+        }
+    }
+
     // MARK: Back / forward (⌘[ ⌘], mouse buttons, swipe)
 
     var canGoBack: Bool { historyIndex > 0 }

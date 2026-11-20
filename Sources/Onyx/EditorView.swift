@@ -18,7 +18,6 @@ final class OnyxTextView: NSTextView {
         return super.scrollToVisible(rect)
     }
 
-    var noteNames: () -> [String] = { [] }
     var onFollowLink: (String) -> Void = { _ in }
     var measure: CGFloat = Theme.editorMeasure
 
@@ -41,11 +40,6 @@ final class OnyxTextView: NSTextView {
         r.origin.y += textContainerOrigin.y
         Theme.activeLine.setFill()
         r.fill()
-    }
-
-    override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
-        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
-        needsDisplay = true
     }
 
     override func layout() {
@@ -78,63 +72,193 @@ final class OnyxTextView: NSTextView {
         return nil
     }
 
-    // MARK: Wikilink completion via the native completion popup
+    // MARK: Wikilink suggestions
+    //
+    // Typing `[[` pairs to `[[]]` and shows a quiet list under the link. The list never edits
+    // the text by itself: every keystroke goes into the note and only filters. ↑/↓ highlight
+    // (nothing is highlighted until you do, unless the top match is exact); ↩/⇥ take the
+    // highlighted row, or with nothing highlighted keep what you typed and step past `]]`;
+    // Esc closes it; typing `]]` or moving the caret out of the link closes it too.
+    // After `#` it lists that note's headings; after `|` (alias) and `#^` (block) it stays away.
 
-    var openLinkStart: Int? {
+    var suggest: (LinkCompletion.Part, String) -> [LinkSuggestion] = { _, _ in [] }
+    private lazy var panel = LinkSuggestPanel()
+    private var linkCtx: LinkCompletion.Context?
+    private var linkLineStart = 0
+    private var dismissedOpen: Int?       // absolute offset of the `[[` Esc closed
+    private var lastQuery: String?
+    private var typedBracket = false
+    private var refreshing = false
+
+    var suggestionsVisible: Bool { panel.isVisible }
+
+    func hideSuggestions() { panel.hide(); linkCtx = nil; lastQuery = nil }
+
+    func refreshSuggestions() {
+        guard !refreshing else { return }
+        refreshing = true; defer { refreshing = false }
         let sel = selectedRange()
-        guard sel.length == 0 else { return nil }
+        guard isEditable, sel.length == 0, window != nil, !hasMarkedText() else { hideSuggestions(); return }
         let ns = string as NSString
         let lr = ns.lineRange(for: NSRange(location: sel.location, length: 0))
-        let before = ns.substring(with: NSRange(location: lr.location, length: sel.location - lr.location))
-        guard let open = before.range(of: "[[", options: .backwards) else { return nil }
-        let after = before[open.upperBound...]
-        if after.contains("]") || after.contains("|") { return nil }
-        return lr.location + before.utf16.distance(from: before.utf16.startIndex, to: open.upperBound.samePosition(in: before.utf16)!)
+        let line = ns.substring(with: NSRange(location: lr.location, length: max(0, NSMaxRange(lr) - lr.location)))
+        guard let c = LinkCompletion.context(line: line, caret: sel.location - lr.location) else {
+            dismissedOpen = nil; hideSuggestions(); return
+        }
+        let absOpen = lr.location + c.open
+        if let d = dismissedOpen, d != absOpen { dismissedOpen = nil }
+        guard dismissedOpen == nil else { hideSuggestions(); return }
+        switch c.part { case .alias, .block: hideSuggestions(); return; default: break }
+        let items = suggest(c.part, c.query)
+        guard !items.isEmpty else { hideSuggestions(); return }
+        let m = panel.model
+        let queryChanged = c.query != lastQuery || linkCtx?.open != c.open || linkLineStart != lr.location
+        m.items = items
+        if queryChanged || (m.highlighted ?? 0) >= items.count {
+            m.highlighted = LinkCompletion.defaultHighlight(topIsExact: items[0].exact)
+        }
+        m.onPick = { [weak self] i in self?.acceptSuggestion(i) }
+        linkCtx = c; linkLineStart = lr.location; lastQuery = c.query
+        let anchor = firstRect(forCharacterRange: NSRange(location: absOpen, length: 2), actualRange: nil)
+        if let w = window, anchor != .zero { panel.show(below: anchor, parent: w) }
+        if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
+            FileHandle.standardError.write("[suggest] q=\"\(c.query)\" part=\(c.part) n=\(items.count) hl=\(m.highlighted.map(String.init) ?? "-") top=\(items[0].title)\n".data(using: .utf8)!)
+        }
     }
 
-    override var rangeForUserCompletion: NSRange {
-        if let start = openLinkStart { return NSRange(location: start, length: selectedRange().location - start) }
-        return super.rangeForUserCompletion
-    }
-
-    override func completions(forPartialWordRange charRange: NSRange, indexOfSelectedItem index: UnsafeMutablePointer<Int>) -> [String]? {
-        guard openLinkStart != nil else { return super.completions(forPartialWordRange: charRange, indexOfSelectedItem: index) }
-        let q = (string as NSString).substring(with: charRange)
-        index.pointee = 0
-        let names = noteNames()
-        if q.isEmpty { return Array(names.prefix(40)) }
-        return names.compactMap { n in Fuzzy.score(q, n).map { (n, $0) } }.sorted { $0.1 > $1.1 }.prefix(40).map(\.0)
-    }
-
-    override func insertCompletion(_ word: String, forPartialWordRange charRange: NSRange, movement: Int, isFinal flag: Bool) {
-        super.insertCompletion(word, forPartialWordRange: charRange, movement: movement, isFinal: flag)
-        guard flag, movement != NSCancelTextMovement, openLinkStart != nil || (string as NSString).substring(to: max(0, charRange.location)).hasSuffix("[[") else { return }
+    func acceptSuggestion(_ i: Int) {
+        guard let c = linkCtx, panel.model.items.indices.contains(i) else { return }
+        let item = panel.model.items[i]
         let ns = string as NSString
+        let from = linkLineStart + c.queryStart
+        // replace the whole segment the caret is in (to the next ] | # on the line)
+        var to = selectedRange().location
+        while to < ns.length, let ch = UnicodeScalar(ns.character(at: to)), !"]|#\n".unicodeScalars.contains(ch) { to += 1 }
+        hideSuggestions()
+        insertText(item.insert, replacementRange: NSRange(location: from, length: to - from))
+        let ns2 = string as NSString
         let end = selectedRange().location
-        if !(end + 2 <= ns.length && ns.substring(with: NSRange(location: end, length: 2)) == "]]") {
-            insertText("]]", replacementRange: selectedRange())
-        } else {
+        let next = end < ns2.length ? ns2.substring(with: NSRange(location: end, length: 1)) : ""
+        if end + 2 <= ns2.length, ns2.substring(with: NSRange(location: end, length: 2)) == "]]" {
             setSelectedRange(NSRange(location: end + 2, length: 0))
+        } else if next != "#" && next != "|" {
+            insertText("]]", replacementRange: selectedRange())
+        }
+        hideSuggestions()
+    }
+
+    /// ↩/⇥ with nothing highlighted: keep what was typed, step past the closing `]]`.
+    private func leaveLink() {
+        hideSuggestions()
+        let ns = string as NSString
+        var i = selectedRange().location
+        while i < ns.length, let ch = UnicodeScalar(ns.character(at: i)), ch != "]", ch != "\n" { i += 1 }
+        if i + 2 <= ns.length, ns.substring(with: NSRange(location: i, length: 2)) == "]]" {
+            setSelectedRange(NSRange(location: i + 2, length: 0))
+        } else {
+            setSelectedRange(NSRange(location: i, length: 0))
+            insertText("]]", replacementRange: selectedRange())
         }
     }
 
     override func didChangeText() {
         super.didChangeText()
         let sel = selectedRange()
-        if sel.location >= 2, (string as NSString).substring(with: NSRange(location: sel.location - 2, length: 2)) == "[[" {
-            // auto-pair and open the completion list
-            insertText("]]", replacementRange: sel)
+        let ns = string as NSString
+        if typedBracket, sel.length == 0, sel.location >= 2, ns.substring(with: NSRange(location: sel.location - 2, length: 2)) == "[[",
+           !(sel.location + 2 <= ns.length && ns.substring(with: NSRange(location: sel.location, length: 2)) == "]]") {
+            typedBracket = false
+            insertText("]]", replacementRange: sel)   // auto-pair
             setSelectedRange(sel)
-            DispatchQueue.main.async { self.complete(nil) }
         }
+        typedBracket = false
+        refreshSuggestions()
+        DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() }
+    }
+
+    override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
+        needsDisplay = true
+        if !stillSelecting, panel.isVisible || linkCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
     }
 
     override func keyDown(with event: NSEvent) {
-        super.keyDown(with: event)
-        if openLinkStart != nil, let c = event.characters, c.count == 1, c.rangeOfCharacter(from: .alphanumerics.union(.whitespaces)) != nil {
-            complete(nil)
+        let mods = event.modifierFlags.intersection([.command, .option, .control])
+        // No matching rows is still a valid link. ↩/⇥ leaves the typed name untouched.
+        if mods.isEmpty, [36, 76, 48].contains(event.keyCode), !event.modifierFlags.contains(.shift), !panel.isVisible {
+            let ns = string as NSString, sel = selectedRange()
+            let lr = ns.lineRange(for: sel)
+            if sel.length == 0, LinkCompletion.context(line: ns.substring(with: lr), caret: sel.location - lr.location) != nil {
+                leaveLink(); return
+            }
+        }
+        if panel.isVisible {
+            if !mods.isEmpty { hideSuggestions(); baseKeyDown(event); return }
+            let m = panel.model
+            switch event.keyCode {
+            case 125: m.highlighted = LinkCompletion.move(m.highlighted, by: 1, count: m.items.count); return   // ↓
+            case 126: m.highlighted = LinkCompletion.move(m.highlighted, by: -1, count: m.items.count); return  // ↑
+            default: break
+            }
+            let key: LinkCompletion.Key = switch event.keyCode {
+                case 36, 76: .returnKey
+                case 48: event.modifierFlags.contains(.shift) ? .other : .tab
+                case 53: .escape
+                default: .other
+            }
+            switch LinkCompletion.action(for: key, highlighted: m.highlighted) {
+            case .accept(let i): acceptSuggestion(i); return
+            case .leave: leaveLink(); return
+            case .dismiss:
+                if let c = linkCtx { dismissedOpen = linkLineStart + c.open }
+                hideSuggestions(); return
+            case .pass: break
+            }
+        }
+        // typing `]` over the auto-paired `]]` steps over it instead of adding a third bracket
+        if mods.isEmpty, event.characters == "]", selectedRange().length == 0, insideOpenLinkBeforeClose() {
+            setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
+            return
+        }
+        typedBracket = mods.isEmpty && event.characters == "["
+        baseKeyDown(event)
+    }
+
+    /// Test harness only (ONYX_TYPE_TEST): a non-key window has no active input context, so
+    /// do what the key bindings would, directly.
+    var directKeys = false
+    private func baseKeyDown(_ e: NSEvent) {
+        guard directKeys else { super.keyDown(with: e); return }
+        let cmd = e.modifierFlags.contains(.command)
+        switch e.keyCode {
+        case 36: insertNewline(nil)
+        case 48: insertTab(nil)
+        case 53: cancelOperation(nil)
+        case 123: moveLeft(nil)
+        case 124: moveRight(nil)
+        case 125: cmd ? moveToEndOfDocument(nil) : moveDown(nil)
+        case 126: cmd ? moveToBeginningOfDocument(nil) : moveUp(nil)
+        default: if let c = e.characters, !c.isEmpty, !cmd { insertText(c, replacementRange: selectedRange()) }
         }
     }
+
+    /// True when the caret sits just before a `]` that closes an open `[[` on this line
+    /// (`[[Name¦]]` or `[[Name]¦]`).
+    private func insideOpenLinkBeforeClose() -> Bool {
+        let ns = string as NSString
+        let loc = selectedRange().location
+        guard loc < ns.length, ns.character(at: loc) == 0x5D else { return false }
+        let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
+        let line = ns.substring(with: NSRange(location: lr.location, length: loc - lr.location))
+        if LinkCompletion.context(line: line + "x", caret: line.utf16.count) != nil { return true }
+        // second bracket: `[[Name]¦]`
+        if line.hasSuffix("]"), LinkCompletion.context(line: String(line.dropLast()), caret: line.utf16.count - 1) != nil { return true }
+        return false
+    }
+
+    override func scrollWheel(with event: NSEvent) { if panel.isVisible { hideSuggestions() }; super.scrollWheel(with: event) }
+    override func resignFirstResponder() -> Bool { hideSuggestions(); return super.resignFirstResponder() }
+    override func viewWillMove(toWindow newWindow: NSWindow?) { if newWindow == nil { hideSuggestions() }; super.viewWillMove(toWindow: newWindow) }
 }
 
 struct EditorView: NSViewRepresentable {
@@ -181,7 +305,7 @@ struct EditorView: NSViewRepresentable {
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         tv.textContainerInset = NSSize(width: 80, height: 96)
         tv.delegate = context.coordinator
-        tv.noteNames = { [weak ws] in ws?.snapshot?.notes.values.map(\.name).sorted() ?? [] }
+        tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
         tv.onFollowLink = { [weak ws] t in ws?.openLink(t) }
 
         let scroll = ThinScrollView()
