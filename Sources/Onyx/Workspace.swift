@@ -122,6 +122,8 @@ final class Workspace {
 
     /// Continuous git when the vault is a repository (see GitSync); nil otherwise.
     var git: GitSync?
+    /// Obsidian Sync, only for folders the user connected in Settings ▸ Sync (see VaultSync); nil otherwise.
+    var obsidianSync: VaultSync?
 
     func open(vault url: URL, initialNote: String? = nil) {
         root = url.standardizedFileURL
@@ -129,6 +131,8 @@ final class Workspace {
         git = GitSync.detect(root!)
         git?.beforeCommit = { [weak self] in self?.flushSave() }
         git?.start()
+        obsidianSync?.stop()
+        obsidianSync = VaultSync.resume(for: root!)
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
         bookmarks = UserDefaults.standard.stringArray(forKey: key("bookmarks")) ?? obsidianBookmarks()
@@ -600,6 +604,7 @@ final class Workspace {
     func vaultMutated(_ message: String, paths: [String]) {
         chromeLog("vault: \(message) \(paths.count) path(s)")
         git?.commitNow(reason: message)
+        obsidianSync?.edited()
     }
 
     // MARK: Editing & saving
@@ -665,6 +670,7 @@ final class Workspace {
             try Data(content.utf8).write(to: url, options: .atomic)
             if create { snapshot?.refresh(paths: [rel]) }
             git?.edited()
+            obsidianSync?.edited()
             return true
         } catch {
             toast = "Couldn’t save: \(error.localizedDescription)"
@@ -733,6 +739,7 @@ final class Workspace {
             toast = "“\((cur as NSString).lastPathComponent)” was moved or deleted elsewhere"
         }
         if external { externalPulse = Date(); lastExternalChange = Date(); git?.edited() }
+        obsidianSync?.edited()
     }
 
     func reindex() { if let root { let cur = currentPath; open(vault: root, initialNote: cur) } }

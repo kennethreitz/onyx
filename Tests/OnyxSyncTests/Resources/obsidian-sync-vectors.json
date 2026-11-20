@@ -1,0 +1,301 @@
+{
+  "generator": "scripts/obsidian-sync-vectors.mjs",
+  "source": "Obsidian 1.15.1 app.js (sync crypto)",
+  "scrypt": {
+    "N": 32768,
+    "r": 8,
+    "p": 1,
+    "dkLen": 32
+  },
+  "cases": [
+    {
+      "password": "correct horse battery staple",
+      "salt": "0123456789abcdef0123456789abcdef",
+      "key": "47828e890e26499530026a1d8a709efa527338b8abd7cb7d792cd5f4b1f82b26",
+      "versions": {
+        "0": {
+          "keyHash": "0d1943be6692cbf340053763caf8761a66218a5b4265ad22b099ed56498e3087",
+          "gcmKey": null,
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "e3b0c44298fc1c149afbf4c8e53cdc0267e81a63428e693850ac37e2"
+            },
+            {
+              "plain": "a",
+              "cipher": "ca978112ca1bbdcafac231b3ecc732b5313d6b1cb8074e75d4a17a1721"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "058fbc72ef3925e409e47b4b7bf6487b77b6f6eba9a595d591d657a96d085b9efd796183f903e0fe46191f5232bab3"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "d0467cc44f6bbdfa877046ef57afcd41651007105b1a2b0ff64db716f2197b0ce2f0a16874e867feeda24ab5"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "e77e864845720a8612d46cebd63749b5fb63a33b4ce23bd773f600159a0166a62bac1b40d558349ebd572c97fbaf3bfa978a251f438191b6b9cda6c25b"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "75ff90f5e0357797e93504b4743136160908a1cf7e49fc2667023f0fb4d56371cfed3426e21a07802bb194f89a3f08fe2d578b0d8a7731e916911f1a9b823a55d3b92e43c84924ceccceaab4"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "cd372fb85148700fa88095e3ab7f33a1e0db9bedfbbec8533aea15c93fdd84d6fced5f9536ce06a3154879aa51ee3671629490ee457e29321fc2d7cbbf7b1709b04e9533c1d4c4974977ddf862138cd86e8e20b68a20f81d92f5ce7c"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "1d449b72b7ac00c6e9216dbe7c4d32c71842650b3b9829eba2df146a0cf0bc85246c586f17d35ea2b010ec0dacf7fb07d469fc8961ea0376dc75554699f46971af0609933a121f2c9ef0a5418434287afa815d34664f8250ce5fa47feae0d72efc60084cf793eb8ec7be3e36e47406f40867812b97ff18d19b3cd66f530c0071ee5020e847af8a9228239ed7da326a33109686d36547631eb197af7e4c1487b72e664a45e3a5e74b092dc5dfd4a989db7158fc1de78f626c2a120e67dbef267fc020a7c59091a2e64602376dc10c58b8f7508e0eaee7d4f98805c364127db92f4d61a0067cab0b6289e50b0832c195a981406370c5b519197e3650101cbe231ab0c76df2cc6829b969e24a5904abb7429bc030749375d6936a7ce1180b6afdbc9344fb7e10e98eee6e84db9cf1ec55ff6375a0cd61878473f0cbdaf0ee21a1eb27b80198f0cc3889ee08aea44acd6df47bc9eb4ee482ef22eaabd666e83e69aa138de2bd7807072c41d194606446abfad4b8ebfd029d5cab7ffd697882e1265844ab6200a9b9f74768842e966e7069f78566ba488e80cac6942758f61610a27c80126a7bba8519ac0eb19a26b30036609c194e93c815f438e26ab2a7c8f6cbec5bf365750599c6d92914661203f843431b04a71af6a6e30e8eac18c908214f542d271472a8b219392665f6cae072b60645a24f97fd0d2ee3e7370f221cb60f7f6b1c7a18f80fe34768db567566aa48d44e1580686f7cc1d331a51bc3fc2c827daaad837a2c0e6930b23a8ce8d01b1cee8c0bf10e4cb2ee2a63288d3da49acfda4c4e4922cdaaea43ca5124407dd13d48a05b2271cdac1009d05586270ef364db19ea8675587a48f78371ebdb70750424f1d2602cd390264b1ce7fd7c53db5390e16c62885e8584791b7fcbc10b40624debbe69e693510ceb0751a45cf888a011bd0f15af174e7f03466ea8cc96ad901d77325d10682bff1ea5aea813bc2830158b0c45a694bd5fe960d675ff9952fc45ca1e63e39ae36d271b36caab5248e7824c6664f1056aad7f8c787471db32d78afa38828704fa51fa5073eb5c0c91b26288ccd8cfca4413ce42de0dec2c541e6cb05e5d25889f226193a22bf8fce7ea15bf227fd31b4713d272d6554f6abc41bf8932b52f12962979db0bcbc6f712b3095eca08f73ac1cb4f3c357d46c10fc2fa71c98cac7dba2c339c876807d3f8c6a3cfededb2d6d1e7e278fa92b8ead2ff4eb48325dcf120779ac469c436cc15ab031de2c6a1a972df8e27b10c1384d91b74997112e4f0066efe05fb51dd0a9b0b72e1fe70390701c66b84ae256fbe75a4d1661fbc45acc356bf97aadfba93123dd8453a7ce87e4429b1cf35c6643969c5ac77fe9ae556abaf95d2ce95d4a3b867621bce1981bc26b6b51332fd2e9afa34d26b4ceef79f9e0b2c51b8eab8acdce6c4100c6bc8942399f4989312f3db65d46d4008e68337742fc6a6d5d2859d2f09fd554555a7f4cb0f88d7ad369717e577c352a862acf366fc6e2fa7820c7bbb206b47f781ff7cfbdeead3209ac4cd068c794460c6efabfd09ce55d9147dfaeb562e3151c2f1dc2f485b"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0cd0b844737beb62065084df20e1751a93de37717509eecc43003450d4cbc8e7248aca36b908ee19fffaa0663669a8988bb0094fd5688fa6b90989efb703e6",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        },
+        "3": {
+          "keyHash": "2ffacc10d1c19e49c8c241c4861f2e051d6c42a1b28272a7f432568f681cfcd6",
+          "gcmKey": "c81906114857fadfe49829293dab6237f1b65eb4c354f90d7a5ad5759008ff31",
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "90adfb9594b836dfd506d0e8e40a764e"
+            },
+            {
+              "plain": "a",
+              "cipher": "5d03693bf5d44b90cd568a0cebdda8285b"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "d510e0f5b182c231627ea0bf9d63433fe1037cae263a2124306d8646008b091426abf3"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "d2bf608a521bd1be922deb3a7e00778cc83a2398dd6ecd9007755c3da87fc5c9"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "ff9e0093d1e3b4270699c76c069d6a9ae97a5db5dcbf25ce7e34b3aac4977a17c6329a86d10c152f9048090f4dba345b99"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "6b333182c3142e7b1e9bfce9fd5da8ccd5c284923982fb20d45e44471df1992db6d6dccad47c84859ed5baeb837021e86cd1336332b76b99657c8b73b027056a"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "2a6ff74b16b4aa5551eae9626296e0e0ed37ddcc58780203a8204584cf0c83176d4ae39f5c94c20cc38e38d1b28f5acd299a41b2039c05b56903bd58e9b735f1544297ff319fd5c9bdd49d4c1e91d18b"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "5c07e0fb539cd34d97fa3d4223a627488360f7af7ca3df2b824b8a3de9ab06aca2112bfd298177806d0cefa6e02e42c7dd70b601fa0693caebfd8a96bbda8c9f8c3a48a5ba373ad12e9af5a56f69718b25d37d6aee5633acc6955915256c7d71029bc3ffe9f5abff770fd925663f7cee55d6d8345ea3f7c7c77d5fa69f785f90b0eba9d9339c9b1d38348ff517fe42bf3e522db7acc08ad60422acbc0656c4c67e9abfe37709ad0ce34c023c8ad2c838bbcd38c550067c73329daa9a57a2e7b33946619a1519bc823c3a30021e22186c0b0220bcaa7902d6cd69d8d9800a5fff1c29435af9569b0b7411ef78568a58bd6fd5ea346d6d89a02769ca2e35685a924310884b53466ae4662d65e8e9cd6ed0ddce2783f291ad256ea87448dd58bedbaa7a5a25d1dcdeb78237a2262efede9c5e11fd30934adda7e1f391903cabdcaa71132d82dd62b0ab2a875a23b2713782738e528f59326452c0a95098d712584568d7f0c27f8c9ce7340a1bc3906022c4ecb768b5f74186a3223fa6441a43b37814b2839d95a72f6b63174a6a2c65e3933e3ac6b83941f1a2ec65a5cdf975822984e4cb951751661b624ce90b2d3832f337651dc82950b851e2a8679c422242aaceef9bcd722a4844cb5e6fa4a5c776876f1b2b75fc2252adfed5a2c45a24ffcc0ea3dbbdd30fe37214ef9f74be0cab998fe382b6fcce7ec93b0029e96a7c23744ed4e7bb1c655ca71081280ab7efd81884b9edb438ea39792e6e7d3292f169423f30c2f9d46ce4957241a40b231a690a75f1522e42d329084e213fe15ff6283641e95e9d2c2e6f27f4ffce39f75ece31b844bf8620212751d4569cb971b80a75ad6cd5562543fa07847b7d58bfe3299cc87b3b5eabc9a136ce03c7713caf5374e5f68c6b4713816439c0df7ee85905ed50b29cf4fafe1221ba108335500ecc747abc9283afb53ab32fa2cee78386564eac5865add68ae2760ac9746ac3a853fea915603294571d2f5ac717206b141f1c7ca6e9ab2112c8742ffee59674c5e648f447363c0744699768b4837ae313e99bc19536a4bfac0f120493de776fc4a257f923f4aa9de66767c67a3527c60ccd0b1c2efc412c4f2b99692c497205f49df582f93edb2fe92d1f57fe19b67644e0f70fe2e3048e5d39dbca50e614d6de1ec003cefc4fc4535bac113efb977186dbf054b708a24bc94d8300135f54496aa6cb80f9e8fffb039e4b965f1eda11850b6b0e534d6e8a7996f21b050b366b9c1474d32bb4d072ce540057bd0e45d0d57abf4c5167724f43e66c2461287e37df92655bfdf8bf7131d0889cd77c92a90c8c890473ac44fd57e93eb75170b729c36831d8fa87b0731ca670c789d41df68adaa60e19617ef2593d10ed9759e694a51d22edda4eb538017cb89665f3b8f670acd68b35fe628d2c4d0b4e0a73aeea7045cbb00e4b7d3e9b8e48fff82f23c45cb3f73dfb528f4e1c960bcebb4ecc459773aae6c8325a0a035f6321c4addf52f29f14197dace1dea32f8e2370ebcb4fad322695ffc4b109f42288cffaf5fe44a8bb9d38ff3b7e8507ed92a953f468"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0c74bb9e258103caa5c5c8166563ba5d6ca300dad7dcb53459bd4ed38097570d6e7b37cead68d4d75f38d0d8e1e3dd48ed558b85faba8c8a08d602f13ceef8",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        }
+      }
+    },
+    {
+      "password": "Onyx ✦ päßwörd",
+      "salt": "fedcba9876543210fedcba9876543210",
+      "key": "eb16f284a8bebde07b7873857e027760ebcf7d8b4f1df8e7c6c84493e52c4001",
+      "versions": {
+        "0": {
+          "keyHash": "3cf390d6017180281095ac2e23bfad053f6d9efc37a387fb7f8523b0525edfe8",
+          "gcmKey": null,
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "e3b0c44298fc1c149afbf4c8d43628336e9cac1593270ced13407c2c"
+            },
+            {
+              "plain": "a",
+              "cipher": "ca978112ca1bbdcafac231b36eb738cd498cf135ebbfb270285b751d4b"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "058fbc72ef3925e409e47b4b3511a15c4c2fc49cf60ee0c58bfe3fbaf1eaef3300205d8ff2f345a1cb48e1ac7a1792"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "d0467cc44f6bbdfa877046efb7519f075cd03d20b05e0eba70cb152c5236daadeb77fcc46172b9bfd2ca43a5"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "e77e864845720a8612d46ceb2675e10b74378b26bf56a1e11abb4d42d460c8e26cb0111a85df35ff772c946cd1be0d34da9ceb56868131137d6edcc80c"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "75ff90f5e0357797e93504b45de70941ee5d7cfe77fbda73e12f10c36b97cea89ef4199e572df3bff8932cb1d841802c23c7a772126fa3392cfd8912c1cd3b6681f05ef1cdbed034c3ea920e"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "cd372fb85148700fa88095e3f27689dadf9d8ff545be0a00ea39bacaaf294d34052d549299a20bd64369cc189a32e16d0ea2df45b955a27b11b591491bb631fa7a63eb9e42eb69df0eb74eb89361082fd2c1877c8e01d134093155ab"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "1d449b72b7ac00c6e9216dbe077927502dc70f7801e30c7a7aeedeea3a0fba6f5ccacb4cc761f22498f3920a3a182a9fb2702f31988bb999314a5e8e719f2e84e73fa624446d35ca871ff60104158e0ca898f07e120a6e7aa5122b56ae8717a4c923a4f29654ea2fdcd3ee36f7bf47c2fe4dbf914fc30941c2af91d667a2bba7090848bcf672862dd092f8b31f3da8acc0e68ef465209217ae090f7846b87dff068fd78fcf898616269a43729474c4d6bc5aa566654e7ead27e6f198d710a7da2affc555a3c04a573e5265277da80600bf55eb45dbdd32ca56c17853ba176879f104dd703d18b4d3c4db8873094e14c4bd765eccc993faf8e3546d52d9a00740cefbc6088815db666593b1403e315aa366e1d2b96b4dfd810979314fffe6f778b9aec5bcac529c73f9595ee440102e41488b5ace17be9052470b3c3ea0cb7fe0815affadaa3f6bc4a8e5f1d9caa61668743a41605bb95f236f636f310cfccaa1218e931d674bc41843a58256518c3d615a022973ec506ea0c4faae0e14c493820cfe8ab196d8709bec65e786c8986cc5aee3d036ce75a5b4fde77ae84a7c8997c6d46b47d733e8e0fde827331aa12391aba5cf37db377bc72ca54ec5812f1a02254335b74eba47965149b0cb0828395d7045f6108c0309e1355cb5d02b37c09995d965b32271d8f11348fcc326b125540be65dea5648870339f1fecaa2183685e4268f1f2086f5c1770063d91768c78f51116b620604140336ea4b2b974a945dd449673240ef57230e42afdb76c5761163d36c06be986158ca96c4a5def8fdfe8cdbdaca252104187d5f39cc3485f65c28013bb1fae66a22b8c7bfbe0e8d08465b80358fd83eabbd277f5569db076b50710834320b87b34f4eecc9a823aafc526a2e17e855c71fd00961e19c4c79379f968e69bc9fadfd3ffb1c966230fe48393ebc5a616b905db7b1cfaf3fa5aa48b0d7ca6b237b20664717d427a90252b37b6e62f2d4db167b9c5f29e41db45bad575227109c42833b37f97bfab2487615440c00d58520f804ff4136e797a130ac354a89bd075833da976bb0d45948b779d3b1a374c4d3aba33b39a3e5a1aafefdd0ea289d39fa3d1600d3b4e1c9aaf24f7639317baf8624c686c26fbabe9b77aea22387c90ce0e8e09f70f6db6f95cd7f402e043e9540e5faa1e3922799a23094f72cda8c674095d85d0fab6c36aff6c5fea145243ae46497d1073b87b58dee84d3965a4bf1e6d15764f4eaa886be6f964f87e5909b0aaaaeaf614b0158c5fbcbfacd5f2071b04351c5e818a320c8d60fbdd0a5b26e70fd55fbc12d0e715ffde68fdf95c4dba68f1f160e0da8d3a45a672f4209f1119780445dcaf036219beb2b2c31bbc0557dc8c2b563faad11f3bc737e15d0183f226097af28102a616eb53e7ecce459dc4f278ec23e89e4cbcfca375ca843c588f5119e0233323ed818d900c3ea9491a548fd9b1728724a4f6e70ea54c517ee8e932a3ad583997bce2ba97afa576eb5fe1153af674fc2855bd2369f3beeb0a3512ca670ab395f0b3ebc55f7bce47af6c33aa43465b223ea931c8d5bd0e54f9dff4b29af51"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0ceb06bae5e073f5a683a6d1e676e1bfecfc7a80ba405cb82d54b27c3f0c1e5bbc3d8c607a4462d3b987e7e392b197b93f2d49197b33afc7bb6b3cfce29d0a",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        },
+        "3": {
+          "keyHash": "109ed6b85f57ddae0fad5b2f15b12458b884bd44642ae576ba55505730665092",
+          "gcmKey": "366a81e92139001cf47e92974c07e43f3b227cbd90a0c4803317bfec8bf361cf",
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "93435979e56bcc50c5b86a8d1ae504b9"
+            },
+            {
+              "plain": "a",
+              "cipher": "f07fbea0390ac423b53a1cdc1a43517f85"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "91918507c962974ae49577a5c2501da9094aa042c8b35524873956e197c0e60c5a85d6"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "293250d3f08d0585cc15d260f44b4a31334834af62c0113f2a67ef54976ae967"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "a6d3772c52794c456a5d5274face57a2606a9106b3b5245befc53841286da8a06fa62a38cbe9ac4d71cb4949bbb2f2b95c"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "e74f5364f5f64a28d01fe2682bb21566556d7ea7726988b28a4ee0aa5b6aa4286066b09c0bb47af8a85435d929867ce160fe3b0e75116f90139f1d39c284a153"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "c1b6383469df1e19d0a9b1b19176e3d7f888d2f9ebef354c814cf930e51ea958105d74a538c15252d89c595576e266264370c9487f0f334c11eaa105f2455b2ca0877a2828bb4c95254c737af19526a8"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "8c51845b9b2175a74faeb3129c9eb5fb688d618a44936c9743af5c5429d1ab6e384c5e6a31f86bcd0ba916a6b55af739cbc1ff890c243ec8c28b42e84c4d3a231347d7e44d696bc43e6c7a42d6c741b35d7ec5902e9aa3f44f96929f0be29d2a37d0c59d9a15b4045010c456b890ee99cc6ef1db60d7a6f27fabc68eef4dc1dc095c45ae92998e35ac7c0103aa6b77b23db6c9780ac78f9e0305e1f74ccc6d86270a7e38689a669ed9c60be7017ea35ecf4a3663903599f69979b3daac14a59ac7b9f0e631f09a91fa9a157dbcccc3055ca3c380d63d4c6d37c4643d2414cf619113a36a933828da0e215dd99bec4b3a6ade5bf405af4dd4927668c00417a943b2a6def2ee3304227a9ca9fcbe12479e1cc86eeda0a3982e0b2cf1944fdaa703b82dc95e6f9f0f301916577d0e355d653a399718204f3bf25596bc38ac85331ae28d171f50f9ad7fde83e7f5e7c612547e1b736c319897aa4c2495d4a35b65c3e48bbe39e4ade3b6f888a9e81fe9a6945bf41a5318965f4e44516bbb850fb10143f6abef4b578f3b2c29192050bb92e83c1c3173629a4e7bd24269ce6879cf933b193cc8a3962d5f3d19d975e32a0b53d2518af8827f9d627057f92c6eac08f91fb8f235a42b8a9def184bb6fbaf6dcc0dda93a4f9ec44d81ead965afde3b17cb58e6830a253deede5bae117df0b3509431000e47078100ec1b8073ba2d7bfd278390116cfe1c9355a81a55bb727ad2f1a806fcab49e642aeb5a8f7f621c1e2c5c3b8e667ba2cdbedd3114be3a8ff3b9f5f2d9bf25ae1a93354e115dd39efcf8789d46d2596033d91b8005ecf1427b6c6d53692f47624383fa31385d59db608561d332c7c7bd29a7e163e3050fad0c08cde43d7984dd9efff14e8538bc0e7deb8bab5f4d2efc381167438d6d9ceccb051e366e3e36674a2075a81447d6704513d8d0ff168b9f496c7b9ac147e84158cb3eceace322f2190b70caa411aa20fe9f8ba7b8106dff0c365ffcfbe404c353212499858bcc050e3628aa441843c838b553e247446c44f9a351c835af56f092cc20ca05bb9094ce8d8dd8a6d04cfdc4218cfb655eac88c1368945723b57d1acc431d961fe020648131f37a7887ecb952fc595c3e6b39a34b3060dcfc6cbc24289a3593391304699d4eacd2481365a05c77d0b6d90ad8e7092bcfff58cab272e2b31b6b15de50ff332043604211089b2b69dcf5bc34d688e796250daf17b0530c8803133dd2f395562e45d54e9a01d6740aa6631fdd17d2a5042eb58a6f8f4ece8dcccd0ea9f10df7ca75fae6e8e7758889d8584b2ff8083e9ec9ebb0e6eefc1f7fbfee3a5ea64819b5023a7e40e08458b7e06d9f9915301b9e327a7982e6f3e2a5df5da879a3210b1ed03293debe1dda74922ca8879c75625d86abfde0d647ff6ee8300377db603bf152bc65e7b247bd5c889a6a3b8fccc1fe43d8235fa2e8e899d9095e15ed6c7d3c9ccf6ecfe600c77d831e27715a2a89a68e36e61a0d30062a53fe1b3b1708130f13280fb1bcdec02f37340c3da41a8e6704f792a68a8b84b0c66ee200cd7210a2f1d602a"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0ceb75138aaa7b1592195533e9ff97d852f2a43e163632ae9ebd858c21cae914a46895a2125a95e1178644dce71a67894f9a76894c7af59dd5976e13cccdc0",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        }
+      }
+    },
+    {
+      "password": "ｏｎｙｘ",
+      "salt": "deadbeefdeadbeefdeadbeefdeadbeef",
+      "key": "588d609a2d0994feb3aec8f2b65208159a1f39a1c3bd67601b7ad1d784b90591",
+      "versions": {
+        "0": {
+          "keyHash": "9a3e9e789bb1ddb02cd1bd870925a3c183163ff1851f57b0f2f439b2b55ec719",
+          "gcmKey": null,
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "e3b0c44298fc1c149afbf4c83eb85a3e4de64a36d9fc12336ca6a9d8"
+            },
+            {
+              "plain": "a",
+              "cipher": "ca978112ca1bbdcafac231b3fd0fb2f96ece276abbcb614f2ac3cbf84f"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "058fbc72ef3925e409e47b4b83ebff7a1b9c579ecec965eeca943427680c8201a2c12c368895525371ed26f3b889cf"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "d0467cc44f6bbdfa877046efc402948d15361d637b1f1339f4b640a7866646617b814bd9a318ccca4605977d"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "e77e864845720a8612d46cebf2d33f215e9c6472d66d6d68af258ed9e49b94e031260f2bbdff99ddae0f78cf24ee477e441fed06a8be15daee13cc14bf"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "75ff90f5e0357797e93504b40b47c263ee0f9b3af88623a8e255f6f9b90a2f28196462325b3bd634dd08e914772fbc7e364b5d626982b03a91b95b5bd5e8ee54d4ab02e1b4feeed689e03fb7"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "cd372fb85148700fa88095e3fe82baeeef196e17294bd2ffce86f2ea1b72fd3446df28309a0e8dfdad6d76835e7e9d6b5346e2c84f72b048b21d40a5d543d1b8923863a12d0c5a83c15b64cabcf6a1db8fd79d87664e2ef45df39a1f"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "1d449b72b7ac00c6e9216dbe145a84e35fc481a0e9d46b5764eb9cb013efa78d9aeeea34b0b743a8d6e526edf23ed2d93bca3e3c22ea7b135f3e14e14101d20f6924be5457df31cd5157da87d9e7342418f4197cb083dc851faea466e4abba7ed4e2b29c65f20f2c969a981f88241acbb12746f152865b354b1860678896f46e7dd9d7b9a7e7c73bad583987c3cd20f0f8ff910a9ed48518c28e89d44d5264c6789628727b9ada705bb2c8b71276c90c70bd1608d7788886a44a3df108e1f7d9faabfcbe5a198e660309f9bc92803804b9864ffd68e64caf5e05d2c13ea911e96d9e4173195a82a367413f896c31a4a7be129bf5c3f9f6b10806250e84d38084a892d7770a93503669b02792b72b6967ca703ebbce2be13124b895a21043590169c4c31970995bb532d330bca0c831ca6560d1f0794e8e2a7c17dc619bca13a0f7e0693c04e3c8aaec1fade4cce60be8ebb56a7f9ffbeeabfeebb400424126cd2c6719e56e207f66fe600749762d8dd56cb6644188f9f949408d21279389782d553d0334718b69ed844b827f5a8c9fe7f0fb73b61e8886f7d9b2b32d8554b31da28ea2dc1706a199411806670c34427baddd912418eaf7dc79fb9cfb7cd8be11397f22a310b87d62376d961a781c220347f2071a4ebe975c38a3229e36e15e896b0a94c4cb381e4c307612d6c3e97bca4ca24b40ad096ee1435e6b9f371c2377089129c116f34389da30470e87dfbb6e5bec2556cd461332aa1275a9d92201ad347ddedff0678121813cb288e0cc07e1198ef8faf37df7734ca0a147005ee7a33dbedd971bb3acdfa1cdca60104caaede34a4002fccc596cd85099326d2fe8122a14c94a1c57b35f224f2a3a6a9f53b83883aaec366cd319942e0276fda9bd04bd05e84af79ff80f9c8b3a00b199bb9554e7f0473fba51c46f3f54d53ecf433b614a846941fc91f88022d35f47b7f13a27ddd9f08b80ae6ffdd824457894488e719ee083cdde8e94d1869a9570b73179fc9e0d80bf9a25f2fbb8afe37a443ef908053a305097232402326c9470b23822b40f52fb7a0c742739ae0dbad887c94e88c8b3c77ff6cee8958095597b5e0630602e0b23763f6156c4f340bdcd43e4290f31a3b90445ea8b4169b1cc49e313e1939687b444a44d998a171d3fa05a16ffaea5d172223cc775cb17498b9be47449d6f0a93e9d362366c723122bd5d4adbfd52a336ab31e6799b5d59f5c78072ae260a134f5402e353b605c843ea75a8cfda14d4b05aa1aa6eba1f2faec0fb8a44733dd04c1acbeb06c91e0861f159ebc3727f8e93782ddf96f9174f8485364e579bd301d728195cb0a524c3ac1b6393d96a5b0b68b87c1600abfcc83bebbd3b33fb77f484febd6cab432803d85a37a065df49c5dcf7bf99dfdf262ace6228a68024e1014843c16a41625e8dc3afbe7f68a7f90a1f9eab8187b93e64e4dd8a6d12189899a8fd93e9f82d1af4bd6489ed84aadd003668530f3735c3a271a00d82665d8b968c9c5839ae112be5425a33da9f477986b35ce87f85c576235b5bde721ab29e232ed6742b9899c18405dd93618ff5c911c90e82395d2"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0c7e566e1457a35883182b00e0ae6be36cd6988e49bc8482c83c282f087abed2cb94e9b7139c7009c2d83014efc9a6390498af919c57e8892a1f33d827bc11",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        },
+        "3": {
+          "keyHash": "cbcc8f315648bf4ef18d9f82f15313f9ee2881183a26a495d24c7eae30d3da85",
+          "gcmKey": "e800428f8db0f4906d7d6d03dfd574f46dd14bf82aed080c378fedd9745c3642",
+          "deterministic": [
+            {
+              "plain": "",
+              "cipher": "ed22c978dea9b25c661a156447366f33"
+            },
+            {
+              "plain": "a",
+              "cipher": "88763a01bf44abefcadd74805f5ae46d2a"
+            },
+            {
+              "plain": "Daily/2026-11-20.md",
+              "cipher": "582ae07cc7ad8c1a87ea38b83105589acde3e0f0fc3e08a11672760ce0d785d31ceba5"
+            },
+            {
+              "plain": "exactly16bytes!!",
+              "cipher": "c9865e21366b9bd6ce6a406386444e95b4900abf89494474d30312777c14f4ce"
+            },
+            {
+              "plain": "Knowledge/Hebrew Letters/Aleph.md",
+              "cipher": "c955ba44277726e7039bc96dd57444ce6147552d4b95fc306451a0d3a381a7464d296173530f2dd9953839ac681cc62962"
+            },
+            {
+              "plain": "Writing/Poetry/AI-Written/ünïcödé — 詩.md",
+              "cipher": "dc43c37ea0f3deed9a3404a3aed3ce4700a2461439567cb48299bda8aa47e0b8eaa1c7ea7cb66844c73086e60e34026a35e18d3c63d903b28268fe4a025e8be8"
+            },
+            {
+              "plain": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "cipher": "ce8c381c5c854e552d7241914fcbc8d356b5446369c5cad42e5d1704c486ee9b98e28462a61c03202da47ebbb93ce4bd3d99143e48477ff202017b76b418cb0d6cd989ccee15db77af3b1fe9cd2de978"
+            },
+            {
+              "plain": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+              "cipher": "66b6f54178b68ea5962bc29479615fefbb73dfe9d1e668a1c1562789ed4822dbc8f9a33aafdf3cb765e17ddbe1bb527669baf63c8b47a8a767f8765e4bdd651212fdbea5d744ad17ed95622a181b8a07e45ad1dc2788d6ac5a9cbcfcea0761af8091f545bdbd3efbf3cacbb553dd0a95785ae1519be49dd46ea0fec3375f7e82cbb7d2f15b3630a12e000fdc82aa5cb0cc2fa66d76811acd80b658f428901f04f9226c3510ba286821f4dbe46b472af6dbbf8f816c741501880a6f29cba4407e1f19761dbe088a486f2b458e5b6e2a03aea950714a0a0598365bf19580c63c672ec86756a18a7549967048dc605e621029f349ce8d8cf43f1a59e95c78b886871ccb96ab07f81cdb358e678240c8c028f7d15d57d7a52974fa4ee608450ef9e0c00bc2eaf21ba335b6e8801720931cdd475445c437971d568f999c137260198b1d6531876eeca0c9b79b3da46a1d85c2e6ebd43c6acb2636dc76b45bcc6063308784959f9ea2120fcfb6587123f3933a466a5950b1d828f6e07c9b853eb0a7656997666bc6f29da9632d7c6b3e786563df3393b5b22129052e7cbc51fefca28850d57ab9b5a5ae9cfa9c91af2491b22c037f702a6d91bb45d95819ca74515866293e87288d524daf179e379653e6b389b87f8bd7206eb27251fff5eba52afb4d17ca977270404226d2774ac5813d6367b0e484c02ef59005387e869a800f32f2c40533c282f659dc9e2a08af7013abaa66d99e2c1ab9c970731239fea31775a60798c6a3eec3b66a2b2271750e9f128cd70c7344b25b617e6271245b8f1578205f5116e562ebf60e0c8368cfbeed7711b905193e17782f78f1a5727946c061b25324619120f2557e0203f6ee2772a3b8fc1ab361706572ecedaebf14b5dd11ea1df06856654dda897fcf1ae232b48f85273d0ef1f79566be6fb79c5ed67ac1c39dc4af844521bf978e9097db3f49cc3a1bed7b1a9dcc5ba9c97a6340fdec08474128f8ff3c3d555efe6ed8ab7b13c3768c92325a39485ac7aa6b1f29e60cce11ae2a212b3653fe7381b9b61791394dfb13c8c1f7188c8c4920aeceda098650457660957a5d1698d74ed48f2d3288f1fea093ec2065cb4e203ccc08bcdc5c3908f4d62c6cc045967ce8816499cb382b426a3299ddeee430f4ff4ed7084a54a7bab35c39b9ca9086659d79146ac03c2c50fd76604f18a4bf9c7056a1bb28097410c507ad7fdd5d92205c3899e9480c8fa2cbafbe03d35d9e8ee1c642c0e1c106d16031be06eabc84a794e3a1739582a25c7cbef304ff471966b2eb1152f105833ae3b51f01b14a8c5685ddcc50882bff26945bf922e4b728ac165226cad9f2f10dd2158ec3907fe2d4be4dd871b6a77819d5a10e84f579a5ca0fa32361075646d8815ea6f527dd1c5c0e722a5b80fc90038797a01d6b4925dbc91d96da19769bfdd292252bb5cf695f5452b5e353ae83c3e45de174a9095869e9dc173c8aa3098e2e64e55da0d7817fb27a19c6660bd28d9aad3377128da974e822494a2ee82a45e5f80c8b9507e09911e812a71ce72b0eaebaf10ecb5187d86bd141ef"
+            }
+          ],
+          "content": {
+            "plainHex": "232048656c6c6f2066726f6d204f6e79780a0a53796e6365642c207365616c65642c2064656c6976657265642e0a",
+            "iv": "0102030405060708090a0b0c",
+            "cipher": "0102030405060708090a0b0cdac2b23a5d03f07744bfeaa49af0940c2dc9d750b7e3c6036fa4b28479803ab32a25ccc063f02369d24a7eb8c840d36f74e001d6a1891737667f7699782b",
+            "sha256": "05ec98a52971c84ca3c144cdc3c2eb0d26805c3ebfd70fc833b7cd3aa0d57f05"
+          }
+        }
+      }
+    }
+  ],
+  "ctrWrap": {
+    "plain": "wrap-probe-28992-padding-to-two-blocks",
+    "cipher": "00567a42e7fd8e1efe4516055041ffff88c0e98f242f7bfbd8df24ffb39cd309d9c09d402106a20a53a9dc78212f85cb816e0475d210"
+  }
+}

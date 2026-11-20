@@ -70,6 +70,8 @@ struct SettingsView: View {
                 Toggle("Open in focus mode (just the text)", isOn: $startFocus)
                 Text("⌃⌘F toggles focus mode any time; Esc leaves it.").font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { header("Focus") }
+
+            ObsidianSyncSettings(ws: ws)
         }
         .formStyle(.grouped)
         .frame(width: 480)
