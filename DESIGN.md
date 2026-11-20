@@ -319,3 +319,16 @@ or drop a card on it to add the card to the end of that lane. Right-clicking a h
 and "Expand all". The state is the plugin's own `list-collapse` array (one boolean per lane index) in the
 `%% kanban:settings` JSON, so it round-trips with Obsidian. Only that array is rewritten. If the key is missing, it is added; if the
 board has no settings block, one is added.
+
+## Rename and move: Markdown links too
+
+Besides wikilinks, rename and move rewrite standard Markdown links and embeds (`[t](x.md)`, `![](img.png)`), keeping
+each link's style:
+- relative (`../`, `./`), vault-absolute (`Folder/x.md`, `/Folder/x.md`) or bare name;
+- `%20`-encoded, raw or `<angle>`;
+- the `#heading` anchor and title.
+
+The relative links inside a moved note are re-expressed from its new folder. Moving or renaming an attachment (or a folder
+of them) updates both `![[path]]` wikilinks and Markdown embeds. Links are resolved the way Obsidian does: relative to the
+note, then from the vault root, then by name. External URLs, same-note `#anchors`, code and comments are left alone. All
+edits and the move land in one git commit. The logic is in `MarkdownLinks` (OnyxCore), with tests in MarkdownLinksTests.

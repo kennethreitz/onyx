@@ -666,9 +666,11 @@ final class Workspace {
     }
     func confirmRenameCurrent() { if let p = currentPath { confirmRename(p) } }
 
-    /// Move or rename a note, file or folder. Wikilinks elsewhere that point at a moved note
-    /// are rewritten: path links ([[Folder/Note]]) always, name links ([[Note]]) when the name
-    /// changed; #heading, |alias and embeds are kept. The note stays open in its panes and
+    /// Move or rename a note, file or folder. Wikilinks elsewhere that point at a moved note or
+    /// attachment are rewritten: path links ([[Folder/Note]]) always, name links ([[Note]]) when the
+    /// name changed; #heading, |alias and embeds are kept. Standard Markdown links and embeds are
+    /// rewritten too (relative, vault-absolute or by name; %20-encoded or raw; anchors kept), including
+    /// the relative links inside the notes that move. The note stays open in its panes and
     /// history. Commits right away via `vaultMutated`.
     @discardableResult
     func relocate(_ from: String, to dest: String, reason: String) -> Bool {
@@ -689,11 +691,16 @@ final class Workspace {
         func noExt(_ p: String) -> String { p.lowercased().hasSuffix(".md") ? String(p.dropLast(3)) : p }
         func title(_ p: String) -> String { (noExt(p) as NSString).lastPathComponent }
         var edited: [String] = []
+        // attachments move too (an image, a PDF, a folder of them): links to them follow
+        var fileMap = map
+        if snap.attachments[from] != nil { fileMap[from] = dest }
+        for p in snap.attachments.keys where p.hasPrefix(from + "/") { fileMap[p] = dest + String(p.dropFirst(from.count)) }
+        let snap0 = snap
         for (path, note) in snap.notes {
             var text = note.content as NSString
             var changed = false
             for l in note.summary.links.sorted(by: { $0.range.location > $1.range.location }) {
-                guard let target = snap.resolve(l.target, from: path), let newPath = map[target] else { continue }
+                guard let target = snap.resolve(l.target, from: path), let newPath = fileMap[target] else { continue }
                 let usesPath = l.target.contains("/")
                 let newTarget: String
                 if usesPath { newTarget = l.target.lowercased().hasSuffix(".md") ? newPath : noExt(newPath) }
@@ -716,15 +723,19 @@ final class Workspace {
                 text = text.replacingCharacters(in: NSRange(location: tStart, length: tLen), with: newTarget) as NSString
                 changed = true
             }
+            // standard Markdown links and embeds: [t](../x.md#h), ![](a%20b.png), <…>; a moved note's own relative links too
+            if let md = MarkdownLinks.rewrite(text as String, oldNote: path, newNote: map[path] ?? path,
+                                              exists: { snap0.notes[$0] != nil || snap0.attachments[$0] != nil },
+                                              resolveName: { snap0.resolve($0, from: path) },
+                                              moved: { fileMap[$0] }) {
+                text = md as NSString; changed = true
+            }
             if changed, write(text as String, to: path, create: false) {
                 snap.update(path: path, content: text as String); edited.append(path)
                 if path == currentPath { suppressTextChange = true; self.text = text as String; lastSaved = text as String; suppressTextChange = false; renderToken += 1 }
             }
         }
         // canvas file cards follow the notes (and images, PDFs) they show
-        var fileMap = map
-        if snap.attachments[from] != nil { fileMap[from] = dest }
-        for p in snap.attachments.keys where p.hasPrefix(from + "/") { fileMap[p] = dest + String(p.dropFirst(from.count)) }
         for c in snap.canvases.keys {
             let url = root.appendingPathComponent(c)
             guard let old = try? String(contentsOf: url, encoding: .utf8),
