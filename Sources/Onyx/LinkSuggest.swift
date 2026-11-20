@@ -138,6 +138,14 @@ enum TypeSelfTest {
             let parts = arg.components(separatedBy: " -> "); if parts.count == 2 { ws.relocate(parts[0], to: parts[1], reason: "Rename \((parts[0] as NSString).lastPathComponent) → \((parts[1] as NSString).lastPathComponent)") }
         case "cat":
             if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
+        case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view
+            let m: NSEvent.ModifierFlags = line.hasPrefix("shift") ? .shift : line.hasPrefix("cmd") ? .command : []
+            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") { ws.openNote(arg) } }
+        case "expand": ws.expanded.insert(arg)
+        case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
+        case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
+        case "trashsel": ws.trash(Array(ws.treeSelection.selected))       // what ⌘⌫ does after its confirm
+        case "movesel": ws.move(Array(ws.treeSelection.selected), toFolder: arg)
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":

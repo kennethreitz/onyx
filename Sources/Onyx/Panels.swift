@@ -110,6 +110,14 @@ struct TreeNodeView: View {
     var isCurrent: Bool {
         ws.currentPath == node.path || (node.folderNote != nil && ws.currentPath == node.folderNote) || (node.isFolder && ws.selectedFolder == node.path)
     }
+    var isSelected: Bool { ws.treeSelection.contains(node.path) }
+    /// Selected rows get the full highlight; with a multi-selection the open note (if not part
+    /// of it) keeps only a faint one so it's clear what a menu or ⌘⌫ will act on.
+    var fill: Double {
+        if isSelected { return 0.085 }
+        if isCurrent { return ws.treeSelection.isMulti ? 0.035 : 0.08 }
+        return hover ? 0.04 : 0
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -137,12 +145,18 @@ struct TreeNodeView: View {
             }
             .padding(.leading, CGFloat(depth) * 13 + 8).padding(.trailing, 8)
             .frame(height: 24)
-            .background(RoundedRectangle(cornerRadius: 5).fill(isCurrent ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.horizontal, 5))
+            .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(fill)).padding(.horizontal, 5))
             .contentShape(Rectangle())
             .onHover { hover = $0 }
-            .onTapGesture { activate() }
+            .onTapGesture { ws.treeClick(node.path, modifiers: NSEvent.modifierFlags) { activate() } }
             .id(node.path)
-            .contextMenu { FileMenu(ws: ws, path: node.path, isFolder: node.isFolder, folderNote: node.folderNote) }
+            .contextMenu {
+                if ws.treeSelection.isMulti && isSelected {
+                    SelectionMenu(ws: ws, paths: ws.targets(for: node.path))
+                } else {
+                    FileMenu(ws: ws, path: node.path, isFolder: node.isFolder, folderNote: node.folderNote)
+                }
+            }
             if node.isFolder && isOpen {
                 ForEach(node.children ?? []) { c in TreeNodeView(ws: ws, node: c, depth: depth + 1) }
             }
@@ -183,6 +197,26 @@ struct FileMenu: View {
         if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }
         Divider()
         Button(isFolder ? "Delete Folder…" : "Delete…", role: .destructive) { DispatchQueue.main.async { ws.confirmTrash(path) } }
+    }
+}
+
+/// Right-click on a row that's part of a multi-selection: batch actions; one-item actions are
+/// shown but disabled so the menu doesn't change shape under the pointer.
+struct SelectionMenu: View {
+    var ws: Workspace
+    var paths: [String]
+    var body: some View {
+        Button("Open") {}.disabled(true)
+        Divider()
+        Button("Rename…") {}.disabled(true)
+        Button("Move \(paths.count) Items to…") { ws.beginMove(paths) }
+        Divider()
+        Button("Reveal \(paths.count) Items in Finder") {
+            if let r = ws.root { NSWorkspace.shared.activateFileViewerSelecting(paths.map { r.appendingPathComponent($0) }) }
+        }
+        Button("Open in Obsidian") {}.disabled(true)
+        Divider()
+        Button("Delete \(paths.count) Items…", role: .destructive) { DispatchQueue.main.async { ws.confirmTrash(paths) } }
     }
 }
 

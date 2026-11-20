@@ -205,6 +205,7 @@ final class Workspace {
         guard let snap = snapshot, let note = snap.notes[path] else { return }
         flushSave()
         if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
+        if !treeSelection.contains(path) { treeSelection.clear() }   // opened from elsewhere
         if recordHistory { pushHistory(.note(path)) }
         if currentPath != path { liveTop = 0 }
         currentPath = path
@@ -379,6 +380,36 @@ final class Workspace {
         createNote(named: "Untitled", folder: folder)
     }
 
+    // MARK: Sidebar selection (Finder-style)
+
+    /// Rows selected in the file tree. Click selects one (and opens it); ⇧-click spans from the
+    /// anchor over visible rows; ⌘-click toggles one without changing the open note.
+    var treeSelection = TreeSelection()
+    /// The tree was the last thing clicked, so ⌘⌫ and Esc act on its selection.
+    @ObservationIgnored var treeFocused = false
+
+    func visibleTreePaths() -> [String] { snapshot?.tree.visiblePaths(expanded: expanded) ?? [] }
+
+    /// One code path for real clicks and the test harness. `open` runs only for a plain click.
+    func treeClick(_ path: String, modifiers: NSEvent.ModifierFlags, open: () -> Void) {
+        treeFocused = true
+        if modifiers.contains(.command) { treeSelection.toggle(path); return }
+        if modifiers.contains(.shift) { treeSelection.extend(to: path, visible: visibleTreePaths()); return }
+        treeSelection.click(path)
+        open()
+    }
+    /// Esc: drop a multi-selection back to just the open note. True if it did anything.
+    func clearTreeSelection() -> Bool {
+        guard treeSelection.isMulti else { return false }
+        treeSelection.clear()
+        if let c = currentPath { treeSelection.click(c) }
+        return true
+    }
+    /// What a menu or ⌘⌫ acts on: the selection when `path` is part of a multi-selection, else just `path`.
+    func targets(for path: String) -> [String] {
+        treeSelection.isMulti && treeSelection.contains(path) ? TreeSelection.roots(treeSelection.selected) : [path]
+    }
+
     // MARK: Deleting
 
     /// Ask, then move a note, file or folder to the Trash.
@@ -409,23 +440,46 @@ final class Workspace {
     }
     func confirmTrashCurrent() { if let p = currentPath { confirmTrash(p) } }
 
+    /// One confirm for several items, then one Trash call and one commit.
+    func confirmTrash(_ paths: [String]) {
+        let roots = TreeSelection.roots(paths)
+        guard roots.count > 1 else { if let p = roots.first { confirmTrash(p) }; return }
+        let a = NSAlert()
+        a.messageText = "Move \(roots.count) items to the Trash?"
+        let names = roots.map { p -> String in let l = (p as NSString).lastPathComponent; return l.lowercased().hasSuffix(".md") ? String(l.dropLast(3)) : l + "/" }
+        var info = names.prefix(8).map { "• " + $0 }.joined(separator: "\n")
+        if names.count > 8 { info += "\n… and \(names.count - 8) more" }
+        let inside = snapshot?.notes.keys.filter { k in roots.contains { k.hasPrefix($0 + "/") } }.count ?? 0
+        if inside > 0 { info += "\n\nIncluding \(inside) note\(inside == 1 ? "" : "s") inside the selected folders." }
+        a.informativeText = info + "\n\nYou can restore them from the Trash in Finder."
+        a.addButton(withTitle: "Move to Trash"); a.addButton(withTitle: "Cancel")
+        a.buttons.first?.hasDestructiveAction = true
+        if a.runModal() == .alertFirstButtonReturn { trash(roots) }
+    }
+
     /// Move to the Trash (recoverable). Every pane showing it moves on (back in its history,
     /// else Home) and it drops out of every history and the recent list.
-    func trash(_ path: String) {
+    func trash(_ path: String) { trash([path]) }
+
+    /// Several paths in one go: one Trash call, one history/pane cleanup, one commit.
+    func trash(_ paths: [String]) {
         guard let root else { return }
-        let gone: (String) -> Bool = { $0 == path || $0.hasPrefix(path + "/") }
+        let roots = TreeSelection.roots(paths)
+        guard !roots.isEmpty else { return }
+        let gone: (String) -> Bool = { p in roots.contains { p == $0 || p.hasPrefix($0 + "/") } }
         if let c = currentPath, gone(c) { flushSave() }   // the Trash gets the latest words
-        let affected = Array(Set((snapshot?.notes.keys.filter(gone) ?? []) + [path])).sorted()
-        NSWorkspace.shared.recycle([root.appendingPathComponent(path)]) { [weak self] _, err in
+        let affected = Array(Set((snapshot?.notes.keys.filter(gone) ?? []) + roots)).sorted()
+        NSWorkspace.shared.recycle(roots.map { root.appendingPathComponent($0) }) { [weak self] trashed, err in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if let err { self.toast = "Couldn’t move to Trash: \(err.localizedDescription)"; return }
-                self.afterTrash(affected, gone: gone, name: (path as NSString).lastPathComponent)
+                if let err, trashed.isEmpty { self.toast = "Couldn’t move to Trash: \(err.localizedDescription)"; return }
+                self.afterTrash(affected, gone: gone, name: TreeSelection.describe(roots))
             }
         }
     }
 
     private func afterTrash(_ affected: [String], gone: (String) -> Bool, name: String) {
+        treeSelection.prune { !gone($0) }
         snapshot?.refresh(paths: affected)
         recent.removeAll(where: gone)
         UserDefaults.standard.set(recent, forKey: key("recent"))
@@ -471,17 +525,49 @@ final class Workspace {
     // MARK: Rename & move
 
     /// What "Move to…" is moving (a note, file or folder path).
-    var moveSource: String?
-    func beginMove(_ path: String) { moveSource = path; withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .moveTo } }
+    var moveSources: [String] = []
+    var moveSource: String? { moveSources.first }
+    func beginMove(_ path: String) { beginMove([path]) }
+    func beginMove(_ paths: [String]) {
+        moveSources = TreeSelection.roots(paths)
+        guard !moveSources.isEmpty else { return }
+        withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .moveTo }
+    }
     func beginMoveCurrent() { if let p = currentPath { beginMove(p) } }
 
     /// Folders for the Move to… picker ("" = vault root), minus where it already is and,
     /// for a folder, itself and everything under it.
-    func moveDestinations(for path: String) -> [String] {
-        let here = (path as NSString).deletingLastPathComponent
+    func moveDestinations(for path: String) -> [String] { moveDestinations(for: [path]) }
+    func moveDestinations(for paths: [String]) -> [String] {
+        let parents = Set(paths.map { ($0 as NSString).deletingLastPathComponent })
         let all = [""] + (snapshot?.folders.sorted() ?? [])
-        return all.filter { f in f != here && f != path && !f.hasPrefix(path + "/") && !(f as NSString).lastPathComponent.hasPrefix(".") }
+        return all.filter { f in
+            !(parents.count == 1 && parents.contains(f))
+                && !paths.contains { f == $0 || f.hasPrefix($0 + "/") }
+                && !(f as NSString).lastPathComponent.hasPrefix(".")
+        }
     }
+
+    /// Move several items to one folder: each keeps its links and panes; one commit.
+    func move(_ paths: [String], toFolder folder: String) {
+        let roots = TreeSelection.roots(paths)
+        guard roots.count > 1 else { if let p = roots.first { move(p, toFolder: folder) }; return }
+        batchDepth += 1
+        var moved: [String] = [], changed: [String] = []
+        for p in roots where (p as NSString).deletingLastPathComponent != folder {
+            let name = (p as NSString).lastPathComponent
+            let dest = folder.isEmpty ? name : folder + "/" + name
+            if relocate(p, to: dest, reason: "") { moved.append(p); changed += [p, dest] }
+        }
+        batchDepth -= 1
+        treeSelection.clear()
+        guard !moved.isEmpty else { return }
+        let reason = "Move \(TreeSelection.describe(moved)) → \(folder.isEmpty ? "/" : folder)"
+        toast = reason
+        vaultMutated(reason, paths: changed)
+    }
+    /// >0 while a batch runs: structural changes are reported once, at the end.
+    @ObservationIgnored private var batchDepth = 0
 
     func move(_ path: String, toFolder folder: String) {
         let name = (path as NSString).lastPathComponent
@@ -602,6 +688,7 @@ final class Workspace {
 
     /// Structural changes (delete, rename, move) land here so git can commit them right away.
     func vaultMutated(_ message: String, paths: [String]) {
+        guard batchDepth == 0 else { return }
         chromeLog("vault: \(message) \(paths.count) path(s)")
         git?.commitNow(reason: message)
         obsidianSync?.edited()

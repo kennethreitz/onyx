@@ -376,14 +376,15 @@ struct RootView: View {
         case .moveTo:
             dimmer
             VStack {
-                if let src = ws.moveSource {
-                    let name = ((src as NSString).lastPathComponent as NSString).deletingPathExtension
-                    PaletteView(placeholder: "Move “\(name)” to…", items: { PaletteCommands.folders(ws, for: src, $0) },
+                if !ws.moveSources.isEmpty {
+                    let srcs = ws.moveSources
+                    let name = TreeSelection.describe(srcs)
+                    PaletteView(placeholder: srcs.count == 1 ? "Move “\(name)” to…" : "Move \(name) to…", items: { PaletteCommands.folders(ws, for: srcs, $0) },
                                 onCreate: { f in
                                     let folder = f.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
                                     ws.show(.none)
                                     if let r = ws.root { try? FileManager.default.createDirectory(at: r.appendingPathComponent(folder), withIntermediateDirectories: true) }
-                                    ws.move(src, toFolder: folder)
+                                    ws.move(srcs, toFolder: folder)
                                 },
                                 exists: { q in ws.snapshot?.folders.contains(q.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))) ?? false },
                                 noun: "folder", openVerb: "move", allowSplit: false,
@@ -440,8 +441,16 @@ struct RootView: View {
                e.window != nil, e.window === MainWindow.current, ws.overlay == .none || ws.overlay == .graph {
                 ch == "[" ? ws.goBack() : ws.goForward(); return nil
             }
+            // ⌘⌫ right after clicking in the file tree deletes the tree selection (one confirm)
+            if mods == [.command], e.keyCode == 51, ws.treeFocused, ws.sidebarVisible, ws.sidebarTab == .files,
+               ws.treeSelection.count > 0, ws.overlay == .none, e.window != nil, e.window === MainWindow.current {
+                let sel = TreeSelection.roots(ws.treeSelection.selected)
+                DispatchQueue.main.async { ws.confirmTrash(sel) }
+                return nil
+            }
             if e.keyCode == 53 { // Esc
                 if let tv = MainWindow.current?.firstResponder as? OnyxTextView, tv.suggestionsVisible { return e }
+                if ws.sidebarVisible, ws.clearTreeSelection() { return nil }   // Esc drops a multi-selection first
                 if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
                 return ws.dismissTop() ? nil : e
             }
@@ -477,6 +486,8 @@ struct RootView: View {
             return e
         }
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { e in
+            // any click clears "tree focus"; a tree row's own tap sets it again right after
+            if e.type == .leftMouseDown { ws.treeFocused = false }
             // a click in an unfocused pane focuses it first, then the click lands as usual
             guard ws.isSplit, ws.overlay == .none, let w = e.window, let content = w.contentView else { return e }
             let p = CGPoint(x: e.locationInWindow.x, y: content.bounds.height - e.locationInWindow.y)
@@ -515,7 +526,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note (to the Trash)"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

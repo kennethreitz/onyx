@@ -271,8 +271,8 @@ enum PaletteCommands {
     }
 
     /// Move to…: folders through the same matcher (on the full folder path).
-    @MainActor static func folders(_ ws: Workspace, for src: String, _ q: String) -> [PaletteItem] {
-        let dests = ws.moveDestinations(for: src)
+    @MainActor static func folders(_ ws: Workspace, for srcs: [String], _ q: String) -> [PaletteItem] {
+        let dests = ws.moveDestinations(for: srcs)
         let toks = QuickMatch.tokens(q)
         var scored: [(Int, PaletteItem)] = []
         for (i, f) in dests.enumerated() {
@@ -285,7 +285,7 @@ enum PaletteCommands {
             }
             guard ok else { continue }
             let item = PaletteItem(id: "folder:" + f, title: shown, subtitle: f.isEmpty ? "/" : "", symbol: "folder", titleHits: hits) {
-                ws.show(.none); ws.move(src, toFolder: f)
+                ws.show(.none); ws.move(srcs, toFolder: f)
             }
             scored.append((toks.isEmpty ? -i : score, item))
         }

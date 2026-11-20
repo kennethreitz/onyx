@@ -151,6 +151,16 @@ note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't 
 any pane showing it steps back (or closes, if it has nowhere to go) and the recent list forgets it.
 `vaultMutated` is the hook git auto-commit uses for deletes, renames and moves.
 
+Sidebar multi-select works like Finder: click selects one row and opens it; ⇧-click selects the
+visible rows between the anchor and the click; ⌘-click toggles a row without changing the open note
+(the anchor moves to it). Selected rows share one highlight; during a multi-selection the open note,
+if not selected, keeps only a faint one. Right-clicking a selected row gives a selection menu: Move N
+Items to…, Reveal N Items in Finder, Delete N Items… (Open, Rename and Open in Obsidian are shown
+disabled). ⌘⌫ deletes the selection when the last click was in the tree; Esc clears it. A folder
+in the selection swallows its selected descendants (`TreeSelection.roots`). Batch moves rewrite
+links per item but report one vault change, and batch deletes are one Trash call, so git sync makes
+one commit per batch ("Move 3 items: a, b, c → Folder", "Delete a and b").
+
 ## Git, continuously
 
 When the vault folder is itself a git repository (its own `.git`) and git is installed, Onyx
