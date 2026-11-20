@@ -39,6 +39,9 @@ keep working right alongside it.
 - **Built in, not bolted on**: daily notes, backlinks, outline, properties, bookmarks, recent
   files, search, a quick switcher and a command palette, Dataview-style `TABLE`/`LIST`
   queries, Kanban boards, git status and commit, and RhymePad highlighting for verse.
+- **A quick switcher that gets you**: ⌘O ranks exact > prefix > initials > substring > fuzzy,
+  ignores accents, matches folders and aliases ("hebrew aleph", "hl", "resume" → Résumé),
+  highlights what matched, opens in a split with ⌘↩ and creates with ⇧↩.
 - **Split panes**: <kbd>⌘D</kbd> side by side, <kbd>⇧⌘D</kbd> stacked, up to four, divided by a
   hairline. Each pane keeps its own note and its own read/edit mode; the title path follows
   the focused one.
@@ -57,7 +60,7 @@ keep working right alongside it.
 
 | Key | Does |
 | --- | --- |
-| <kbd>⌘O</kbd> | Quick switcher: find or create a note |
+| <kbd>⌘O</kbd> | Quick switcher: find or create a note (⌘↩ opens in a split, ⇧↩ creates) |
 | <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> | Command palette |
 | <kbd>⌘K</kbd> | Show or hide the sidebar (opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
