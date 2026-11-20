@@ -110,21 +110,39 @@ extension View {
 
 import WebKit
 
-/// Test hook: with ONYX_SCROLL_TEST=1, scroll every scroll view and reader a few seconds after
-/// launch so the scrollbar fade can be screenshotted without synthetic input.
+/// Test hook: with ONYX_SCROLL_TEST=<seconds>, scroll every scroll view and reader in small steps
+/// that long after launch so the scrollbar fade can be screenshotted without synthetic input.
 enum ScrollSelfTest {
     @MainActor static func scheduleIfRequested() {
-        guard ProcessInfo.processInfo.environment["ONYX_SCROLL_TEST"] != nil else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4) {
-            for w in NSApp.windows { if let v = w.contentView { poke(v) } }
+        guard let v = ProcessInfo.processInfo.environment["ONYX_SCROLL_TEST"] else { return }
+        let delay = Double(v).map { $0 > 1 ? $0 : 4 } ?? 4     // ONYX_SCROLL_TEST=<seconds>, default 4
+        // small steps over ~1.5s, so a screenshot reliably lands mid-scroll
+        for k in 0..<6 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay + Double(k) * 0.3) {
+                for w in NSApp.windows { if let v = w.contentView { poke(v) } }
+            }
         }
     }
     @MainActor private static func poke(_ v: NSView) {
-        if let wv = v as? WKWebView { wv.evaluateJavaScript("window.scrollBy(0, 400)", completionHandler: nil) }
+        if let wv = v as? WKWebView { wv.evaluateJavaScript("window.scrollBy(0, 70)", completionHandler: nil) }
         if let sv = v as? NSScrollView, let doc = sv.documentView, doc.frame.height > sv.contentView.bounds.height + 1 {
-            var o = sv.contentView.bounds.origin; o.y += 220
+            var o = sv.contentView.bounds.origin; o.y += 40
             sv.contentView.scroll(to: o); sv.reflectScrolledClipView(sv.contentView)
         }
         v.subviews.forEach(poke)
+    }
+}
+
+/// A scroll view whose thin scroller floats over the content instead of reserving a column,
+/// so split panes meet at a hairline with no gutter.
+final class ThinScrollView: NSScrollView {
+    override func tile() {
+        super.tile()
+        guard let v = verticalScroller, hasVerticalScroller else { return }
+        var c = contentView.frame
+        c.size.width = bounds.width - c.minX
+        contentView.frame = c
+        v.frame = NSRect(x: bounds.maxX - v.frame.width, y: v.frame.minY, width: v.frame.width, height: v.frame.height)
+        if subviews.last !== v { addSubview(v, positioned: .above, relativeTo: nil) }
     }
 }

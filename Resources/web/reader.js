@@ -231,28 +231,53 @@
 })();
 
 
-// Scrollbar fade: show the thin thumb while scrolling or when the pointer nears the edge,
-// then ease it out after a beat of stillness.
+// Floating scrollbar: a 3px thumb drawn over the page (WebKit's own is hidden so it reserves no
+// gutter). It fades in while scrolling or with the pointer near the edge, out after ~0.9s idle,
+// and can be dragged.
 (function () {
   const root = document.documentElement;
-  let a = 0, target = 0, raf = 0, idle = 0, hot = false;
-  const step = () => {
-    a += (target - a) * 0.22;
-    if (Math.abs(target - a) < 0.02) a = target;
-    root.style.setProperty('--sb-a', a.toFixed(3));
-    raf = a === target ? 0 : requestAnimationFrame(step);
+  const bar = document.createElement('div'); bar.id = 'onyx-sb';
+  const thumb = document.createElement('i'); bar.appendChild(thumb);
+  const mount = () => { if (!bar.isConnected) document.body.appendChild(bar); };
+  let idle = 0, hot = false, drag = null;
+  const metrics = () => {
+    const vh = window.innerHeight, sh = root.scrollHeight;
+    const h = Math.max(36, vh * vh / sh), max = sh - vh;
+    return { vh, sh, h, max, top: max > 0 ? (vh - h - 4) * (window.scrollY / max) + 2 : 2 };
   };
-  const go = (t) => { target = t; if (!raf) raf = requestAnimationFrame(step); };
-  const wake = () => {
-    if (root.scrollHeight <= root.clientHeight + 1) return;
-    go(1); clearTimeout(idle);
-    idle = setTimeout(() => { if (!hot) go(0); }, 900);
+  const place = () => {
+    mount();
+    const m = metrics();
+    bar.style.height = m.vh + 'px';
+    thumb.style.height = m.h + 'px'; thumb.style.top = m.top + 'px';
+    return m.max > 1;
   };
-  window.addEventListener('scroll', wake, { passive: true });
+  const show = (hold) => {
+    if (!place()) { bar.className = ''; return; }
+    bar.className = 'on' + (hot || drag ? ' hot' : '');
+    clearTimeout(idle);
+    if (!hold) idle = setTimeout(() => { if (!hot && !drag) bar.className = 'off'; }, 900);
+  };
+  window.addEventListener('scroll', () => show(false), { passive: true });
+  window.addEventListener('resize', () => { if (bar.className.startsWith('on')) place(); });
   window.addEventListener('mousemove', (e) => {
-    const near = e.clientX > window.innerWidth - 16;
-    if (near !== hot) { hot = near; root.classList.toggle('sb-hot', near); }
-    if (near) { go(1); clearTimeout(idle); } else if (target === 1) wake();
+    const near = e.clientX > window.innerWidth - 14;
+    if (near !== hot) { hot = near; show(near); }
   }, { passive: true });
-  document.addEventListener('mouseleave', () => { hot = false; root.classList.remove('sb-hot'); wake(); });
+  document.addEventListener('mouseleave', () => { hot = false; show(false); });
+  bar.addEventListener('mousedown', (e) => {
+    const m = metrics();
+    const r = thumb.getBoundingClientRect();
+    if (e.clientY < r.top || e.clientY > r.bottom) {      // click in the gutter: jump there
+      window.scrollTo(0, (e.clientY - m.h / 2) / (m.vh - m.h) * m.max);
+    }
+    drag = { y: e.clientY, s: window.scrollY, m: metrics() };
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!drag) return;
+    const { m } = drag;
+    window.scrollTo(0, drag.s + (e.clientY - drag.y) * m.max / Math.max(1, m.vh - m.h - 4));
+  });
+  window.addEventListener('mouseup', () => { if (drag) { drag = null; show(false); } });
 })();

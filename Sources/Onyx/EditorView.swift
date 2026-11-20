@@ -169,7 +169,7 @@ struct EditorView: NSViewRepresentable {
         tv.noteNames = { [weak ws] in ws?.snapshot?.notes.values.map(\.name).sorted() ?? [] }
         tv.onFollowLink = { [weak ws] t in ws?.openLink(t) }
 
-        let scroll = NSScrollView()
+        let scroll = ThinScrollView()
         scroll.documentView = tv
         scroll.hasVerticalScroller = true
         scroll.autohidesScrollers = true
