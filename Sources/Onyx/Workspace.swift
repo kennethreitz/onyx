@@ -65,6 +65,12 @@ final class Workspace {
     var focusedPane = 0
     var splitAxis: SplitAxis = .vertical
     var paneFrames: [UUID: CGRect] = [:]   // window coords, top-left origin
+    /// Topmost visible source line (fractional, 0-based, frontmatter included) of the focused
+    /// pane and of each unfocused pane. Reported by the editor and reader as they scroll and
+    /// read by a freshly created view, so ⌘↩ and splits land on the same spot. Not observed:
+    /// scrolling must not re-render SwiftUI.
+    @ObservationIgnored var liveTop: Double = 0
+    @ObservationIgnored var paneTop: [UUID: Double] = [:]
     var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
     var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
     var copiedFlash = 0                  // bump to flash "Copied" in the title line
@@ -169,6 +175,7 @@ final class Workspace {
         selectedFolder = nil
         guard let snap = snapshot, let note = snap.notes[path] else { return }
         flushSave()
+        if currentPath != path { liveTop = 0 }
         currentPath = path
         conflict = nil
         suppressTextChange = true
@@ -533,7 +540,18 @@ extension Workspace {
         panes[focusedPane].path = currentPath
         panes[focusedPane].text = text
         panes[focusedPane].mode = mode
+        paneTop[panes[focusedPane].id] = liveTop
     }
+
+    /// Scroll report from a view; `pane` is nil for the focused (live) pane.
+    func reportTop(_ pane: UUID?, _ line: Double) {
+        if let pane { paneTop[pane] = line } else { liveTop = line }
+        if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
+            FileHandle.standardError.write("[top] \(pane.map { String($0.uuidString.prefix(4)) } ?? "live") \(String(format: "%.2f", line)) \(mode)\n".data(using: .utf8)!)
+        }
+    }
+    /// Where a newly created view should open.
+    func initialTop(_ pane: UUID?) -> Double { pane.map { paneTop[$0] ?? 0 } ?? liveTop }
 
     /// ⌘D / ⇧⌘D: split the focused pane; the new pane shows the same note and takes focus.
     func split(_ axis: SplitAxis) {
@@ -543,7 +561,9 @@ extension Workspace {
         captureFocused()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             splitAxis = axis
-            panes.insert(Pane(id: UUID(), path: currentPath, text: text, mode: mode), at: focusedPane + 1)
+            let fresh = Pane(id: UUID(), path: currentPath, text: text, mode: mode)
+            paneTop[fresh.id] = liveTop   // the new pane opens where the source pane is
+            panes.insert(fresh, at: focusedPane + 1)
             focusedPane += 1
         }
         chromeLog("split \(axis) panes=\(panes.count) focused=\(focusedPane)")
@@ -557,6 +577,7 @@ extension Workspace {
         focusedPane = i
         let p = panes[i]
         if let path = p.path, path != currentPath { openNote(path) }
+        liveTop = paneTop[p.id] ?? 0
         mode = p.mode
         chromeLog("focusPane \(i) → \(currentPath ?? "-") \(mode)")
     }
@@ -577,6 +598,7 @@ extension Workspace {
         }
         let p = panes[focusedPane]
         if let path = p.path, path != currentPath { openNote(path) }
+        liveTop = paneTop[p.id] ?? liveTop
         mode = p.mode
         if panes.count == 1 { panes = [] ; focusedPane = 0 }
         chromeLog("closePane → panes=\(panes.count) \(currentPath ?? "-")")

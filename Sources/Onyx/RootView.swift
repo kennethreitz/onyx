@@ -247,9 +247,9 @@ struct RootView: View {
         let mode = focused ? ws.mode : pane.mode
         let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
         if mode == .edit {
-            EditorView(ws: ws, fontSize: editorSize, measure: measure, source: src).id("\(pane.id)-e")
+            EditorView(ws: ws, fontSize: editorSize, measure: measure, source: src, paneID: focused ? nil : pane.id).id("\(pane.id)-e")
         } else {
-            ReaderView(ws: ws, fontSize: readerSize, measure: measure, source: src).id("\(pane.id)-r")
+            ReaderView(ws: ws, fontSize: readerSize, measure: measure, source: src, paneID: focused ? nil : pane.id).id("\(pane.id)-r")
         }
     }
 

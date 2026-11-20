@@ -76,3 +76,21 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   just outside their region's rim (no list).
 - The canvas is static unless a transition is running; the TimelineView only exists while
   animating, so camera changes can't be drawn stale.
+
+## Keeping your place
+
+Onyx tracks "where you are" as a **source line**, not a pixel offset: the line sitting just
+under the title (48pt down), with a fraction for how far into a soft-wrapped paragraph or a
+multi-line block that point is.
+
+- The reader renders each top-level markdown block with `data-line` / `data-lines` (0-based
+  line in the file, frontmatter included; dataview fences keep their line count when replaced).
+  The editor maps line ↔ glyph rect through TextKit.
+- Both views report their top line as you scroll (into unobserved workspace state, so scrolling
+  never re-renders SwiftUI), and a freshly created view opens at it. That is what keeps
+  **⌘↩ / ⌘E** on the same passage in both directions, and makes **⌘D / ⇧⌘D** open the new pane
+  exactly where the source pane is.
+- Resizes (splitting, sidebars, the window) re-apply the last chosen line, so the source pane
+  never jumps when it gets narrower or shorter. The editor also refuses AppKit's
+  "recenter the caret on resize" scroll.
+- Positions inside the frontmatter map to the top of the reader (it shows properties there).

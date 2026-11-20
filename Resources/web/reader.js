@@ -115,7 +115,90 @@
   const embedMarked = new marked.Marked({ gfm: true });
   embedMarked.use({ extensions: [wikilink, highlight, tag], renderer });
 
-  function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, ''); }
+  function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, m => m.replace(/[^\n]/g, '')); }  // keep line numbers
+
+  // Source-line anchors. Each top-level block gets data-line (0-based line in the note file,
+  // frontmatter included) and data-lines (how many source lines it spans), so the reader and
+  // editor can hand each other "where you are" by source position rather than pixels.
+  const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
+  function parseWithLines(md, base) {
+    const toks = mainMarked.lexer(md);
+    const out = [];
+    let line = base;
+    for (const t of toks) {
+      const raw = t.raw || '';
+      if (t.type !== 'space' && raw.trim()) {
+        const lead = (raw.match(/^\n*/) || [''])[0].length;
+        const span = raw.replace(/^\n+/, '').replace(/\n+$/, '').split('\n').length;
+        out.push({ type: 'html', block: true, pre: false, raw: '', text: `<!--L${line + lead}:${span}-->` });
+      }
+      out.push(t);
+      line += (raw.match(/\n/g) || []).length;
+    }
+    out.links = toks.links;
+    if (mainMarked.defaults.walkTokens) mainMarked.walkTokens(out, mainMarked.defaults.walkTokens);
+    return mainMarked.parser(out);
+  }
+  function markLines() {
+    const walker = document.createTreeWalker(page, NodeFilter.SHOW_COMMENT);
+    const marks = [];
+    while (walker.nextNode()) marks.push(walker.currentNode);
+    for (const c of marks) {
+      const m = /^L(\d+):(\d+)$/.exec(c.data);
+      if (!m) continue;
+      let el = c.nextSibling;
+      while (el && el.nodeType !== 1) el = el.nextSibling;
+      if (el && !el.dataset.line) { el.dataset.line = m[1]; el.dataset.lines = m[2]; }
+      c.remove();
+    }
+  }
+  function blocks() { return [...page.querySelectorAll('[data-line]')].filter(e => e.offsetParent !== null || e.getClientRects().length); }
+  function topLine() {
+    if (window.scrollY <= 0) return 0;
+    let best = null;
+    for (const b of blocks()) {
+      const r = b.getBoundingClientRect();
+      if (r.bottom <= ANCHOR) { best = b; continue; }
+      const start = +b.dataset.line, span = +b.dataset.lines || 1;
+      if (r.top <= ANCHOR) return start + Math.min(0.999, (ANCHOR - r.top) / Math.max(1, r.height)) * span;
+      // in the gap above this block: say we're at its start
+      return best ? start : start;
+    }
+    return best ? +best.dataset.line + (+best.dataset.lines || 1) : 0;
+  }
+  function scrollToLine(line) {
+    let target = null;
+    for (const b of blocks()) { if (+b.dataset.line <= line) target = b; else break; }
+    if (!target) { window.scrollTo(0, 0); return; }
+    const start = +target.dataset.line, span = +target.dataset.lines || 1;
+    const r = target.getBoundingClientRect();
+    const frac = Math.min(1, Math.max(0, (line - start) / span));
+    window.scrollTo(0, Math.max(0, r.top + window.scrollY + frac * r.height - ANCHOR));
+  }
+  let restoring = 0, reportQueued = false, anchorLine = 0;
+  function reportTop() {
+    if (restoring || reportQueued) return;
+    reportQueued = true;
+    setTimeout(() => { reportQueued = false; if (!restoring) { anchorLine = topLine(); post({ type: 'top', line: anchorLine }); } }, 60);  // not rAF: throttled in occluded windows
+  }
+  window.addEventListener('scroll', reportTop, { passive: true });
+  // Hold a restored position while late layout lands (fonts, Mermaid), unless the reader scrolls.
+  // A resize (split, sidebar, window) reflows the page; hold the reading position by source line.
+  window.addEventListener('resize', () => { if (anchorLine > 0) restoreLine(anchorLine); });
+  function restoreLine(line) {
+    anchorLine = line;
+    const token = ++restoring;
+    let userMoved = false;
+    const stop = () => { userMoved = true; };
+    window.addEventListener('wheel', stop, { once: true, passive: true });
+    window.addEventListener('keydown', stop, { once: true });
+    const apply = () => { if (!userMoved && restoring === token) scrollToLine(line); };
+    apply();
+    setTimeout(apply, 16);
+    if (document.fonts) document.fonts.ready.then(apply);
+    setTimeout(apply, 150);
+    setTimeout(() => { apply(); if (restoring === token) { restoring = 0; reportTop(); } }, 450);
+  }
 
   function props(list) {
     if (!list || !list.length) return '';
@@ -185,19 +268,26 @@
       if (payload.kanban) {
         html = `<h1>${esc(payload.name)}</h1>` + kanbanHTML(payload.kanban);
       } else {
-        try { html = mainMarked.parse(md); } catch (e) { html = `<pre>${esc(md)}</pre>`; }
+        try { html = parseWithLines(md, payload.lineBase || 0); }
+        catch (e) { try { html = mainMarked.parse(md); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
         html = html.replace(/<div class="onyx-dataview" data-i="(\d+)"><\/div>/g, (_, i) => payload.dataview[+i] || '');
         if (!/<h1[\s>]/.test(html)) html = `<h1 class="fallback-title">${esc(payload.name)}</h1>` + html;
       }
       page.classList.add('instant');
       if (!payload.keepScroll) page.classList.remove('shown');
       page.innerHTML = props(payload.props) + html;
+      markLines();
       decorate();
       if (payload.sidenotes) sidenotes();
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
       if (payload.keepScroll) { window.scrollTo(0, y); }
-      else {
+      else if (payload.line > 0) {
+        // Opened at a remembered spot (⌘↩ from the editor, or a split): no slide-in, just land there.
+        page.classList.add('shown');
+        restoreLine(payload.line);
+        requestAnimationFrame(() => page.classList.remove('instant'));
+      } else {
         window.scrollTo(0, 0);
         requestAnimationFrame(() => { page.classList.remove('instant'); requestAnimationFrame(() => page.classList.add('shown')); });
       }
@@ -206,6 +296,7 @@
       document.documentElement.style.setProperty('--font-text-size', size + 'px');
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');
     },
+    scrollToLine(line) { restoreLine(line); },
     scrollToHeading(i) {
       const hs = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
       const h = hs[i];

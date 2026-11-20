@@ -5,6 +5,19 @@ import OnyxCore
 /// The writing room: NSTextView on TextKit 1, a centered 760px measure,
 /// a warm active-line glow and a colored cursor, as in Reitz Mono.
 final class OnyxTextView: NSTextView {
+    // AppKit recenters the insertion point on every width change. A pane resize/split is
+    // not a caret navigation; keep the viewport under the source-anchor coordinator instead.
+    private var sizing = 0   // depth: AppKit nests setFrameSize calls
+    override func setFrameSize(_ newSize: NSSize) {
+        sizing += 1
+        super.setFrameSize(newSize)
+        sizing -= 1
+    }
+    override func scrollToVisible(_ rect: NSRect) -> Bool {
+        if sizing > 0 { return false }
+        return super.scrollToVisible(rect)
+    }
+
     var noteNames: () -> [String] = { [] }
     var onFollowLink: (String) -> Void = { _ in }
     var measure: CGFloat = Theme.editorMeasure
@@ -130,6 +143,8 @@ struct EditorView: NSViewRepresentable {
     var measure: Double = 41
     /// Set for an unfocused split pane: show this note, read-only until the pane is focused.
     var source: (path: String?, text: String)? = nil
+    /// The split pane this view belongs to when unfocused (nil = the focused pane).
+    var paneID: UUID? = nil
     @Environment(\.colorScheme) var scheme
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
@@ -183,6 +198,17 @@ struct EditorView: NSViewRepresentable {
         tv.isEditable = source == nil
         context.coordinator.wasLive = source == nil
         if source == nil { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) } }
+        // Open where this pane was (⌘↩ from the reader, or a fresh split), then report as it scrolls.
+        let c = context.coordinator
+        let start = ws.initialTop(paneID)
+        scroll.contentView.postsBoundsChangedNotifications = true
+        scroll.onResize = { [weak c] in c?.holdAnchor() }
+        c.anchor = start
+        NotificationCenter.default.addObserver(c, selector: #selector(Coordinator.scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
+        if start > 0 {
+            c.restoring = true
+            c.restore(start, caret: source == nil, tries: 30)
+        }
         return scroll
     }
 
@@ -225,6 +251,9 @@ struct EditorView: NSViewRepresentable {
         var scheme: ColorScheme?
         var rhymesOn = false
         var typeKey = ""
+        var restoring = false
+        var anchor: Double = 0   // last position the writer chose (scroll or restore)
+        private var reportQueued = false
         private var rhymeTask: Task<Void, Never>?
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }
 
@@ -257,6 +286,86 @@ struct EditorView: NSViewRepresentable {
             highlighter.apply(to: ts)
             textView?.needsDisplay = true
             updateRhymes(force: true)
+        }
+
+        /// Distance below the visible top that counts as "where you are": just under the title line.
+        static let anchorY: CGFloat = 48
+
+        private func lineStart(_ line: Int, in ns: NSString) -> Int {
+            var loc = 0
+            for _ in 0..<max(0, line) {
+                let r = ns.lineRange(for: NSRange(location: loc, length: 0))
+                if NSMaxRange(r) >= ns.length { return ns.length }
+                loc = NSMaxRange(r)
+            }
+            return loc
+        }
+
+        /// Fractional source line at the anchor: the line index plus how far down its
+        /// (possibly soft-wrapped) paragraph the anchor sits.
+        func topLine() -> Double? {
+            guard let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer,
+                  let clip = tv.enclosingScrollView?.contentView else { return nil }
+            let ns = tv.string as NSString
+            guard ns.length > 0 else { return 0 }
+            let y = clip.bounds.minY + Self.anchorY - tv.textContainerOrigin.y
+            if y <= 0 { return 0 }
+            let g = lm.glyphIndex(for: NSPoint(x: 0, y: y), in: tc)
+            let ch = min(lm.characterIndexForGlyph(at: g), ns.length - 1)
+            let lr = ns.lineRange(for: NSRange(location: ch, length: 0))
+            var line = 0
+            ns.enumerateSubstrings(in: NSRange(location: 0, length: lr.location), options: [.byLines, .substringNotRequired]) { _, _, _, _ in line += 1 }
+            let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
+            let frac = rect.height > 0 ? min(max((y - rect.minY) / rect.height, 0), 0.999) : 0
+            return Double(line) + Double(frac)
+        }
+
+        func scrollTo(line: Double, caret: Bool) {
+            guard let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer,
+                  let scroll = tv.enclosingScrollView else { return }
+            let ns = tv.string as NSString
+            let loc = lineStart(Int(line), in: ns)
+            let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
+            lm.ensureLayout(forCharacterRange: NSRange(location: 0, length: NSMaxRange(lr)))
+            let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
+            let frac = CGFloat(line - line.rounded(.down))
+            let maxY = max(0, tv.frame.height - scroll.contentView.bounds.height)
+            let y = min(max(0, rect.minY + frac * rect.height + tv.textContainerOrigin.y - Self.anchorY), maxY)
+            scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
+            scroll.reflectScrolledClipView(scroll.contentView)
+            if caret { tv.setSelectedRange(NSRange(location: loc, length: 0)) }
+        }
+
+        /// Wait for the scroll view to get a real size (SwiftUI lays it out after creation).
+        func restore(_ line: Double, caret: Bool, tries: Int) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.016) { [weak self] in
+                guard let self, let tv = self.textView, let clip = tv.enclosingScrollView?.contentView else { return }
+                if clip.bounds.height < 1 || tv.frame.width < 1, tries > 0 { return self.restore(line, caret: caret, tries: tries - 1) }
+                tv.layoutManager?.ensureLayout(for: tv.textContainer!)
+                self.scrollTo(line: line, caret: caret)
+                if tries > 0 { return self.restore(line, caret: false, tries: tries - 1) }
+                self.restoring = false
+                if let t = self.topLine() { self.parent.ws.reportTop(self.parent.paneID, t) }
+            }
+        }
+
+        func holdAnchor() {
+            guard anchor > 0, textView != nil else { return }
+            let was = restoring
+            restoring = true
+            scrollTo(line: anchor, caret: false)
+            restoring = was
+        }
+
+        @objc func scrolled(_ n: Notification) {
+            if (textView?.enclosingScrollView as? ThinScrollView)?.resizing ?? 0 > 0 { return }
+            guard !restoring, !reportQueued else { return }
+            reportQueued = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.reportQueued = false
+                if !self.restoring, let t = self.topLine() { self.anchor = t; self.parent.ws.reportTop(self.parent.paneID, t) }
+            }
         }
 
         func reveal(line: Int) {

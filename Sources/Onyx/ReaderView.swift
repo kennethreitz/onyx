@@ -38,12 +38,19 @@ struct ReaderView: NSViewRepresentable {
     var measure: Double = 41
     /// Set for an unfocused split pane: render this note instead of the focused one.
     var source: (path: String?, text: String)? = nil
+    /// The split pane this view belongs to when unfocused (nil = the focused pane).
+    var paneID: UUID? = nil
     @Environment(\.colorScheme) var scheme
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
     var text: String { source?.text ?? ws.text }
 
-    func makeCoordinator() -> Coordinator { Coordinator(ws: ws) }
+    func makeCoordinator() -> Coordinator {
+        let c = Coordinator(ws: ws)
+        c.paneID = paneID
+        c.startLine = ws.initialTop(paneID)   // open where this pane was (⌘↩ or a fresh split)
+        return c
+    }
 
     func makeNSView(context: Context) -> WKWebView {
         let cfg = WKWebViewConfiguration()
@@ -64,6 +71,7 @@ struct ReaderView: NSViewRepresentable {
     func updateNSView(_ wv: WKWebView, context: Context) {
         let c = context.coordinator
         c.ws = ws
+        c.paneID = paneID
         c.handler?.vaultRoot = ws.root
         let dark = scheme == .dark
         if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text {
@@ -94,6 +102,8 @@ struct ReaderView: NSViewRepresentable {
         var dark = false
         var sidenotes = true
         var typeKey = ""
+        var paneID: UUID?
+        var startLine: Double = 0
 
         init(ws: Workspace) { self.ws = ws }
 
@@ -107,7 +117,8 @@ struct ReaderView: NSViewRepresentable {
 
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
-            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll)
+            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll, line: keepScroll ? 0 : startLine)
+            startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
 
@@ -137,6 +148,7 @@ struct ReaderView: NSViewRepresentable {
                 if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }
             case "edit": ws.toggleMode()
+            case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
             default: break
             }
         }
@@ -147,7 +159,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0) -> String {
         let fm = Frontmatter.parse(text)
         var body = (text as NSString).substring(from: fm.bodyOffset)
         // Dataview blocks become placeholders, computed here.
@@ -157,7 +169,9 @@ enum ReaderPayload {
         var last = 0
         for m in fence.matches(in: body, range: NSRange(location: 0, length: ns.length)) {
             out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
-            out += "\n<div class=\"onyx-dataview\" data-i=\"\(dv.count)\"></div>\n"
+            // Same number of lines as the fence it replaces, so source-line anchors stay true.
+            let fenceLines = ns.substring(with: m.range).filter { $0 == "\n" }.count
+            out += "<div class=\"onyx-dataview\" data-i=\"\(dv.count)\"></div>" + String(repeating: "\n", count: fenceLines)
             dv.append(dataviewHTML(ns.substring(with: m.range(at: 1)), snap: snap, path: path))
             last = NSMaxRange(m.range)
         }
@@ -199,6 +213,7 @@ enum ReaderPayload {
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll,
+            "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)

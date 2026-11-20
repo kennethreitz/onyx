@@ -136,6 +136,17 @@ enum ScrollSelfTest {
 /// A scroll view whose thin scroller floats over the content instead of reserving a column,
 /// so split panes meet at a hairline with no gutter.
 final class ThinScrollView: NSScrollView {
+    /// Called after a real size change (split, sidebar, window), so the owner can hold its
+    /// reading position by source line instead of letting AppKit drift it.
+    var onResize: (() -> Void)?
+    private(set) var resizing = 0
+    override func setFrameSize(_ newSize: NSSize) {
+        let changed = newSize != frame.size
+        resizing += 1
+        super.setFrameSize(newSize)
+        resizing -= 1
+        if changed { onResize?() }
+    }
     override func tile() {
         super.tile()
         guard let v = verticalScroller, hasVerticalScroller else { return }
