@@ -1,0 +1,244 @@
+import AppKit
+import SwiftUI
+import WebKit
+import UniformTypeIdentifiers
+import OnyxCore
+
+/// Serves bundled web assets at onyx://app/… and vault files at onyx://vault/…
+final class OnyxSchemeHandler: NSObject, WKURLSchemeHandler {
+    var vaultRoot: URL?
+    func webView(_ webView: WKWebView, start task: WKURLSchemeTask) {
+        guard let url = task.request.url, let host = url.host else { return task.didFailWithError(URLError(.badURL)) }
+        let rel = url.path.removingPercentEncoding ?? url.path
+        let base: URL?
+        switch host {
+        case "app": base = AppResources.root
+        case "vault": base = vaultRoot
+        default: base = nil
+        }
+        guard let base else { return task.didFailWithError(URLError(.fileDoesNotExist)) }
+        let file = base.appendingPathComponent(String(rel.drop(while: { $0 == "/" }))).standardizedFileURL
+        guard file.path.hasPrefix(base.standardizedFileURL.path), let data = try? Data(contentsOf: file) else {
+            return task.didFailWithError(URLError(.fileDoesNotExist))
+        }
+        let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        task.didReceive(URLResponse(url: url, mimeType: mime, expectedContentLength: data.count, textEncodingName: mime.hasPrefix("text") || mime.contains("javascript") ? "utf-8" : nil))
+        task.didReceive(data)
+        task.didFinish()
+    }
+    func webView(_ webView: WKWebView, stop task: WKURLSchemeTask) {}
+}
+
+/// Reading view: the note typeset like a LaTeX article (Reitz LaTeX), with
+/// wikilinks, embeds, callouts, highlights, footnotes as Tufte sidenotes,
+/// Mermaid as TikZ-ish figures, dataview-lite tables and kanban boards.
+struct ReaderView: NSViewRepresentable {
+    @Bindable var ws: Workspace
+    var fontSize: Double = 19
+    var measure: Double = 41
+    @Environment(\.colorScheme) var scheme
+
+    func makeCoordinator() -> Coordinator { Coordinator(ws: ws) }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let cfg = WKWebViewConfiguration()
+        let handler = OnyxSchemeHandler()
+        handler.vaultRoot = ws.root
+        cfg.setURLSchemeHandler(handler, forURLScheme: "onyx")
+        cfg.userContentController.add(context.coordinator, name: "onyx")
+        let wv = WKWebView(frame: .zero, configuration: cfg)
+        wv.setValue(false, forKey: "drawsBackground")
+        wv.navigationDelegate = context.coordinator
+        wv.allowsMagnification = true
+        context.coordinator.webView = wv
+        context.coordinator.handler = handler
+        wv.load(URLRequest(url: URL(string: "onyx://app/web/reader.html")!))
+        return wv
+    }
+
+    func updateNSView(_ wv: WKWebView, context: Context) {
+        let c = context.coordinator
+        c.ws = ws
+        c.handler?.vaultRoot = ws.root
+        let dark = scheme == .dark
+        if c.renderedToken != ws.renderToken || c.renderedPath != ws.currentPath || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != ws.text {
+            let sameNote = c.renderedPath == ws.currentPath
+            c.renderedToken = ws.renderToken; c.renderedPath = ws.currentPath; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = ws.text
+            c.render(keepScroll: sameNote)
+        }
+        if c.typeKey != "\(fontSize)/\(measure)" {
+            c.typeKey = "\(fontSize)/\(measure)"
+            c.eval("Onyx.setType(\(fontSize), \(measure))")
+        }
+        if let j = ws.readerJump {
+            c.eval("Onyx.scrollToHeading(\(j))")
+            DispatchQueue.main.async { ws.readerJump = nil }
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+        var ws: Workspace
+        weak var webView: WKWebView?
+        var handler: OnyxSchemeHandler?
+        var ready = false
+        var pending: [String] = []
+        var renderedToken = -1
+        var renderedPath: String?
+        var renderedText: String?
+        var dark = false
+        var sidenotes = true
+        var typeKey = ""
+
+        init(ws: Workspace) { self.ws = ws }
+
+        func eval(_ js: String) {
+            guard ready else {
+                if js.hasPrefix("Onyx.render(") { pending.removeAll { $0.hasPrefix("Onyx.render(") } }
+                pending.append(js); return
+            }
+            webView?.evaluateJavaScript(js, completionHandler: nil)
+        }
+
+        func render(keepScroll: Bool) {
+            guard let snap = ws.snapshot, let path = ws.currentPath else { return }
+            let payload = ReaderPayload.build(text: ws.text, path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll)
+            eval("Onyx.render(\(payload))")
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            ready = true
+            for p in pending { webView.evaluateJavaScript(p, completionHandler: nil) }
+            pending = []
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+            if let u = action.request.url, action.navigationType == .linkActivated {
+                if u.scheme == "http" || u.scheme == "https" || u.scheme == "mailto" || u.scheme == "obsidian" { NSWorkspace.shared.open(u) }
+                return decisionHandler(.cancel)
+            }
+            decisionHandler(.allow)
+        }
+
+        func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
+            guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            switch type {
+            case "open":
+                if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil {
+                    ws.openNote(p, heading: body["heading"] as? String)
+                } else if let t = body["target"] as? String { ws.openLink(t) }
+            case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
+            case "tag":
+                if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
+            case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }
+            case "edit": ws.toggleMode()
+            default: break
+            }
+        }
+    }
+}
+
+/// Everything the page needs, resolved Swift-side so JS never touches the disk.
+enum ReaderPayload {
+    static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
+
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool) -> String {
+        let fm = Frontmatter.parse(text)
+        var body = (text as NSString).substring(from: fm.bodyOffset)
+        // Dataview blocks become placeholders, computed here.
+        var dv: [String] = []
+        let ns = body as NSString
+        var out = ""
+        var last = 0
+        for m in fence.matches(in: body, range: NSRange(location: 0, length: ns.length)) {
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            out += "\n<div class=\"onyx-dataview\" data-i=\"\(dv.count)\"></div>\n"
+            dv.append(dataviewHTML(ns.substring(with: m.range(at: 1)), snap: snap, path: path))
+            last = NSMaxRange(m.range)
+        }
+        out += ns.substring(from: last)
+        body = out
+
+        var links: [String: [String: String]] = [:]
+        var embeds: [String: [String: String]] = [:]
+        func resolveAll(_ s: String, from: String, depth: Int) {
+            for l in NoteParser.parseWikiLinks(s) {
+                let key = l.target.lowercased()
+                let resolved = snap.resolve(l.target, from: from)
+                links[key] = ["path": resolved ?? "", "name": l.target]
+                if l.isEmbed, embeds[key] == nil, let r = resolved {
+                    if let note = snap.notes[r] {
+                        var md = (note.content as NSString).substring(from: note.summary.frontmatter.bodyOffset)
+                        if let h = l.heading { md = section(md, heading: h) }
+                        embeds[key] = ["type": "note", "path": r, "markdown": md, "name": note.name]
+                        if depth < 1 { resolveAll(md, from: r, depth: depth + 1) }
+                    } else {
+                        let ext = (r as NSString).pathExtension.lowercased()
+                        let kind = ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "heic", "bmp"].contains(ext) ? "image" : (ext == "pdf" ? "pdf" : (["mp3", "m4a", "wav", "ogg", "flac"].contains(ext) ? "audio" : (["mp4", "mov", "webm"].contains(ext) ? "video" : "file")))
+                        embeds[key] = ["type": kind, "path": r, "url": "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)]
+                    }
+                }
+            }
+        }
+        resolveAll(body, from: path, depth: 0)
+
+        let props = fm.properties.map { ["key": $0.key, "value": $0.value.display] }
+        var kanban: Any = NSNull()
+        if KanbanBoard.isBoard(fm) {
+            let b = KanbanBoard.parse(text)
+            kanban = b.lanes.map { ["title": $0.title, "cards": $0.cards.map { ["text": $0.text, "done": $0.done] }] as [String: Any] }
+        }
+        let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        let folder = (path as NSString).deletingLastPathComponent
+        let obj: [String: Any] = [
+            "markdown": body, "path": path, "name": name, "folder": folder,
+            "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
+            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll,
+            "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
+        ]
+        let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    static func section(_ md: String, heading: String) -> String {
+        let lines = md.components(separatedBy: "\n")
+        guard let start = lines.firstIndex(where: { l in l.hasPrefix("#") && NoteParser.stripInline(l.drop(while: { $0 == "#" }).trimmingCharacters(in: .whitespaces)).lowercased() == heading.lowercased() }) else { return md }
+        let level = lines[start].prefix { $0 == "#" }.count
+        var end = lines.count
+        for i in (start + 1)..<lines.count where lines[i].hasPrefix("#") {
+            let lv = lines[i].prefix { $0 == "#" }.count
+            if lv <= level && lines[i].dropFirst(lv).hasPrefix(" ") { end = i; break }
+        }
+        return lines[start..<end].joined(separator: "\n")
+    }
+
+    static func esc(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
+    static func cell(_ v: DVValue) -> String {
+        switch v {
+        case .link(let p, let n): return "<a class=\"internal-link\" data-path=\"\(esc(p))\">\(esc(n))</a>"
+        case .list(let l): return l.map(cell).joined(separator: ", ")
+        case .string(let s):
+            if s.hasPrefix("[["), s.hasSuffix("]]") { return "<span class=\"onyx-inline-md\">\(esc(s))</span>" }
+            return "<span class=\"onyx-inline-md\">\(esc(s))</span>"
+        default: return esc(v.text)
+        }
+    }
+
+    static func dataviewHTML(_ query: String, snap: VaultSnapshot, path: String) -> String {
+        do {
+            let r = try Dataview.run(query, in: snap, from: path)
+            if r.isList {
+                return "<ul class=\"dataview-list\">" + r.rows.map { "<li>" + $0.map(cell).joined(separator: ": ") + "</li>" }.joined() + "</ul>"
+            }
+            if r.rows.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
+            let head = "<thead><tr>" + r.headers.map { "<th>\(esc($0))</th>" }.joined() + "</tr></thead>"
+            let rows = r.rows.map { "<tr>" + $0.map { "<td>\(cell($0))</td>" }.joined() + "</tr>" }.joined()
+            return "<div class=\"table-wrap\"><table class=\"dataview\">\(head)<tbody>\(rows)</tbody></table></div>"
+        } catch {
+            return "<div class=\"dataview-error\"><span>dataview</span> \(esc(String(describing: error)))<pre>\(esc(query))</pre></div>"
+        }
+    }
+}

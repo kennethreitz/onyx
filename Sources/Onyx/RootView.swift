@@ -1,0 +1,409 @@
+import SwiftUI
+import AppKit
+import OnyxCore
+
+/// Calm by default: the typeset page, a quiet title line, a footer that dims
+/// itself, and a docked file list you can put away. Everything else is
+/// summoned (⌘O ⌘P ⌘K ⌘I ⌘G, or the window edges); ⌃⌘F is pure text.
+struct RootView: View {
+    @Bindable var ws: Workspace
+    var appearance: (String) -> Void
+    @AppStorage(Prefs.readerSize) private var readerSize = 19.0
+    @AppStorage(Prefs.editorSize) private var editorSize = 14.0
+    @AppStorage(Prefs.measure) private var measure = 41.0
+    @State private var leftEdgeHover = false
+    @State private var rightEdgeHover = false
+    @State private var hoverSummonedSidebar = false
+    @State private var hoverSummonedInspector = false
+    @State private var footerHover = false
+    @State private var showLights = false
+    @State private var keyMonitor: Any?
+    @State private var moveMonitor: Any?
+
+    let sidebarWidth: CGFloat = 270
+    let inspectorWidth: CGFloat = 300
+    var leftInset: CGFloat { ws.sidebarPinned && ws.sidebarVisible ? sidebarWidth : 0 }
+    var rightInset: CGFloat { ws.inspectorPinned && ws.inspectorVisible ? inspectorWidth : 0 }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Color.paper.ignoresSafeArea()
+            if ws.root == nil {
+                WelcomeView(ws: ws)
+            } else {
+                page
+                    .padding(.leading, leftInset)
+                    .padding(.trailing, rightInset)
+                if !ws.focusMode {
+                    titleLine.padding(.leading, leftInset).padding(.trailing, rightInset)
+                    footer.padding(.leading, leftInset).padding(.trailing, rightInset)
+                } else {
+                    toastLayer
+                }
+                edges
+                panels
+                if ws.showHints && !ws.focusMode && ws.overlay == .none { hints.padding(.trailing, rightInset) }
+                overlays
+            }
+        }
+        .ignoresSafeArea()
+        .background(WindowConfigurator(showLights: !ws.focusMode || showLights || ws.anyChrome || ws.root == nil))
+        .onAppear(perform: installMonitors)
+        .onDisappear { [keyMonitor, moveMonitor] in
+            if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            if let moveMonitor { NSEvent.removeMonitor(moveMonitor) }
+        }
+    }
+
+    // MARK: Title line — the note, its folder a shade lighter
+
+    var titleLine: some View {
+        VStack {
+            HStack(spacing: 6) {
+                if let n = ws.currentNote {
+                    if !n.folder.isEmpty {
+                        Text(n.folder.replacingOccurrences(of: "/", with: " / ") + " /").foregroundStyle(Color.faint.opacity(0.8))
+                    }
+                    Text(n.name).foregroundStyle(Color.muted)
+                    if ws.isDirty { Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity) }
+                }
+            }
+            .font(.system(size: 12))
+            .lineLimit(1).truncationMode(.head)
+            .padding(.horizontal, 90)
+            .frame(maxWidth: .infinity)
+            .frame(height: 28)
+            .allowsHitTesting(false)
+            Spacer()
+        }
+    }
+
+    // MARK: Footer — quiet affordances that come up when you reach for them
+
+    var footer: some View {
+        VStack {
+            Spacer()
+            HStack(spacing: 2) {
+                FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
+                FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
+                FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphLocal = false; ws.show(.graph) }
+                FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
+                FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
+                FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
+                Spacer()
+                if let t = ws.toast {
+                    Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).lineLimit(1)
+                        .transition(.opacity)
+                        .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } }
+                    Spacer()
+                }
+                syncDot.padding(.trailing, 6)
+                if ws.currentPath != nil {
+                    Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)
+                }
+                FooterButton(symbol: "sidebar.right", help: "Inspector (⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: 30)
+            .background(Color.paper.opacity(footerHover ? 0.96 : 0))
+            .opacity(footerHover ? 1 : 0.42)
+            .animation(.easeOut(duration: 0.2), value: footerHover)
+            .onHover { footerHover = $0 }
+        }
+    }
+
+    var countText: String {
+        let words = NoteParser.countWords(ws.text)
+        var s = "\(words.formatted()) words"
+        if footerHover {
+            s += " · \(ws.text.count.formatted()) characters"
+            if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 { s += " · \(c) backlinks" }
+        }
+        if ws.rhymesOn { s += " · ♪" }
+        return s
+    }
+
+    var toastLayer: some View {
+        VStack { Spacer(); if let t = ws.toast { Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).padding(.horizontal, 12).padding(.vertical, 6).panelChrome().padding(.bottom, 14)
+            .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } } } }
+            .frame(maxWidth: .infinity).allowsHitTesting(false)
+    }
+
+    // MARK: First-run hints
+
+    var hints: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Text("Onyx, in a few keys").font(Theme.serif(15, bold: true)).foregroundStyle(Color.ink)
+                        Spacer()
+                        Button { ws.dismissHints() } label: { Image(systemName: "xmark").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Color.faint) }.buttonStyle(.plain)
+                    }
+                    ForEach(ShortcutHints.all, id: \.0) { k, v in
+                        HStack(spacing: 10) {
+                            Text(k).font(.system(size: 11.5, design: .rounded).weight(.medium)).foregroundStyle(Color.ink).frame(width: 54, alignment: .trailing)
+                            Text(v).font(.system(size: 11.5)).foregroundStyle(Color.muted)
+                        }
+                    }
+                    Text("Every command is in the menu bar, too.").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.top, 2)
+                }
+                .padding(14).frame(width: 290)
+                .panelChrome()
+                .padding(.trailing, 16).padding(.bottom, 42)
+            }
+        }
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    // MARK: Page
+
+    @ViewBuilder var page: some View {
+        ZStack {
+            if ws.currentPath == nil {
+                VStack(spacing: 14) {
+                    if ws.isIndexing { ProgressView().controlSize(.small) }
+                    Text(ws.isIndexing ? "Reading your vault…" : "Nothing open.").font(Theme.serif(19, italic: true)).foregroundStyle(Color.muted)
+                    if !ws.isIndexing {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(ShortcutHints.all, id: \.0) { k, v in
+                                HStack(spacing: 12) {
+                                    Text(k).font(.system(size: 12, design: .rounded).weight(.medium)).foregroundStyle(Color.ink).frame(width: 56, alignment: .trailing)
+                                    Text(v).font(.system(size: 12)).foregroundStyle(Color.muted)
+                                }
+                            }
+                        }
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if ws.mode == .edit {
+                EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
+            } else {
+                ReaderView(ws: ws, fontSize: readerSize, measure: measure).transition(.opacity)
+            }
+            if let disk = ws.conflict { conflictBanner(disk) }
+        }
+    }
+
+    func conflictBanner(_ disk: String) -> some View {
+        VStack {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.triangle.2.circlepath").foregroundStyle(Color.muted)
+                Text("This note changed elsewhere while you were editing.").font(.system(size: 12))
+                Spacer()
+                Button("Use theirs") { ws.resolveConflict(keepMine: false) }
+                Button("Keep mine") { ws.resolveConflict(keepMine: true) }.keyboardShortcut(.defaultAction)
+            }
+            .controlSize(.small)
+            .padding(.horizontal, 14).padding(.vertical, 9)
+            .frame(maxWidth: 620)
+            .panelChrome()
+            .padding(.top, 40)
+            Spacer()
+        }.frame(maxWidth: .infinity).transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    // MARK: Hover edges
+
+    var edges: some View {
+        HStack(spacing: 0) {
+            Color.clear.frame(width: 8).contentShape(Rectangle())
+                .onHover { inside in
+                    leftEdgeHover = inside
+                    guard inside, !ws.sidebarVisible else { return }
+                    Task { try? await Task.sleep(nanoseconds: 220_000_000); if leftEdgeHover && !ws.sidebarVisible { hoverSummonedSidebar = true; ws.toggleSidebar(.files) } }
+                }
+            Spacer()
+            Color.clear.frame(width: 8).contentShape(Rectangle())
+                .onHover { inside in
+                    rightEdgeHover = inside
+                    guard inside, !ws.inspectorVisible else { return }
+                    Task { try? await Task.sleep(nanoseconds: 260_000_000); if rightEdgeHover && !ws.inspectorVisible { hoverSummonedInspector = true; ws.toggleInspector() } }
+                }
+        }
+        .padding(.top, 40).padding(.bottom, 40)
+    }
+
+    // MARK: Panels
+
+    @ViewBuilder var panels: some View {
+        HStack(alignment: .top, spacing: 0) {
+            if ws.sidebarVisible {
+                SidebarView(ws: ws)
+                    .frame(width: sidebarWidth)
+                    .padding(.top, ws.sidebarPinned ? 28 : 0)
+                    .panelChrome(pinned: ws.sidebarPinned)
+                    .padding(ws.sidebarPinned ? 0 : 10)
+                    .padding(.top, ws.sidebarPinned ? 0 : 28)
+                    .overlay(alignment: .trailing) { if ws.sidebarPinned { Rectangle().fill(Color.hairline).frame(width: 0.8) } }
+                    .onHover { inside in
+                        if !inside && hoverSummonedSidebar && !ws.sidebarPinned {
+                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedSidebar && !ws.sidebarPinned && !leftEdgeHover { hoverSummonedSidebar = false; if ws.sidebarVisible { ws.toggleSidebar() } } }
+                        } else if inside { hoverSummonedSidebar = hoverSummonedSidebar && true }
+                    }
+                    .transition(.move(edge: .leading).combined(with: .opacity))
+            }
+            Spacer(minLength: 0)
+            if ws.inspectorVisible {
+                InspectorView(ws: ws)
+                    .frame(width: inspectorWidth)
+                    .padding(.top, ws.inspectorPinned ? 28 : 0)
+                    .panelChrome(pinned: ws.inspectorPinned)
+                    .padding(ws.inspectorPinned ? 0 : 10)
+                    .padding(.top, ws.inspectorPinned ? 0 : 28)
+                    .overlay(alignment: .leading) { if ws.inspectorPinned { Rectangle().fill(Color.hairline).frame(width: 0.8) } }
+                    .onHover { inside in
+                        if !inside && hoverSummonedInspector && !ws.inspectorPinned {
+                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedInspector && !ws.inspectorPinned && !rightEdgeHover { hoverSummonedInspector = false; if ws.inspectorVisible { ws.toggleInspector() } } }
+                        }
+                    }
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+            }
+        }
+        .frame(maxHeight: .infinity)
+        .onChange(of: ws.sidebarVisible) { if !ws.sidebarVisible { hoverSummonedSidebar = false } }
+        .onChange(of: ws.inspectorVisible) { if !ws.inspectorVisible { hoverSummonedInspector = false } }
+    }
+
+    /// A breath of ink when something outside Onyx (Obsidian Sync, git, a bot) changes the vault.
+    var syncDot: some View {
+        TimelineView(.animation(minimumInterval: 0.05, paused: ws.externalPulse == nil)) { tl in
+            let age = ws.externalPulse.map { tl.date.timeIntervalSince($0) } ?? 99
+            let o = age < 2.4 ? max(0, 1 - age / 2.4) : 0
+            Circle().fill(Color.cursorBlue).frame(width: 6, height: 6).opacity(o * 0.9)
+                .help(ws.lastExternalChange.map { "Vault changed outside Onyx \($0.formatted(.relative(presentation: .named)))" } ?? "")
+        }
+    }
+
+    // MARK: Overlays
+
+    @ViewBuilder var overlays: some View {
+        switch ws.overlay {
+        case .switcher:
+            dimmer
+            VStack {
+                PaletteView(placeholder: "Find or create a note…", items: { PaletteCommands.notes(ws, $0) },
+                            onCreate: { ws.createNote(named: $0, folder: "") }, dismiss: { ws.show(.none) })
+                    .padding(.top, 88)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .palette:
+            dimmer
+            VStack {
+                PaletteView(placeholder: "Type a command…", items: { PaletteCommands.filter(PaletteCommands.all(ws, appearance: appearance), $0) }, dismiss: { ws.show(.none) })
+                    .padding(.top, 88)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .graph:
+            GraphView(ws: ws).transition(.opacity)
+        case .none:
+            EmptyView()
+        }
+    }
+
+    var dimmer: some View {
+        Color.black.opacity(0.06).ignoresSafeArea().contentShape(Rectangle())
+            .onTapGesture { ws.show(.none) }
+            .transition(.opacity)
+    }
+
+    // MARK: Events
+
+    func installMonitors() {
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if e.keyCode == 53 { // Esc
+                if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
+                return ws.dismissTop() ? nil : e
+            }
+            return e
+        }
+        moveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { e in
+            guard ws.focusMode, let w = e.window, let content = w.contentView else { return e }
+            let nearTop = e.locationInWindow.y > content.bounds.height - 44
+            if nearTop != showLights { withAnimation(.easeOut(duration: 0.18)) { showLights = nearTop } }
+            return e
+        }
+    }
+}
+
+struct FooterButton: View {
+    var symbol: String
+    var help: String
+    var on: Bool = false
+    var action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12.5, weight: on ? .semibold : .regular))
+                .foregroundStyle(on || hover ? Color.ink : Color.muted)
+                .frame(width: 28, height: 24)
+                .background(hover ? Color.ink.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).help(help).onHover { hover = $0 }
+    }
+}
+
+enum ShortcutHints {
+    static let all: [(String, String)] = [
+        ("⌘O", "Find or create a note"), ("⌘P", "Every command"), ("⌘K", "Files"), ("⇧⌘F", "Search the vault"),
+        ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
+        ("⌘G", "Graph"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+    ]
+}
+
+/// Transparent, hidden titlebar; the traffic lights only appear when you reach for them.
+struct WindowConfigurator: NSViewRepresentable {
+    var showLights: Bool
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        DispatchQueue.main.async { configure(v.window) }
+        return v
+    }
+    func updateNSView(_ v: NSView, context: Context) { DispatchQueue.main.async { configure(v.window) } }
+    func configure(_ w: NSWindow?) {
+        guard let w else { return }
+        w.titlebarAppearsTransparent = true
+        w.titleVisibility = .hidden
+        w.styleMask.insert(.fullSizeContentView)
+        w.isMovableByWindowBackground = false
+        w.backgroundColor = Theme.paper
+        w.acceptsMouseMovedEvents = true
+        w.tabbingMode = .disallowed
+        for b in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let btn = w.standardWindowButton(b) else { continue }
+            NSAnimationContext.runAnimationGroup { ctx in ctx.duration = 0.18; btn.animator().alphaValue = showLights ? 1 : 0 }
+        }
+        if WindowConfigurator.idFile != nil { WindowConfigurator.writeWindowID(w) }
+    }
+    nonisolated(unsafe) static var idFile: String?
+    static func writeWindowID(_ w: NSWindow) {
+        guard let f = idFile else { return }
+        try? String(w.windowNumber).write(toFile: f, atomically: true, encoding: .utf8)
+    }
+}
+
+struct WelcomeView: View {
+    @Bindable var ws: Workspace
+    var body: some View {
+        VStack(spacing: 18) {
+            Text("Onyx").font(Theme.titleSerif(44)).foregroundStyle(Color.ink)
+            Text("Write like iA Writer. Read like a LaTeX paper.").font(Theme.serif(16, italic: true)).foregroundStyle(Color.muted)
+            HStack(spacing: 12) {
+                Button("Open Vault…") { pick() }.keyboardShortcut(.defaultAction)
+                let notes = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Notes")
+                if FileManager.default.fileExists(atPath: notes.path) {
+                    Button("Open ~/Notes") { OnyxApp.remember(notes); ws.open(vault: notes) }
+                }
+            }.controlSize(.large).padding(.top, 8)
+            Text("Any folder of Markdown files works, including an Obsidian vault.").font(.system(size: 11.5)).foregroundStyle(Color.faint)
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+    func pick() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"
+        if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
+    }
+}

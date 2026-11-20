@@ -11,6 +11,8 @@ public struct GraphData: Sendable {
     public var degree: [Int]
     public var positions: [SIMD2<Float>]
     public var isUnresolved: [Bool]
+    public var temperature: Float? = nil
+    public var iterationsRun = 0
 
     public static func build(_ snap: VaultSnapshot, focus: String? = nil, depth: Int = 1, includeOrphans: Bool = true) -> GraphData {
         var adj: [String: Set<String>] = [:]
@@ -58,7 +60,7 @@ public struct GraphData: Sendable {
         guard n > 1 else { return }
         let k: Float = 26            // ideal edge length
         let cell: Float = k * 3
-        var temp: Float = Float(sqrt(Double(n))) * 6
+        var temp: Float = temperature ?? Float(sqrt(Double(n))) * 6
         var disp = [SIMD2<Float>](repeating: .zero, count: n)
         for _ in 0..<iterations {
             for i in 0..<n { disp[i] = .zero }
@@ -91,6 +93,8 @@ public struct GraphData: Sendable {
             }
             temp = max(temp * 0.985, 0.4)
         }
+        temperature = temp
+        iterationsRun += iterations
     }
 
     public var bounds: (min: SIMD2<Float>, max: SIMD2<Float>) {
