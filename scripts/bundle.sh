@@ -46,7 +46,7 @@ if [ -z "$ID" ]; then
   ID=$(security find-identity -v -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p;s/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -1)
 fi
 if [ -z "$ID" ] && security find-identity -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | grep -q '"Onyx Local Signing"'; then ID="Onyx Local Signing"; fi
-if [ -n "$ID" ] && codesign --force --deep "${KC_ARGS[@]}" --sign "$ID" "$APP" >/dev/null 2>&1; then
+if [ -n "$ID" ] && codesign --force --deep ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$ID" "$APP" >/dev/null 2>&1; then
   echo "Signed with \"$ID\""
 else
   codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
