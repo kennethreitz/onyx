@@ -12,12 +12,17 @@ public struct ObsidianAPI: Sendable {
     public var userAgent: String?
     public var session: URLSession
 
-    /// The User-Agent of the official `obsidian-headless` 0.0.14 CLI, the client whose signin we mirror.
+    /// The User-Agent of the official `obsidian-headless` 0.0.14 CLI (sign-in worked with it on 2026-11-20).
     public static let headlessUserAgent = "obsidian-headless/0.0.14"
+    /// Onyx identifies as itself: "Onyx/<CFBundleShortVersionString>" (or "Onyx/dev" outside the app bundle).
+    public static let defaultUserAgent: String = {
+        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return "Onyx/" + (v ?? "dev")
+    }()
     /// `obsidian-headless` signs in with `{preflight: true, headers: {Origin: "https://obsidian.md"}}`.
     public static let signInOrigin = "https://obsidian.md"
 
-    public init(baseURL: URL = URL(string: "https://api.obsidian.md")!, userAgent: String? = ObsidianAPI.headlessUserAgent,
+    public init(baseURL: URL = URL(string: "https://api.obsidian.md")!, userAgent: String? = ObsidianAPI.defaultUserAgent,
                 session: URLSession = .shared) {
         self.baseURL = baseURL; self.userAgent = userAgent; self.session = session
     }

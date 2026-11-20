@@ -38,7 +38,7 @@ final class SignInRequestTests: XCTestCase {
 
     /// Must match obsidian-headless 0.0.14 cli.js:
     /// `z("/user/signin",{email,password,mfa},{preflight:!0,headers:{Origin:"https://obsidian.md"}})`
-    /// with `User-Agent: obsidian-headless/0.0.14`, an OPTIONS preflight, then a JSON POST.
+    /// (but identifying as `Onyx/<version>`), an OPTIONS preflight, then a JSON POST.
     func testSignInMatchesOfficialHeadlessClient() async throws {
         let api = makeAPI()
         CaptureProtocol.responses = [#"{"token":"tok","email":"k@example.com","name":"K"}"#]
@@ -53,7 +53,8 @@ final class SignInRequestTests: XCTestCase {
         XCTAssertEqual(Set(seen.map(\.url)), ["https://api.obsidian.md/user/signin"])
         for s in seen {
             XCTAssertEqual(s.headers["Origin"], "https://obsidian.md")
-            XCTAssertEqual(s.headers["User-Agent"], "obsidian-headless/0.0.14")
+            XCTAssertEqual(s.headers["User-Agent"], ObsidianAPI.defaultUserAgent)
+            XCTAssertTrue(ObsidianAPI.defaultUserAgent.hasPrefix("Onyx/"))
         }
         XCTAssertNil(seen[0].headers["Content-Type"], "CLI sets Content-Type only on the POST")
         let post = seen[1]

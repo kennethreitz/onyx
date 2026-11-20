@@ -16,6 +16,6 @@ let package = Package(
         .target(name: "OnyxSync", path: "Sources/OnyxSync"),
         .executableTarget(name: "onyx-sync-poc", dependencies: ["OnyxSync"], path: "Sources/OnyxSyncPOC"),
         .testTarget(name: "OnyxSyncTests", dependencies: ["OnyxSync"], path: "Tests/OnyxSyncTests",
-                    resources: [.copy("Resources/obsidian-sync-vectors.json")]),
+                    resources: [.copy("Resources/obsidian-sync-vectors.json"), .copy("Resources/obsidian-merge-vectors.json")]),
     ]
 )

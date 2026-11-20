@@ -58,8 +58,10 @@ public actor SyncConnection {
     public private(set) var userID: Int?
     var requestTimeout: TimeInterval = 60
 
-    public init(crypto: any SyncEncryptionProvider, session: URLSession = .shared) {
-        self.crypto = crypto; self.session = session
+    private let userAgent: String?
+
+    public init(crypto: any SyncEncryptionProvider, session: URLSession = .shared, userAgent: String? = ObsidianAPI.defaultUserAgent) {
+        self.crypto = crypto; self.session = session; self.userAgent = userAgent
         (events, eventSink) = AsyncStream.makeStream(of: SyncEvent.self, bufferingPolicy: .unbounded)
     }
 
@@ -78,7 +80,9 @@ public actor SyncConnection {
     /// `initial` true on first sync of this device. Returns when the server answers `res: ok`;
     /// the backlog then arrives as `.push` events followed by `.ready`.
     public func connect(url: URL, token: String, vaultID: String, version: Int, initial: Bool, device: String) async throws {
-        let t = session.webSocketTask(with: url)
+        var req = URLRequest(url: url)
+        if let userAgent { req.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
+        let t = session.webSocketTask(with: req)
         t.maximumMessageSize = 64 * 1024 * 1024
         task = t
         t.resume()
@@ -105,6 +109,8 @@ public actor SyncConnection {
             }
         }
     }
+
+    public var isOpen: Bool { task != nil }
 
     public func disconnect(reason: String = "Disconnected") {
         guard task != nil else { return }

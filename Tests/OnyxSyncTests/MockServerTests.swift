@@ -13,6 +13,8 @@ final class MockSyncServer: @unchecked Sendable {
     var uid = 0
     var log: [[String: Any]] = []
     var conns: [NWConnection] = []
+    /// Senders of every connection that completed init: server pushes are broadcast to all devices.
+    var live: [([String: Any]) -> Void] = []
     var port: UInt16 { listener.port!.rawValue }
 
     init(keyhash: String) throws {
@@ -45,6 +47,9 @@ final class MockSyncServer: @unchecked Sendable {
 
     func stop() { listener.cancel(); conns.forEach { $0.cancel() } }
 
+    /// Drop every client connection (simulates a server restart / network loss).
+    func dropAll() async { await withCheckedContinuation { c in q.async { self.conns.forEach { $0.cancel() }; self.conns = []; self.live = []; c.resume() } } }
+
     private func accept(_ c: NWConnection) {
         conns.append(c)
         var pendingUpload: (meta: [String: Any], pieces: Int, got: Data)?
@@ -58,6 +63,11 @@ final class MockSyncServer: @unchecked Sendable {
             c.send(content: d, contentContext: ctx, isComplete: true, completion: .idempotent)
         }
         func announce(_ r: Record) {
+            let msg: [String: Any] = ["op": "push", "uid": r.uid, "path": r.path, "hash": r.hash, "size": r.size, "ctime": r.ctime, "mtime": r.mtime,
+                                      "folder": r.folder, "deleted": r.deleted, "device": "mock", "user": 7]
+            for f in live { f(msg) }
+        }
+        func announceTo(_ r: Record) {
             send(["op": "push", "uid": r.uid, "path": r.path, "hash": r.hash, "size": r.size, "ctime": r.ctime, "mtime": r.mtime,
                   "folder": r.folder, "deleted": r.deleted, "device": "mock", "user": 7])
         }
@@ -83,7 +93,8 @@ final class MockSyncServer: @unchecked Sendable {
                         guard m["keyhash"] as? String == keyhash else { send(["res": "err", "msg": "Invalid encryption key"]); return receive() }
                         send(["res": "ok", "perFileMax": 5_000_000, "userId": 7])
                         let since = m["version"] as? Int ?? 0
-                        for r in latest() where r.uid > since { announce(r) }
+                        for r in latest() where r.uid > since { announceTo(r) }
+                        live.append { send($0) }
                         send(["op": "ready", "version": uid])
                     case "ping": send(["op": "pong"])
                     case "push":
