@@ -40,6 +40,8 @@ struct ReaderView: NSViewRepresentable {
     var source: (path: String?, text: String)? = nil
     /// The split pane this view belongs to when unfocused (nil = the focused pane).
     var paneID: UUID? = nil
+    /// A hover preview: compact, no backlinks, no nested previews, never edits.
+    var preview = false
     @Environment(\.colorScheme) var scheme
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
@@ -48,7 +50,8 @@ struct ReaderView: NSViewRepresentable {
     func makeCoordinator() -> Coordinator {
         let c = Coordinator(ws: ws)
         c.paneID = paneID
-        c.startLine = ws.initialTop(paneID)   // open where this pane was (⌘↩ or a fresh split)
+        c.preview = preview
+        c.startLine = preview ? 0 : ws.initialTop(paneID)   // open where this pane was (⌘↩ or a fresh split)
         c.scrollHandled = ws.scrollRequest?.id
         return c
     }
@@ -108,6 +111,7 @@ struct ReaderView: NSViewRepresentable {
         var sidenotes = true
         var typeKey = ""
         var paneID: UUID?
+        var preview = false
         var startLine: Double = 0
         var scrollHandled: Int?
 
@@ -123,7 +127,7 @@ struct ReaderView: NSViewRepresentable {
 
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
-            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll, line: keepScroll ? 0 : startLine)
+            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview)
             startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
@@ -144,6 +148,7 @@ struct ReaderView: NSViewRepresentable {
 
         func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
             guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            if preview, !["open", "url", "tag"].contains(type) { return }   // a preview only navigates
             switch type {
             case "open":
                 if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil {
@@ -156,7 +161,8 @@ struct ReaderView: NSViewRepresentable {
                    let x = body["x"] as? Double, let y = body["y"] as? Double,
                    let w = body["width"] as? Double, let h = body["height"] as? Double {
                     let rect = CGRect(x: x, y: webView.isFlipped ? y : webView.bounds.height - y - h, width: w, height: h)
-                    GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView)
+                    let h = (body["heading"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+                    GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView, mode: nil, heading: h)
                 }
             case "previewEnd": GraphPreviewController.shared.leaveLink()
             case "unlinked":
@@ -180,7 +186,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -237,7 +243,7 @@ enum ReaderPayload {
         let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let folder = (path as NSString).deletingLastPathComponent
         // Backlinks under the note, like Obsidian's backlinkInDocument (unlinked load on demand).
-        let mentions: [[String: Any]] = snap.linkedMentions(to: path).map { m in
+        let mentions: [[String: Any]] = preview ? [] : snap.linkedMentions(to: path).map { m in
             ["path": m.source, "name": snap.notes[m.source]?.name ?? m.source, "folder": (m.source as NSString).deletingLastPathComponent,
              "lines": m.lines.map { ["line": $0.line, "text": snippet($0.context)] as [String: Any] }]
         }
@@ -245,7 +251,7 @@ enum ReaderPayload {
             "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
-            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll,
+            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview,
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]

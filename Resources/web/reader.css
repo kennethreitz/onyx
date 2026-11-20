@@ -236,3 +236,7 @@ a.field-chip.is-unresolved { border-bottom: 1px dotted currentColor; }
 .doc-backlinks .bl-context { display: block; color: var(--text-muted); text-decoration: none; font-size: 12.5px; line-height: 1.45; margin: .2em 0 0 .1em; padding: .25em .6em; border-left: 2px solid color-mix(in srgb, currentColor 14%, transparent); }
 .doc-backlinks a.bl-context:hover { color: var(--text-normal); background: color-mix(in srgb, currentColor 5%, transparent); }
 .doc-backlinks .bl-empty { color: var(--text-faint); font-style: italic; }
+
+/* hover page preview: a compact page inside the card */
+body.preview .markdown-preview-view { padding: 4px 18px 28px; max-width: none; opacity: 1; transform: none; transition: none; }
+body.preview .fallback-title { display: none; }

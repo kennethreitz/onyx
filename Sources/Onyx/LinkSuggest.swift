@@ -158,6 +158,26 @@ enum TypeSelfTest {
                 print("[hoverbtn] scheduled \(t.path) now=\(GraphPreviewController.shared.shownPath ?? "-")")
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { print("[hoverbtn] after 600ms shown=\(GraphPreviewController.shared.shownPath ?? "-")"); fflush(stdout) }
             } else { print("[hoverbtn] no trigger") }
+        case "previewmode": print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-") mode=\(GraphPreviewController.shared.shownMode.rawValue) linkMode=\(GraphPreviewController.linkMode.rawValue)")
+        case "linkpreview":   // what a reader link hover does after 400 ms (remembered mode)
+            if let v = MainWindow.current?.contentView { GraphPreviewController.shared.show(ws: ws, path: arg, rect: CGRect(x: v.bounds.midX - 40, y: v.bounds.maxY - 120, width: 80, height: 20), in: v, mode: nil); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-") mode=\(GraphPreviewController.shared.shownMode.rawValue)") }
+        case "previewshot":   // previewshot <png>: only the popover's own window
+            if let w = GraphPreviewController.shared.popoverWindow {
+                let t = Process(); t.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture"); t.arguments = ["-x", "-o", "-l", String(w.windowNumber), arg]
+                try? t.run(); t.waitUntilExit(); print("[previewshot] \(arg)")
+            } else { print("[previewshot] no popover") }
+        case "edhover":   // edhover <link text>: ⌘-hover the first [[link]] containing it in the editor
+            if let tv = editor(), let lm = tv.layoutManager, let tc = tv.textContainer {
+                let r = (tv.string as NSString).range(of: "[[" + arg)
+                if r.location != NSNotFound {
+                    tv.scrollRangeToVisible(r)
+                    var b = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: NSRange(location: r.location + 3, length: 1), actualCharacterRange: nil), in: tc)
+                    b.origin.x += tv.textContainerOrigin.x; b.origin.y += tv.textContainerOrigin.y
+                    tv.previewHover(.command, at: NSPoint(x: b.midX, y: b.midY))
+                    tv.previewHover([], at: NSPoint(x: b.midX, y: b.midY)); tv.previewHover(.command, at: NSPoint(x: b.midX, y: b.midY))   // release and press again: same link, one schedule
+                    print("[edhover] \(arg) at \(Int(b.midX)),\(Int(b.midY))")
+                } else { print("[edhover] not found") }
+            }
         case "previewclose": GraphPreviewController.shared.close(); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")")
         case "cardshot":   // cardshot <note> -> <png>: renders only the card, never the screen
             let parts = arg.components(separatedBy: " -> ")

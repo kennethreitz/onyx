@@ -257,3 +257,11 @@ Below every note (not Kanban boards) the reader lists linked mentions, grouped b
 three context lines each. Field links count, wikilinks read as their alias, and table rows are flattened. Clicking
 a context opens the note at that line. "Unlinked mentions" loads on demand when expanded.
 Both sections collapse, and the open state is remembered.
+
+## Hover page preview
+
+Hovering a resolved link in the reader (or holding ⌘ over a `[[link]]` in the editor) opens a card after 400 ms.
+The card shows the target note rendered compactly and scrollable, or its local graph. A toggle in the card header
+switches between the two, and links remember the last choice (page by default). The title-bar graph button and the
+inspector's relation rows always open on the graph. `[[Note#Heading]]` previews just that section. Inside the preview,
+links navigate (and close the card) but do not nest further previews. Tasks are read-only there.

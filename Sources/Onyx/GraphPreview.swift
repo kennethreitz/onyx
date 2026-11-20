@@ -13,25 +13,42 @@ final class GraphPreviewController: NSObject, NSPopoverDelegate {
     private var closeTimer: Timer?
     private var insideCard = false
     private(set) var shownPath: String?
+    private(set) var shownMode: PreviewMode = .graph
+    private var shownHeading: String?
 
-    func schedule(ws: Workspace, path: String, rect: CGRect, in view: NSView) {
+    /// What the card shows first. Links (reader, ⌘-hover in the editor) open in the last mode
+    /// you picked, the page by default. The graph button and inspector rows always open the graph.
+    static var linkMode: PreviewMode {
+        get { PreviewMode(rawValue: UserDefaults.standard.string(forKey: "onyx.preview.mode") ?? "") ?? .page }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "onyx.preview.mode") }
+    }
+
+    func schedule(ws: Workspace, path: String, rect: CGRect, in view: NSView, mode: PreviewMode? = .graph, heading: String? = nil) {
         guard ws.snapshot?.notes[path] != nil else { return }
         closeTimer?.invalidate(); showTimer?.invalidate()
         let delay = ProcessInfo.processInfo.environment["ONYX_PREVIEW_DELAY"].flatMap(Double.init) ?? 0.4
         showTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self, weak view] _ in
             MainActor.assumeIsolated {
                 guard let self, let view, view.window != nil else { return }
-                self.show(ws: ws, path: path, rect: rect, in: view)
+                self.show(ws: ws, path: path, rect: rect, in: view, mode: mode, heading: heading)
             }
         }
     }
 
-    func show(ws: Workspace, path: String, rect: CGRect, in view: NSView) {
+    /// `mode` nil = a link: the remembered mode.
+    func show(ws: Workspace, path: String, rect: CGRect, in view: NSView, mode: PreviewMode? = .graph, heading: String? = nil) {
         guard let snap = ws.snapshot else { return }
+        let start = mode ?? Self.linkMode
+        if popover?.isShown == true, shownPath == path, shownHeading == heading { return }   // already up
         let graph = RelationGraph.build(snap, center: path)
-        let card = GraphPreviewCard(graph: graph, path: path,
+        let card = LinkPreviewCard(ws: ws, graph: graph, path: path, heading: heading, mode: start,
             open: { [weak self] p in self?.close(); ws.openNote(p) },
-            hover: { [weak self] inside in self?.insideCard = inside; if inside { self?.closeTimer?.invalidate() } else { self?.leaveLink() } })
+            hover: { [weak self] inside in self?.insideCard = inside; if inside { self?.closeTimer?.invalidate() } else { self?.leaveLink() } },
+            switched: { [weak self] m in
+                self?.shownMode = m
+                if mode == nil { Self.linkMode = m }
+                self?.popover?.contentSize = m.size
+            })
         let host = NSHostingController(rootView: card)
         host.sizingOptions = [.preferredContentSize]
         if popover == nil {
@@ -39,8 +56,8 @@ final class GraphPreviewController: NSObject, NSPopoverDelegate {
             popover = p
         }
         popover?.contentViewController = host
-        popover?.contentSize = NSSize(width: 340, height: 250)
-        shownPath = path
+        popover?.contentSize = start.size
+        shownPath = path; shownMode = start; shownHeading = heading
         popover?.show(relativeTo: rect.insetBy(dx: -1, dy: -1), of: view, preferredEdge: view.isFlipped ? .maxY : .minY)   // below the link or button
     }
 
@@ -51,6 +68,7 @@ final class GraphPreviewController: NSObject, NSPopoverDelegate {
             MainActor.assumeIsolated { if self?.insideCard == false { self?.close() } }
         }
     }
+    var popoverWindow: NSWindow? { popover?.isShown == true ? popover?.contentViewController?.view.window : nil }
     func close() {
         showTimer?.invalidate(); closeTimer?.invalidate(); insideCard = false; shownPath = nil
         popover?.performClose(nil)
@@ -58,20 +76,95 @@ final class GraphPreviewController: NSObject, NSPopoverDelegate {
     func popoverDidClose(_ notification: Notification) { shownPath = nil; insideCard = false }
 }
 
+enum PreviewMode: String { case page, graph
+    var size: NSSize { self == .page ? NSSize(width: 440, height: 380) : NSSize(width: 340, height: 250) }
+}
+
+/// The hover card: the note itself (rendered, scrollable) or its local graph, with a small toggle.
+struct LinkPreviewCard: View {
+    var ws: Workspace
+    var graph: RelationGraph
+    var path: String
+    var heading: String?
+    @State var mode: PreviewMode
+    var open: (String) -> Void
+    var hover: (Bool) -> Void
+    var switched: (PreviewMode) -> Void
+
+    var text: String {
+        let t = ws.snapshot?.notes[path]?.content ?? ""
+        return heading.map { ReaderPayload.section(t, heading: $0) } ?? t
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Button { open(path) } label: {
+                    Text(graph.nodes.first?.name ?? "").font(Theme.titleSerif(15)).foregroundStyle(Color.ink).lineLimit(1)
+                }.buttonStyle(.plain).help("Open")
+                if let heading { Text("› " + heading).font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1) }
+                Spacer()
+                if mode == .graph { Text(GraphPreviewCard.summary(graph)).font(.system(size: 10)).foregroundStyle(Color.faint).lineLimit(1) }
+                toggle
+            }
+            .padding(.horizontal, 14).padding(.top, 10)
+            Group {
+                if mode == .page {
+                    ReaderView(ws: ws, fontSize: 14.5, measure: 60, source: (path, text), preview: true)
+                } else {
+                    GraphPreviewCard(graph: graph, path: path, open: open, hover: { _ in }, embedded: true)
+                        .padding(.horizontal, 14).padding(.bottom, 10)
+                }
+            }
+        }
+        .frame(width: mode.size.width, height: mode.size.height)
+        .background(Color.paper)
+        .onHover(perform: hover)
+    }
+
+    var toggle: some View {
+        HStack(spacing: 0) {
+            ForEach([PreviewMode.page, .graph], id: \.rawValue) { m in
+                Button { mode = m; switched(m) } label: {
+                    Image(systemName: m == .page ? "doc.text" : "point.3.connected.trianglepath.dotted")
+                        .font(.system(size: 10.5)).frame(width: 22, height: 17)
+                        .foregroundStyle(mode == m ? Color.ink : Color.faint)
+                        .background(mode == m ? Color.ink.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                }.buttonStyle(.plain).help(m == .page ? "Page preview" : "Graph preview")
+            }
+        }
+        .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 4 }
+    }
+}
+
 struct GraphPreviewCard: View {
     var graph: RelationGraph
     var path: String
     var open: (String) -> Void
     var hover: (Bool) -> Void
+    var embedded = false
     @State private var hot: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(graph.nodes.first?.name ?? "").font(Theme.titleSerif(15)).foregroundStyle(Color.ink).lineLimit(1)
-                Spacer()
-                Text(summary).font(.system(size: 10)).foregroundStyle(Color.faint)
+        if embedded { canvas } else {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(graph.nodes.first?.name ?? "").font(Theme.titleSerif(15)).foregroundStyle(Color.ink).lineLimit(1)
+                    Spacer()
+                    Text(Self.summary(graph)).font(.system(size: 10)).foregroundStyle(Color.faint)
+                }
+                canvas
             }
+            .padding(.horizontal, 14).padding(.vertical, 10)
+            .frame(width: 340, height: 250)
+            .background(Color.paper)
+            .onHover(perform: hover)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("Graph preview for \(graph.nodes.first?.name ?? "note")")
+        }
+    }
+
+    var canvas: some View {
             GeometryReader { geo in
                 Canvas { ctx, size in draw(&ctx, size) }
                     .contentShape(Rectangle())
@@ -80,16 +173,9 @@ struct GraphPreviewCard: View {
                     }
                     .onTapGesture(coordinateSpace: .local) { p in open(hit(p, geo.size) ?? path) }
             }
-        }
-        .padding(.horizontal, 14).padding(.vertical, 10)
-        .frame(width: 340, height: 250)
-        .background(Color.paper)
-        .onHover(perform: hover)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Graph preview for \(graph.nodes.first?.name ?? "note")")
     }
 
-    var summary: String {
+    static func summary(_ graph: RelationGraph) -> String {
         let n = Dictionary(grouping: graph.nodes, by: \.role).mapValues(\.count)
         if let l = n[.link] { return "\(l + graph.hiddenParts) links" }
         return [("parent", n[.parent] ?? 0), ("part", (n[.part] ?? 0) + graph.hiddenParts), ("related", n[.related] ?? 0)]

@@ -58,6 +58,51 @@ final class OnyxTextView: NSTextView {
         super.mouseDown(with: event)
     }
 
+    // ⌘-hover over a [[link]] shows the same preview card the reader shows on hover.
+    var onPreview: (_ target: String?, _ rect: NSRect) -> Void = { _, _ in }
+    private var previewRange: NSRange?
+    override func mouseMoved(with event: NSEvent) {
+        super.mouseMoved(with: event)
+        previewHover(event.modifierFlags, at: convert(event.locationInWindow, from: nil))
+    }
+    override func flagsChanged(with event: NSEvent) {
+        super.flagsChanged(with: event)
+        guard let w = window else { return }
+        previewHover(event.modifierFlags, at: convert(w.mouseLocationOutsideOfEventStream, from: nil))
+    }
+    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); endPreviewHover() }
+    func previewHover(_ flags: NSEvent.ModifierFlags, at point: NSPoint) {
+        guard flags.contains(.command), bounds.contains(point), let hit = wikilinkHit(at: point) else { endPreviewHover(); return }
+        if hit.range == previewRange { return }
+        previewRange = hit.range
+        guard let lm = layoutManager, let tc = textContainer else { return }
+        var r = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: hit.range, actualCharacterRange: nil), in: tc)
+        r.origin.x += textContainerOrigin.x; r.origin.y += textContainerOrigin.y
+        onPreview(hit.target, r)
+    }
+    func endPreviewHover() {
+        guard previewRange != nil else { return }
+        previewRange = nil
+        onPreview(nil, .zero)
+    }
+
+    /// The [[link]] under a point, without side effects.
+    func wikilinkHit(at point: NSPoint) -> (target: String, range: NSRange)? {
+        guard let lm = layoutManager, let tc = textContainer else { return nil }
+        let p = NSPoint(x: point.x - textContainerOrigin.x, y: point.y - textContainerOrigin.y)
+        var frac: CGFloat = 0
+        let g = lm.glyphIndex(for: p, in: tc, fractionOfDistanceThroughGlyph: &frac)
+        guard lm.boundingRect(forGlyphRange: NSRange(location: g, length: 1), in: tc).insetBy(dx: -2, dy: -2).contains(p) else { return nil }
+        let idx = lm.characterIndexForGlyph(at: g)
+        let ns = string as NSString
+        guard idx < ns.length else { return nil }
+        let lr = ns.lineRange(for: NSRange(location: idx, length: 0))
+        for l in NoteParser.parseWikiLinks(string, in: lr) where NSLocationInRange(idx, l.range) {
+            return (l.target + (l.heading.map { "#" + $0 } ?? ""), l.range)
+        }
+        return nil
+    }
+
     func wikilink(at point: NSPoint) -> String? {
         let idx = characterIndexForInsertion(at: point)
         let ns = string as NSString
@@ -306,7 +351,15 @@ struct EditorView: NSViewRepresentable {
         tv.textContainerInset = NSSize(width: 80, height: 96)
         tv.delegate = context.coordinator
         tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
-        tv.onFollowLink = { [weak ws] t in ws?.openLink(t) }
+        tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
+        tv.onPreview = { [weak ws, weak tv] t, rect in
+            guard let ws, let tv else { return }
+            guard let t else { GraphPreviewController.shared.leaveLink(); return }
+            let parts = t.split(separator: "#", maxSplits: 1).map(String.init)
+            let name = parts.first ?? ""
+            guard let p = name.isEmpty ? ws.currentPath : ws.snapshot?.resolve(name, from: ws.currentPath) else { return }
+            GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: tv, mode: nil, heading: parts.count > 1 ? parts[1] : nil)
+        }
 
         let scroll = ThinScrollView()
         scroll.documentView = tv

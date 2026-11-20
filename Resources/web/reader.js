@@ -281,7 +281,7 @@
   window.Onyx = {
     render(payload) {
       P = payload;
-      document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '');
+      document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '') + (payload.preview ? ' preview' : '');
       document.documentElement.classList.toggle('dark', !!payload.dark);
       const y = window.scrollY;
       const md = stripComments(payload.markdown);
@@ -296,7 +296,11 @@
       }
       page.classList.add('instant');
       if (!payload.keepScroll) page.classList.remove('shown');
-      page.innerHTML = props(payload.props) + html + (payload.kanban ? '' : backlinksHTML(payload.backlinks || []));
+      page.innerHTML = props(payload.props) + html + (payload.kanban || payload.preview ? '' : backlinksHTML(payload.backlinks || []));
+      if (payload.preview) {   // the card header already names the note
+        const h = page.querySelector('h1');
+        if (h && h.textContent.trim().toLowerCase() === String(payload.name).toLowerCase()) h.remove();
+      }
       markLines();
       decorate();
       if (payload.sidenotes) sidenotes();
@@ -340,9 +344,9 @@
   // The native graph card is shared with inspector links. Swift owns the 400 ms delay.
   document.addEventListener('mouseover', e => {
     const a = e.target.closest('a.internal-link[data-path]');
-    if (!a || !a.dataset.path || a.contains(e.relatedTarget)) return;
+    if (!a || !a.dataset.path || a.contains(e.relatedTarget) || (P && P.preview)) return;
     const r = a.getBoundingClientRect();
-    post({ type: 'preview', path: a.dataset.path, x: r.x, y: r.y, width: r.width, height: r.height });
+    post({ type: 'preview', path: a.dataset.path, heading: a.dataset.heading || '', x: r.x, y: r.y, width: r.width, height: r.height });
   });
   document.addEventListener('mouseout', e => {
     const a = e.target.closest('a.internal-link');
