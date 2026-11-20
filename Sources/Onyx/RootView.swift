@@ -382,20 +382,29 @@ struct RootView: View {
 
     func installMonitors() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if ProcessInfo.processInfo.environment["ONYX_DEBUG_KEYS"] != nil {
+                let key = e.charactersIgnoringModifiers ?? "?"
+                let fr = String(describing: type(of: NSApp.keyWindow?.firstResponder ?? NSObject()))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    print("[key] \(e.keyCode) '\(key)' fr=\(fr) → overlay=\(ws.overlay) atlas=\(ws.graphAtlas) mode=\(ws.mode) sidebar=\(ws.sidebarVisible)/\(ws.sidebarPinned)/\(ws.sidebarTab) inspector=\(ws.inspectorVisible) focus=\(ws.focusMode) panes=\(ws.panes.count)/\(ws.splitAxis) note=\(ws.currentPath ?? "-")")
+                    fflush(stdout)
+                }
+            }
             // ⇧⌘P: the command palette too, for VS Code hands (⌘P is the menu item)
             let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
             if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
                 ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
             }
             // ⌘W: close the focused pane when split; otherwise let the window close
-            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "w", ws.isSplit, e.window?.isKeyWindow == true,
-               !(e.window is NSPanel), ws.overlay == .none {
+            // (keyed to the main Onyx window, so ⌘W in Settings still closes Settings)
+            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "w", ws.isSplit,
+               e.window != nil, e.window === MainWindow.current, ws.overlay == .none {
                 ws.closePane(); return nil
             }
             // ⌘I: the inspector, even while the editor has focus (NSTextView otherwise
             // swallows ⌘I before the menu sees it, so a docked inspector couldn't be put away).
-            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "i", e.window?.isKeyWindow == true,
-               !(e.window is NSPanel) {
+            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "i",
+               e.window != nil, e.window === MainWindow.current {
                 ws.toggleInspector(); return nil
             }
             if e.keyCode == 53 { // Esc
@@ -441,11 +450,14 @@ struct FooterButton: View {
 
 enum ShortcutHints {
     static let all: [(String, String)] = [
-        ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Files"), ("⇧⌘F", "Search the vault"),
+        ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
         ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
+
+/// The window hosting the workspace (not Settings, not a panel), for window-scoped shortcuts.
+@MainActor enum MainWindow { static weak var current: NSWindow? }
 
 /// Transparent, hidden titlebar; the traffic lights only appear when you reach for them.
 struct WindowConfigurator: NSViewRepresentable {
@@ -458,6 +470,7 @@ struct WindowConfigurator: NSViewRepresentable {
     func updateNSView(_ v: NSView, context: Context) { DispatchQueue.main.async { configure(v.window) } }
     func configure(_ w: NSWindow?) {
         guard let w else { return }
+        MainWindow.current = w
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden
         w.styleMask.insert(.fullSizeContentView)

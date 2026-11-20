@@ -801,10 +801,13 @@ struct GraphView: View {
         }) { monitors.append(m) }
         if let m = NSEvent.addLocalMonitorForEvents(matching: .keyDown, handler: { e in
             guard ws.overlay == .graph, !(NSApp.keyWindow?.firstResponder is NSTextView) else { return e }
+            // Exact modifiers only, so ⌘↩ (read/edit), ⇧⌘F (vault search) and ⌃⌘F (focus mode)
+            // still reach the menu while the graph is open.
+            let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
             switch e.keyCode {
-            case 36, 76: if let f = hover ?? focus { open(f) }; return nil      // return / enter
-            case 51: back(); return nil                                          // delete
-            case 3 where e.modifierFlags.contains(.command): searchFocused = true; return nil   // ⌘F
+            case 36 where mods.isEmpty, 76 where mods.isEmpty: if let f = hover ?? focus { open(f) }; return nil   // return / enter
+            case 51 where mods.isEmpty: back(); return nil                                                        // delete
+            case 3 where mods == [.command]: searchFocused = true; return nil                                     // ⌘F
             default: return e
             }
         }) { monitors.append(m) }

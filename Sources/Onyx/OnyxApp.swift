@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WebKit
 import OnyxCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -7,9 +8,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         ScrollSelfTest.scheduleIfRequested()
+        KeySelfTest.scheduleIfRequested()
         // ⌃⌘F belongs to focus mode; Enter Full Screen keeps its menu item and the green button.
         for delay in [0.3, 1.0, 3.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.freeControlCommandF() } }
+        if ProcessInfo.processInfo.environment["ONYX_DUMP_MENUS"] != nil {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { Self.dumpMenus() }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in Self.freeControlCommandF() }
+    }
+    /// Debug: every menu item that has a key equivalent, to audit for double bindings.
+    static func dumpMenus() {
+        func mods(_ m: NSEvent.ModifierFlags) -> String {
+            (m.contains(.control) ? "⌃" : "") + (m.contains(.option) ? "⌥" : "") + (m.contains(.shift) ? "⇧" : "") + (m.contains(.command) ? "⌘" : "")
+        }
+        func walk(_ m: NSMenu?, _ path: String) {
+            for item in m?.items ?? [] {
+                let p = path.isEmpty ? item.title : path + " > " + item.title
+                if !item.keyEquivalent.isEmpty {
+                    let k = item.keyEquivalent == "\r" ? "↩" : item.keyEquivalent == "\u{1b}" ? "Esc" : item.keyEquivalent
+                    print("[menu] \(mods(item.keyEquivalentModifierMask))\(k)\t\(p)\t\(item.action.map(NSStringFromSelector) ?? "-")")
+                }
+                walk(item.submenu, p)
+            }
+        }
+        walk(NSApp.mainMenu, "")
+        fflush(stdout)
     }
     static func freeControlCommandF() {
         func walk(_ m: NSMenu?) {
@@ -157,7 +180,7 @@ struct OnyxApp: App {
             Button(ws.mode == .read ? "Edit Note and Save" : "Save and Read") { ws.toggleMode() }.keyboardShortcut(.return, modifiers: .command)
             Button(ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }.keyboardShortcut("f", modifiers: [.command, .control])
             Divider()
-            Button("Files") { ws.toggleDockedSidebar(.files) }.keyboardShortcut("k")
+            Button(ws.sidebarVisible && ws.sidebarPinned ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }.keyboardShortcut("k")
             Button("Search Vault") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }.keyboardShortcut("f", modifiers: [.command, .shift])
             Button("Recent Files") { ws.toggleSidebar(.recent) }.keyboardShortcut("r", modifiers: [.command, .shift])
             Button("Bookmarks") { ws.toggleSidebar(.bookmarks) }.keyboardShortcut("b", modifiers: [.command, .shift])
@@ -203,5 +226,39 @@ struct OnyxApp: App {
         a.informativeText = "You can restore it from the Trash in Finder."
         a.addButton(withTitle: "Move to Trash"); a.addButton(withTitle: "Cancel")
         if a.runModal() == .alertFirstButtonReturn { ws.trashCurrent() }
+    }
+}
+
+/// Debug (ONYX_KEY_SELFTEST=1): offer every help-sheet shortcut to the window's view hierarchy
+/// with the editor, then the reader, as first responder, and report which views claim it
+/// before the menu bar gets a chance (i.e. which keys the text view or web view would swallow).
+enum KeySelfTest {
+    static let keys: [(String, UInt16, String, NSEvent.ModifierFlags)] = [
+        ("⌘O", 31, "o", .command), ("⌘P", 35, "p", .command), ("⇧⌘P", 35, "p", [.command, .shift]),
+        ("⌘K", 40, "k", .command), ("⇧⌘F", 3, "f", [.command, .shift]), ("⌘↩", 36, "\r", .command),
+        ("⌘E", 14, "e", .command), ("⌘T", 17, "t", .command), ("⌘\\", 42, "\\", .command),
+        ("⌘I", 34, "i", .command), ("⌘G", 5, "g", .command), ("⇧⌘G", 5, "g", [.command, .shift]),
+        ("⌘D", 2, "d", .command), ("⇧⌘D", 2, "d", [.command, .shift]), ("⌘W", 13, "w", .command),
+        ("⌃⌘F", 3, "f", [.command, .control]), ("Esc", 53, "\u{1b}", []),
+    ]
+    @MainActor static func scheduleIfRequested() {
+        guard ProcessInfo.processInfo.environment["ONYX_KEY_SELFTEST"] != nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { run() }
+    }
+    @MainActor static func run() {
+        guard let w = NSApp.windows.first(where: { $0.contentView != nil && !($0 is NSPanel) && $0.isVisible }), let root = w.contentView else { return }
+        func find<T: NSView>(_ v: NSView, _ t: T.Type) -> T? { if let x = v as? T { return x }; for s in v.subviews { if let x = find(s, t) { return x } }; return nil }
+        for (label, responder) in [("editor", find(root, OnyxTextView.self) as NSView?), ("reader", find(root, WKWebView.self) as NSView?)] {
+            guard let r = responder else { print("[keytest] \(label): not on screen"); continue }
+            w.makeFirstResponder(r)
+            for (name, code, ch, mods) in keys {
+                let chars = mods.contains(.shift) ? ch.uppercased() : ch
+                guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: mods, timestamp: 0, windowNumber: w.windowNumber, context: nil, characters: chars, charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code) else { continue }
+                // Only shortcut-style keys travel the performKeyEquivalent path; Esc goes to keyDown.
+                let claimed = mods.contains(.command) ? root.performKeyEquivalent(with: e) : false
+                print("[keytest] \(label) \(name): \(claimed ? "CLAIMED by a view" : "free → menu")")
+            }
+        }
+        fflush(stdout)
     }
 }

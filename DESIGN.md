@@ -44,7 +44,7 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | --- | --- |
 | ⌘O | Quick switcher (find or create) |
 | ⌘P, ⇧⌘P | Command palette (⇧⌘P for VS Code hands) |
-| ⌘K | Files sidebar |
+| ⌘K | Show or hide the sidebar (docks it on Files; from another tab, switches to Files) |
 | ⇧⌘F | Search the vault |
 | ⌘I | Inspector |
 | ⌘G / ⇧⌘G | Focus graph / Atlas |
@@ -94,3 +94,11 @@ multi-line block that point is.
   never jumps when it gets narrower or shorter. The editor also refuses AppKit's
   "recenter the caret on resize" scroll.
 - Positions inside the frontmatter map to the top of the reader (it shows properties there).
+
+## Shortcut audit hooks
+
+Debug-only environment switches used to check the "Onyx, in a few keys" sheet against reality:
+`ONYX_DUMP_MENUS=1` prints every menu key equivalent (to catch double bindings),
+`ONYX_KEY_SELFTEST=1` offers each sheet shortcut to the view hierarchy with the editor / reader
+as first responder (to catch a view swallowing it before the menu), and `ONYX_DEBUG_KEYS=1`
+logs workspace state after each key press.

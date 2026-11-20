@@ -59,7 +59,7 @@ keep working right alongside it.
 | --- | --- |
 | <kbd>⌘O</kbd> | Quick switcher: find or create a note |
 | <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> | Command palette |
-| <kbd>⌘K</kbd> | Files sidebar |
+| <kbd>⌘K</kbd> | Show or hide the sidebar (opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
 | <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> | Focus graph · atlas |
