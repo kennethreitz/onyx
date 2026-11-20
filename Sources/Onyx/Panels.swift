@@ -142,13 +142,7 @@ struct TreeNodeView: View {
             .onHover { hover = $0 }
             .onTapGesture { activate() }
             .id(node.path)
-            .contextMenu {
-                if node.isNote || node.folderNote != nil {
-                    Button("Open") { activate() }
-                    Button("Reveal in Finder") { if let r = ws.root { NSWorkspace.shared.activateFileViewerSelecting([r.appendingPathComponent(node.folderNote ?? node.path)]) } }
-                }
-                if node.isFolder { Button("New Note Here") { ws.createNote(named: "Untitled", folder: node.path) } }
-            }
+            .contextMenu { FileMenu(ws: ws, path: node.path, isFolder: node.isFolder, folderNote: node.folderNote) }
             if node.isFolder && isOpen {
                 ForEach(node.children ?? []) { c in TreeNodeView(ws: ws, node: c, depth: depth + 1) }
             }
@@ -165,6 +159,27 @@ struct TreeNodeView: View {
             if let fn = node.folderNote { ws.expanded.insert(node.path); ws.openNote(fn) } else { toggle() }
         } else if node.isNote { ws.openNote(node.path) }
         else if let r = ws.root { NSWorkspace.shared.open(r.appendingPathComponent(node.path)) }
+    }
+}
+
+/// The right-click menu wherever a note, file or folder appears (tree, recent, bookmarks, search).
+struct FileMenu: View {
+    var ws: Workspace
+    var path: String
+    var isFolder = false
+    var folderNote: String? = nil
+    var body: some View {
+        let note = isFolder ? folderNote : (path.lowercased().hasSuffix(".md") ? path : nil)
+        if let note {
+            Button("Open") { ws.openNote(note) }
+            Button("Open in Split") { ws.split(.vertical); ws.openNote(note) }
+        }
+        if isFolder { Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) } }
+        Divider()
+        Button("Reveal in Finder") { ws.revealInFinder(path) }
+        if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }
+        Divider()
+        Button(isFolder ? "Delete Folder…" : "Delete…", role: .destructive) { DispatchQueue.main.async { ws.confirmTrash(path) } }
     }
 }
 
@@ -199,6 +214,7 @@ struct NoteRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 5).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.horizontal, 5))
         .contentShape(Rectangle())
+        .contextMenu { FileMenu(ws: ws, path: path) }
         .onHover { hover = $0 }
         .onTapGesture { ws.openNote(path) }
     }

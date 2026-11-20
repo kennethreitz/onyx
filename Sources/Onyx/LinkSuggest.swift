@@ -110,6 +110,7 @@ struct LinkSuggestList: View {
 /// can't become key without stealing focus). Lines: `type <text>`, `key <code> [cmd|shift|opt]`,
 /// `wait <seconds>`, `dump` (prints the note text). Never set in normal use.
 enum TypeSelfTest {
+    @MainActor static weak var ws: Workspace?
     @MainActor static func scheduleIfRequested() {
         guard let f = ProcessInfo.processInfo.environment["ONYX_TYPE_TEST"],
               let script = try? String(contentsOfFile: f, encoding: .utf8) else { return }
@@ -122,6 +123,21 @@ enum TypeSelfTest {
             DispatchQueue.main.asyncAfter(deadline: .now() + at) { run(line) }
             t += line.hasPrefix("type ") ? 0.05 * Double(line.count) + 0.3 : 0.3
         }
+    }
+    /// `open <path>`, `split`, `back`, `trash <path>` (no confirm), `state`.
+    @MainActor static func workspaceCommand(_ line: String, _ ws: Workspace) -> Bool {
+        let arg = line.split(separator: " ", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
+        switch line.split(separator: " ").first ?? "" {
+        case "open": ws.openNote(arg)
+        case "split": ws.split(.vertical)
+        case "back": ws.goBack()
+        case "trash": ws.trash(arg)
+        case "state":
+            let h = ws.debugHistory
+            print("[state] current=\(ws.currentPath ?? "-") history=\(h) panes=\(ws.panes.map { $0.path ?? "-" }) focused=\(ws.focusedPane) recent0=\(ws.recent.first ?? "-")")
+        default: return false
+        }
+        return true
     }
     @MainActor static func editor() -> OnyxTextView? {
         func find(_ v: NSView) -> OnyxTextView? {
@@ -138,6 +154,7 @@ enum TypeSelfTest {
         tv.keyDown(with: e)
     }
     @MainActor static func run(_ line: String) {
+        if let ws, workspaceCommand(line, ws) { fflush(stdout); return }
         guard let tv = editor() else { print("[type] no editor"); return }
         tv.directKeys = true
         if line.hasPrefix("type ") {

@@ -73,6 +73,7 @@ keep working right alongside it.
 | <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane (or just click one) |
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
 | <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
+| <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm; also right-click any file) |
 | <kbd>⌘N</kbd> | New note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌘,</kbd> | Settings |

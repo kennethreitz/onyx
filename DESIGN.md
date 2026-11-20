@@ -55,6 +55,7 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | ⌃⇥ / ⌃⇧⇥ | Next / previous pane (click also focuses) |
 | ⌘[ ⌘] | Back / forward through this pane's history (also mouse buttons 4/5, swipe) |
 | ⌥⌘[ ⌥⌘] | Previous / next daily note |
+| ⌘⌫ | Delete note: confirm, then the Trash; panes and history move on (replaces the editor's delete-to-line-start) |
 | ⌘N | New note |
 | ⌃⌘F | Focus mode |
 | Esc | Put away the topmost layer (overlay → floating panel → inspector → focus mode) |
@@ -139,3 +140,13 @@ Triggers: ⌘[ / ⌘] (Go menu, also caught by the window's key monitor so the e
 view can't claim them), mouse buttons 4/5, three-finger "swipe between pages", and a two-finger
 horizontal swipe when the system setting allows it (outside overlays). The title bar shows
 ‹ before the path and › after the title, dimmed when there's nowhere to go. The graph header has both chevrons side by side.
+
+## Deleting and the file menu
+
+Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
+New Note Here (folders), Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
+Delete…. Delete Note… is also in the File menu and the palette (⌘⌫). Delete always confirms and
+always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. Afterwards the
+note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),
+any pane showing it steps back (or closes, if it has nowhere to go) and the recent list forgets it.
+`vaultMutated` is the hook git auto-commit uses for deletes, renames and moves.
