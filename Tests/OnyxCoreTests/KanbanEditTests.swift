@@ -65,6 +65,26 @@ final class KanbanEditTests: XCTestCase {
         XCTAssertEqual(KanbanDoc(d.text).text, d.text)
     }
 
+    func testCollapseRoundTripsThroughSettings() {
+        var d = KanbanDoc(board)
+        XCTAssertEqual(d.collapsed, [false, false, false, false])
+        d.setCollapsed(lane: 1, true)
+        XCTAssertTrue(d.text.contains("{\"kanban-plugin\":\"board\",\"list-collapse\":[false,true,false,false]}"))
+        XCTAssertEqual(KanbanDoc(d.text).collapsed, [false, true, false, false])
+        XCTAssertFalse(d.setCollapsed(lane: 1, true))            // already: no write
+        d.setCollapsed([true, true, false, true])                // "collapse all except this"
+        d.setCollapsed(lane: 0, false); d.setCollapsed(lane: 1, false); d.setCollapsed(lane: 3, false)
+        XCTAssertEqual(d.text, board)                            // back to the exact bytes
+        // a settings block without the key gains it; a board without settings gains one
+        var e = KanbanDoc("---\nkanban-plugin: board\n---\n\n## A\n\n- [ ] x\n\n\n%% kanban:settings\n```\n{\"kanban-plugin\":\"board\"}\n```\n%%")
+        e.setCollapsed(lane: 0, true)
+        XCTAssertTrue(e.text.contains("{\"kanban-plugin\":\"board\",\"list-collapse\":[true]}"))
+        var f = KanbanDoc("---\nkanban-plugin: board\n---\n\n## A\n\n- [ ] x\n\n\n")
+        f.setCollapsed(lane: 0, true)
+        XCTAssertEqual(KanbanDoc(f.text).collapsed, [true])
+        XCTAssertEqual(KanbanDoc(f.text).lanes.map { $0.cards.count }, [1])
+    }
+
     /// ONYX_KANBAN_FILE=/tmp/…/Ideas.md: a real board (a copy) must round-trip byte for byte,
     /// and every toggle/move undone must restore it exactly.
     func testRealBoardCopy() throws {
@@ -85,6 +105,8 @@ final class KanbanEditTests: XCTestCase {
                 }
             }
         }
+        var c = d; c.setCollapsed(lane: 0, !d.collapsed[0]); c.setCollapsed(lane: 0, d.collapsed[0])
+        XCTAssertEqual(c.text, text, "collapse and expand restores the bytes")
         print("[kanban] \(d.lanes.count) lanes, \(d.lanes.map { $0.cards.count }.reduce(0, +)) cards, round-trip identical")
     }
 }

@@ -240,8 +240,10 @@
   // double-click to edit, add, archive. Swift splices the file, so nothing else in it moves.
   function kanbanHTML(lanes) {
     const editable = !P.preview && P.kanbanEditable;
-    return `<div class="kanban${editable ? ' editable' : ''}">` + lanes.map((l, li) =>
-      `<section class="lane" data-lane="${li}"><h3>${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3><div class="kb-cards">` +
+    return `<div class="kanban${editable ? ' editable' : ''}">` + lanes.map((l, li) => l.collapsed ?
+      // collapsed: a thin strip, title rotated, with the count; click to expand
+      `<section class="lane collapsed" data-lane="${li}"${editable ? ' title="Expand"' : ''}><span class="kb-strip-count">${l.cards.length}</span><span class="kb-strip-title">${embedMarked.parseInline(l.title)}</span></section>` :
+      `<section class="lane" data-lane="${li}"><h3>${editable ? '<button class="kb-fold" title="Collapse (right-click: collapse all except this)">&#x2039;</button>' : ''}${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3><div class="kb-cards">` +
       l.cards.map((c, ci) => `<div class="card${c.done ? ' done' : ''}"${editable ? ' draggable="true"' : ''} data-lane="${li}" data-card="${ci}" data-raw="${esc(c.text)}">` +
         (editable ? `<input type="checkbox" class="kb-check"${c.done ? ' checked' : ''} title="Done">` : '') +
         `<div class="kb-text">${embedMarked.parseInline(c.text.replace(/\n/g, ' '))}</div>` +
@@ -266,6 +268,11 @@
     const board = e.target.closest('.kanban.editable');
     if (!board) return;
     const card = e.target.closest('.card');
+    const lane = e.target.closest('.lane');
+    hideKbMenu();
+    if (e.target.closest('.kb-menu button')) return;
+    if (lane && lane.classList.contains('collapsed') && !e.target.closest('a')) { kb({ op: 'collapse', lane: +lane.dataset.lane, on: false }); e.stopPropagation(); return; }
+    if (e.target.classList.contains('kb-fold') && lane) { kb({ op: 'collapse', lane: +lane.dataset.lane, on: true }); e.stopPropagation(); return; }
     if (e.target.classList.contains('kb-check') && card) { e.preventDefault(); kb({ op: 'toggle', lane: +card.dataset.lane, card: +card.dataset.card }); e.stopPropagation(); }
     else if (e.target.classList.contains('kb-archive') && card) { kb({ op: 'archive', lane: +card.dataset.lane, card: +card.dataset.card }); e.stopPropagation(); }
     else if (e.target.classList.contains('kb-add')) {
@@ -275,6 +282,26 @@
       e.stopPropagation();
     }
   }, true);
+  // column menu (right-click a lane header or a collapsed strip)
+  function hideKbMenu() { document.querySelectorAll('.kb-menu').forEach(m => m.remove()); }
+  document.addEventListener('contextmenu', e => {
+    const lane = e.target.closest('.kanban.editable .lane');
+    if (!lane || !(e.target.closest('h3') || lane.classList.contains('collapsed'))) return;
+    e.preventDefault(); hideKbMenu();
+    const li = +lane.dataset.lane, m = document.createElement('div');
+    m.className = 'kb-menu';
+    const folded = lane.classList.contains('collapsed');
+    [[folded ? 'Expand' : 'Collapse', { op: 'collapse', lane: li, on: !folded }],
+     ['Collapse all except this', { op: 'collapseOthers', lane: li }],
+     ['Expand all', { op: 'expandAll' }]].forEach(([t, op]) => {
+      const b = document.createElement('button'); b.textContent = t;
+      b.addEventListener('click', ev => { ev.stopPropagation(); hideKbMenu(); kb(op); });
+      m.appendChild(b);
+    });
+    m.style.left = (e.pageX) + 'px'; m.style.top = (e.pageY) + 'px';
+    document.body.appendChild(m);
+  });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') hideKbMenu(); });
   document.addEventListener('dblclick', e => {
     const card = e.target.closest('.kanban.editable .card');
     if (!card || e.target.closest('a') || e.target.classList.contains('kb-check')) return;
@@ -303,6 +330,7 @@
     const lane = DRAG && e.target.closest && e.target.closest('.kanban.editable .lane');
     if (!lane) return;
     e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+    if (lane.classList.contains('collapsed')) { lane.classList.add('kb-over'); return; }
     const { cards, index } = kbDropIndex(lane, e.clientY);
     let mark = document.querySelector('.kb-drop');
     if (!mark) { mark = document.createElement('div'); mark.className = 'kb-drop'; }
@@ -313,7 +341,7 @@
     const lane = DRAG && e.target.closest && e.target.closest('.kanban.editable .lane');
     if (!lane) return;
     e.preventDefault();
-    const { index } = kbDropIndex(lane, e.clientY);
+    const index = lane.classList.contains('collapsed') ? +lane.querySelector('.kb-strip-count').textContent : kbDropIndex(lane, e.clientY).index;
     const to = +lane.dataset.lane, d = DRAG;
     DRAG = null;
     document.querySelectorAll('.kb-drop').forEach(m => m.remove());
@@ -324,7 +352,9 @@
     if (DRAG) DRAG.el.classList.remove('dragging');
     DRAG = null;
     document.querySelectorAll('.kb-drop').forEach(m => m.remove());
+    document.querySelectorAll('.kb-over').forEach(m => m.classList.remove('kb-over'));
   });
+  document.addEventListener('dragleave', e => { const l = e.target.closest && e.target.closest('.lane.collapsed'); if (l && !l.contains(e.relatedTarget)) l.classList.remove('kb-over'); });
 
   function sidenotes() {
     page.querySelectorAll('a[data-footnote-ref]').forEach((ref) => {

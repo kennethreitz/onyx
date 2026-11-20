@@ -868,6 +868,9 @@ final class Workspace {
         case "add": ok = d.add(lane: lane, text: b["text"] as? String ?? "")
         case "edit": ok = d.edit(lane: lane, card: card, text: b["text"] as? String ?? "")
         case "archive": ok = d.archive(lane: lane, card: card)
+        case "collapse": ok = d.setCollapsed(lane: lane, b["on"] as? Bool ?? true)
+        case "collapseOthers": ok = d.setCollapsed(d.lanes.indices.map { $0 != lane })
+        case "expandAll": ok = d.setCollapsed(d.lanes.map { _ in false })
         default: ok = false
         }
         if ok { text = d.text; flushSave() } else { renderToken += 1 }   // a no-op still redraws (drops an open editor)

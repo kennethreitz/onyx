@@ -21,6 +21,24 @@ public struct KanbanDoc: Sendable {
     public private(set) var archive: [Card] = []
     public private(set) var settingsLine: Int?
     public private(set) var archiveRule: Int?
+    /// Per-lane collapse, from `list-collapse` in the settings JSON (the plugin's own key).
+    public var collapsed: [Bool] {
+        guard let j = settingsJSONLine, let d = lines[j].data(using: .utf8),
+              let o = try? JSONSerialization.jsonObject(with: d) as? [String: Any], let a = o["list-collapse"] as? [Bool] else {
+            return Array(repeating: false, count: lanes.count)
+        }
+        return lanes.indices.map { $0 < a.count ? a[$0] : false }
+    }
+    /// The settings block's JSON line (`%% kanban:settings`, a fence, then the JSON).
+    var settingsJSONLine: Int? {
+        guard let s = settingsLine else { return nil }
+        var i = s + 1
+        while i < lines.count, lines[i].trimmingCharacters(in: .whitespaces) != "%%" {
+            if lines[i].trimmingCharacters(in: .whitespaces).hasPrefix("{") { return i }
+            i += 1
+        }
+        return nil
+    }
 
     public init(_ text: String) {
         lines = text.components(separatedBy: "\n")
@@ -161,6 +179,34 @@ public struct KanbanDoc: Sendable {
         }
         parse()
         return true
+    }
+
+    /// Collapse or expand lanes. Only the `list-collapse` array in the settings JSON changes (written
+    /// compactly, as the plugin's JSON.stringify does); without a settings block, one is added.
+    @discardableResult public mutating func setCollapsed(_ values: [Bool]) -> Bool {
+        let v = lanes.indices.map { $0 < values.count ? values[$0] : false }
+        guard v != collapsed else { return false }
+        let arr = "[" + v.map { $0 ? "true" : "false" }.joined(separator: ",") + "]"
+        if let j = settingsJSONLine {
+            var line = lines[j]
+            if let r = line.range(of: #""list-collapse"\s*:\s*\[[^\]]*\]"#, options: .regularExpression) {
+                line.replaceSubrange(r, with: "\"list-collapse\":" + arr)
+            } else if let close = line.lastIndex(of: "}") {
+                let empty = line[..<close].trimmingCharacters(in: .whitespaces).hasSuffix("{")
+                line.insert(contentsOf: (empty ? "" : ",") + "\"list-collapse\":" + arr, at: close)
+            } else { return false }
+            lines[j] = line
+        } else {
+            while lines.last?.trimmingCharacters(in: .whitespaces).isEmpty == true { lines.removeLast() }
+            lines += ["", "", "", "%% kanban:settings", "```", "{\"kanban-plugin\":\"board\",\"list-collapse\":\(arr)}", "```", "%%"]
+        }
+        parse()
+        return true
+    }
+    @discardableResult public mutating func setCollapsed(lane: Int, _ on: Bool) -> Bool {
+        guard lanes.indices.contains(lane) else { return false }
+        var v = collapsed; v[lane] = on
+        return setCollapsed(v)
     }
 
     /// A card's markdown: `- [ ] first line`, later lines indented (how the plugin keeps multi-line cards).

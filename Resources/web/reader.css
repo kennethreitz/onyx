@@ -272,3 +272,17 @@ body.preview .fallback-title { display: none; }
 /* ⌘F matches */
 mark.onyx-find { background: rgba(255, 176, 32, .28); color: inherit; border-radius: 2px; padding: 0; }
 mark.onyx-find.current { background: rgba(255, 138, 0, .62); box-shadow: 0 0 0 1px rgba(255, 138, 0, .5); }
+
+/* Kanban: collapsed lanes are thin strips (state lives in the board's list-collapse setting) */
+.lane.collapsed { flex: 0 0 1.9rem; display: flex; flex-direction: column; align-items: center; gap: .6em; padding: .35em 0 .8em;
+  border: 0.8px solid var(--border); min-height: 9rem; cursor: pointer; }
+.lane.collapsed:hover, .lane.collapsed.kb-over { border-color: var(--text-normal); }
+.kb-strip-title { writing-mode: vertical-rl; font-variant-caps: small-caps; letter-spacing: .03em; font-weight: 600; white-space: nowrap; }
+.kb-strip-count { color: var(--text-faint); font-size: .8em; }
+.kb-fold { border: 0; background: none; color: var(--text-faint); cursor: pointer; font-size: 1em; padding: 0 .3em 0 0; opacity: 0; transition: opacity .12s; }
+.lane h3:hover .kb-fold { opacity: .8; }
+.kb-fold:hover { color: var(--text-normal); opacity: 1; }
+.kb-menu { position: absolute; z-index: 50; display: flex; flex-direction: column; padding: 4px; border: 0.8px solid var(--border);
+  background: var(--background-primary); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
+.kb-menu button { border: 0; background: none; color: var(--text-normal); font: 13px -apple-system, sans-serif; text-align: left; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+.kb-menu button:hover { background: var(--text-selection, rgba(127,127,127,.15)); }

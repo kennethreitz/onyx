@@ -314,3 +314,8 @@ as they were. A board that is opened but not edited is never written. Lanes keep
 two blank lines). Archived cards go under `***` / `## Archive` ahead of the settings block, the way the plugin writes them.
 Only the focused pane's board can be edited. Split and preview copies are read-only. `ONYX_KANBAN_FILE=/tmp/…` runs the real-board
 round-trip test against a copy.
+Lanes collapse with the ‹ in the header. A collapsed lane is a thin strip with the title rotated and the card count. Click it to expand,
+or drop a card on it to add the card to the end of that lane. Right-clicking a header or strip offers Collapse/Expand, "Collapse all except this"
+and "Expand all". The state is the plugin's own `list-collapse` array (one boolean per lane index) in the
+`%% kanban:settings` JSON, so it round-trips with Obsidian. Only that array is rewritten. If the key is missing, it is added; if the
+board has no settings block, one is added.

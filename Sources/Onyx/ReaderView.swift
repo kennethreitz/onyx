@@ -248,7 +248,8 @@ enum ReaderPayload {
         var kanban: Any = NSNull()
         if KanbanBoard.isBoard(fm) {
             let d = KanbanDoc(text)   // the same indices the edit operations use
-            kanban = d.lanes.map { l in ["title": l.title, "cards": l.cards.map { ["text": d.cardText($0), "done": $0.done] }] as [String: Any] }
+            let folded = d.collapsed
+            kanban = d.lanes.enumerated().map { i, l in ["title": l.title, "collapsed": folded[i], "cards": l.cards.map { ["text": d.cardText($0), "done": $0.done] }] as [String: Any] }
         }
         let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         let folder = (path as NSString).deletingLastPathComponent
