@@ -183,6 +183,11 @@ struct OnyxApp: App {
             Button("Move Note to…") { ws.beginMoveCurrent() }.keyboardShortcut("m", modifiers: [.command, .shift]).disabled(ws.currentPath == nil || ws.overlay != .none)
             Button("Delete Note…") { ws.confirmTrashCurrent() }.keyboardShortcut(.delete).disabled(ws.currentPath == nil || ws.overlay != .none)
         }
+        // ⌘P is the command palette here (Obsidian's habit), so Print takes ⌥⌘P.
+        CommandGroup(replacing: .printItem) {
+            Button("Export as PDF…") { NotePrinter.run("export", ws: ws) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(ws.currentPath == nil)
+            Button("Print…") { NotePrinter.run("print", ws: ws) }.keyboardShortcut("p", modifiers: [.command, .option]).disabled(ws.currentPath == nil)
+        }
         CommandMenu("Go") {
             Button("Today’s Daily Note") { ws.openDaily() }.keyboardShortcut("t")
             Button("Today’s Daily Note ") { ws.openDaily() }.keyboardShortcut("\\")

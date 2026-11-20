@@ -250,6 +250,8 @@ enum PaletteCommands {
             PaletteItem(id: "focus", title: ws.focusMode ? "Leave focus mode" : "Focus mode (just the text)", symbol: "arrow.up.left.and.arrow.down.right", shortcut: "⌃⌘F") { ws.toggleFocusMode() },
             PaletteItem(id: "layout", title: "Toggle three-pane workspace", symbol: "rectangle.split.3x1", shortcut: "⌘⌥0") { ws.toggleWorkspaceLayout() },
             PaletteItem(id: "rhymes", title: ws.rhymesOn ? "Turn rhyme view off" : "Toggle rhyme view (RhymePad)", symbol: "music.note", shortcut: "⌘⌥R") { ws.rhymesOn.toggle(); if ws.rhymesOn { ws.mode = .edit } },
+            PaletteItem(id: "exportpdf", title: "Export as PDF…", symbol: "doc.richtext") { NotePrinter.run("export", ws: ws) },
+            PaletteItem(id: "print", title: "Print…", symbol: "printer") { NotePrinter.run("print", ws: ws) },
             PaletteItem(id: "sidenotes", title: ws.sidenotes ? "Footnotes at the end" : "Footnotes as sidenotes", symbol: "text.append") { ws.sidenotes.toggle() },
             PaletteItem(id: "light", title: "Appearance: light", symbol: "sun.max") { appearance("light") },
             PaletteItem(id: "dark", title: "Appearance: dark", symbol: "moon") { appearance("dark") },
