@@ -91,6 +91,18 @@ struct OnyxApp: App {
 
     static func remember(_ url: URL) { UserDefaults.standard.set(url.path, forKey: "onyx.vault") }
 
+    /// Without --vault: the last vault you opened, else ~/Notes if it exists. A remembered vault
+    /// in /tmp (a test or demo copy) doesn't count, so the demo opens only when chosen with
+    /// --vault or Open Vault…. ONYX_NO_DEFAULT_VAULT=1 (tests) never falls back to anything.
+    static func defaultVault() -> URL? {
+        guard ProcessInfo.processInfo.environment["ONYX_NO_DEFAULT_VAULT"] == nil else { return nil }
+        let fm = FileManager.default
+        if let p = UserDefaults.standard.string(forKey: "onyx.vault"), !p.hasPrefix("/tmp/"), !p.hasPrefix("/private/tmp/"),
+           fm.fileExists(atPath: p) { return URL(fileURLWithPath: p) }
+        let notes = fm.homeDirectoryForCurrentUser.appendingPathComponent("Notes")
+        return fm.fileExists(atPath: notes.path) ? notes : nil
+    }
+
     var body: some Scene {
         WindowGroup("Onyx") {
             RootView(ws: ws, appearance: { appearance = $0; apply($0) })
@@ -117,8 +129,8 @@ struct OnyxApp: App {
         TypeSelfTest.ws = ws
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
-        let url = options.vault ?? UserDefaults.standard.string(forKey: "onyx.vault").map { URL(fileURLWithPath: $0) }
-        guard let url, FileManager.default.fileExists(atPath: url.path) else { return }
+        guard let url = options.vault ?? OnyxApp.defaultVault() else { return }
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
         if let m = options.mode { ws.mode = m }
         if let sb = options.sidebar { ws.sidebarVisible = sb; ws.sidebarPinned = sb }
         ws.sidenotes = UserDefaults.standard.object(forKey: Prefs.sidenotes) as? Bool ?? true
