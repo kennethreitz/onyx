@@ -113,3 +113,10 @@ rough edges. Back up your vault (or point Onyx at a copy) while it settles.
 ## License
 
 Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Stable signing (once)
+
+`make app` signs with an Apple Development / Developer ID identity if you have one, else with a
+self-signed "Onyx Local Signing" identity. Create that once with `scripts/make-signing-cert.sh`
+(it asks for your login-keychain password one time). Without it the build is signed ad hoc, which
+changes on every build and makes macOS re-ask for Keychain access to the Obsidian Sync token.

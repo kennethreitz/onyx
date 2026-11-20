@@ -15,8 +15,22 @@ final class SyncAccount {
     private(set) var signedIn = false
     var vaults: [ObsidianAPI.RemoteVault] = []
 
-    init() { signedIn = store.token != nil }
-    var token: String? { store.token }
+    /// Signed-in state comes from a non-secret marker, so launching Onyx or opening Settings never touches
+    /// the Keychain (each `make app` re-signs the binary, and a Keychain read would prompt). The token is read
+    /// only when a connected vault actually syncs, or on an explicit account action, then kept for the session.
+    static let signedInKey = "onyx.sync.signedIn"
+    init() {
+        let d = UserDefaults.standard
+        if d.object(forKey: Self.signedInKey) == nil { d.set(!(d.string(forKey: "onyx.sync.email") ?? "").isEmpty, forKey: Self.signedInKey) }  // pre-marker installs
+        signedIn = d.bool(forKey: Self.signedInKey)
+    }
+    @ObservationIgnored private var cachedToken: String?
+    var token: String? {
+        if let t = cachedToken { return t }
+        cachedToken = store.token
+        if cachedToken == nil && signedIn { signedIn = false; UserDefaults.standard.set(false, forKey: Self.signedInKey) }
+        return cachedToken
+    }
 
     enum SignInResult { case ok, needsCode }
 
@@ -26,6 +40,8 @@ final class SyncAccount {
             let r = try await api.signIn(email: email, password: password, mfa: code ?? "")
             guard let t = r.token else { throw ObsidianAPI.APIError(message: "No token in the sign-in response") }
             try store.set("token", Data(t.utf8))
+            cachedToken = t
+            UserDefaults.standard.set(true, forKey: Self.signedInKey)
             self.email = r.email ?? email
             UserDefaults.standard.set(self.email, forKey: "onyx.sync.email")
             signedIn = true
@@ -37,7 +53,8 @@ final class SyncAccount {
 
     func signOut() async {
         if let t = token { try? await api.signOut(token: t) }
-        store.remove("token"); signedIn = false; vaults = []
+        store.remove("token"); cachedToken = nil; signedIn = false; vaults = []
+        UserDefaults.standard.set(false, forKey: Self.signedInKey)
     }
 
     func refreshVaults() async throws {

@@ -37,5 +37,19 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+# A stable signature keeps Keychain "Always Allow" valid across rebuilds. Prefer a real Apple identity,
+# then the self-signed "Onyx Local Signing" (scripts/make-signing-cert.sh), else ad-hoc (prompts again
+# after each rebuild). SIGN_IDENTITY / SIGN_KEYCHAIN override.
+KC_ARGS=(); [ -n "${SIGN_KEYCHAIN:-}" ] && KC_ARGS=(--keychain "$SIGN_KEYCHAIN")
+ID="${SIGN_IDENTITY:-}"
+if [ -z "$ID" ]; then
+  ID=$(security find-identity -v -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p;s/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -1)
+fi
+if [ -z "$ID" ] && security find-identity -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | grep -q '"Onyx Local Signing"'; then ID="Onyx Local Signing"; fi
+if [ -n "$ID" ] && codesign --force --deep "${KC_ARGS[@]}" --sign "$ID" "$APP" >/dev/null 2>&1; then
+  echo "Signed with \"$ID\""
+else
+  codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+  echo "Signed ad hoc (run scripts/make-signing-cert.sh once for a stable signature)"
+fi
 echo "Built $APP"
