@@ -127,6 +127,17 @@ struct OnyxApp: App {
     func boot() {
         apply(appearance)
         TypeSelfTest.ws = ws
+        // git: leaving the app commits at once, coming back pulls, quitting commits and pushes
+        let nc = NotificationCenter.default
+        nc.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.flushSave(); ws.git?.commitNow() }
+        }
+        nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.git?.syncNow() }
+        }
+        nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.flushSave(); ws.git?.finishForQuit() }
+        }
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
         guard let url = options.vault ?? OnyxApp.defaultVault() else { return }

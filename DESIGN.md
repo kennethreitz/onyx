@@ -150,3 +150,33 @@ always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finde
 note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),
 any pane showing it steps back (or closes, if it has nowhere to go) and the recent list forgets it.
 `vaultMutated` is the hook git auto-commit uses for deletes, renames and moves.
+
+## Git, continuously
+
+When the vault folder is itself a git repository (its own `.git`) and git is installed, Onyx
+keeps it committed and in sync with no buttons to press (GitSync):
+
+- **Commit** about a second after a save settles (so ~2s after you stop typing), and at once
+  on delete / rename / move, switching notes, leaving the app and quit. Messages name the notes:
+  "Edit Mercury", "Add 2026-11-20; edit Mercury", "Rename A → B", "Move A → Archive",
+  "Delete Old Note", "Edit 7 notes: A, B, C, …" (file list in the body). Commits use the repo's
+  own identity (Onyx <onyx@host> only if none is configured) and `--no-verify`.
+- **Sync** after every commit, on launch, when the app comes forward and every 30s:
+  fetch → `rebase @{u}` (autostash) → push, going round again if the push is rejected because
+  the remote moved. No upstream yet: `push -u` the current branch. No remote: local only.
+- **Never** force-push, never amend or rewrite pushed history, never drop work.
+- **Conflicts**: during the rebase, each conflicted file keeps the local version at its path
+  and the remote version is written beside it as `Note (conflict YYYY-MM-DD HHMM).md`; both are
+  committed and pushed. Edited-vs-deleted keeps the edit. Anything unexpected → `rebase --abort`,
+  which leaves the local commits exactly as they were. A rebase or merge you started by hand is
+  left alone (Onyx waits).
+- **Offline**: network errors retry with backoff (5s, 10s, 20s … 5 min). Prompts are disabled
+  (`GIT_TERMINAL_PROMPT=0`, ssh BatchMode) so a missing credential fails instead of hanging.
+- **Indicator**: a tiny glyph in the footer: ✓ synced, ↻ syncing, ↑ pushing, wifi-slash offline,
+  dashed circle local only, ⚠ conflict (until the copies are gone) or needs attention. Hover for
+  details; click for Source Control, which lists conflict copies.
+
+`ONYX_NO_GIT=1` turns it off; `ONYX_GIT_INTERVAL=<s>` changes the poll (tests use 5 or 600).
+Tested only on /tmp repos: a bare remote plus two clones (Onyx on one, the git CLI as the other
+machine) covering launch pull, edit → commit → push, remote edits arriving, delete commits, a
+same-line conflict (kept both), and offline → backoff → recovery.

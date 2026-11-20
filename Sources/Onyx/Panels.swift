@@ -413,8 +413,19 @@ struct GitPanel: View {
                     Image(systemName: "arrow.triangle.branch").foregroundStyle(Color.faint)
                     Text(branch).font(.custom("IBMPlexMono", size: 11.5))
                     Spacer()
-                    Button { refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted)
+                    Button { ws.git?.syncNow(); refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("Sync now")
                 }.padding(.horizontal, 12).padding(.top, 10)
+                if let g = ws.git {
+                    Text(g.help).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(4).padding(.horizontal, 12)
+                    ForEach(g.conflictCopies, id: \.self) { c in
+                        Button { ws.openNote(c) } label: {
+                            Label((c as NSString).lastPathComponent, systemImage: "doc.on.doc").font(.system(size: 11.5)).lineLimit(1)
+                        }.buttonStyle(.plain).foregroundStyle(Color.ink).padding(.horizontal, 12)
+                        .help("Both versions were kept. Merge what you need into the original, then delete this copy.")
+                    }
+                } else {
+                    Text("Auto-sync is off (git not found).").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.horizontal, 12)
+                }
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(changes, id: \.1) { c in

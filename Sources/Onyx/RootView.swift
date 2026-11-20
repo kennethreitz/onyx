@@ -132,6 +132,7 @@ struct RootView: View {
                     Spacer()
                 }
                 syncDot.padding(.trailing, 6)
+                if let g = ws.git { GitBadge(git: g) { ws.toggleSidebar(.git) }.padding(.trailing, 6) }
                 if ws.currentPath != nil {
                     Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)
                 }
@@ -559,6 +560,29 @@ struct WelcomeView: View {
 /// One clickable piece of the title path: quiet until hovered, then underlined with a pointer.
 /// The quiet ‹ › flanking the title path (‹ folder / Note ›), side by side in the graph header. Dim when there's
 /// nowhere to go; a hint of ink on hover.
+/// The footer's tiny git state: synced ✓, syncing ↻, offline, conflict (tinted), local only.
+struct GitBadge: View {
+    var git: GitSync
+    var action: () -> Void
+    var body: some View {
+        let (symbol, color): (String, Color) = switch git.state {
+            case .synced: ("checkmark.circle", Color.faint)
+            case .committing, .pulling: ("arrow.triangle.2.circlepath", Color.faint)
+            case .pushing: ("arrow.up.circle", Color.faint)
+            case .offline: ("wifi.slash", Color.faint)
+            case .localOnly: ("circle.dashed", Color.faint)
+            case .conflict: ("exclamationmark.triangle", Color.orange.opacity(0.85))
+            case .failed: ("exclamationmark.circle", Color.orange.opacity(0.85))
+        }
+        Button(action: action) {
+            Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
+        }
+        .buttonStyle(.plain)
+        .help(git.help)
+        .accessibilityLabel(git.help)
+    }
+}
+
 struct NavChevrons: View {
     enum Which { case both, back, forward }
     @Bindable var ws: Workspace

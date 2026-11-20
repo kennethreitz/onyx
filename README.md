@@ -36,6 +36,7 @@ keep working right alongside it.
   links around it, and you travel by clicking. The *atlas* zooms out to your whole vault as
   colored regions (folders or tags) that open into sub-regions and notes as you zoom.
   Filters by folder, tag and recency; orphans on demand.
+- **Git, continuously**: if your vault is a git repo, Onyx commits as you write (naming the notes), pulls and pushes in the background, never force-pushes, and keeps both versions on a conflict. A tiny footer glyph shows synced / syncing / offline / conflict.
 - **Built in, not bolted on**: daily notes, backlinks, outline, properties, bookmarks, recent
   files, search, a quick switcher and a command palette, Dataview-style `TABLE`/`LIST`
   queries, Kanban boards, git status and commit, and RhymePad highlighting for verse.
