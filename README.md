@@ -86,10 +86,10 @@ Every command is also in the menu bar with its shortcut.
 Requires macOS 14+ and Swift 5.10 (Xcode 15.3 or newer).
 
 ```sh
-make run                       # build Onyx.app and open it on a test vault (VAULT=/tmp/onyx-vault)
+make run                       # build Onyx.app and open your vault (last opened, else ~/Notes)
 make run VAULT=~/path/to/vault # or any folder of Markdown
-make open                      # open the vault Onyx last used
-make test                      # core tests
+make run-test                  # open the disposable test copy (/tmp/onyx-vault), never ~/Notes
+make test                      # core + reader tests
 make install                   # copy Onyx.app to /Applications
 ```
 
