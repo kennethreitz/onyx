@@ -132,6 +132,8 @@ enum TypeSelfTest {
         case "split": ws.split(.vertical)
         case "back": ws.goBack()
         case "trash": ws.trash(arg)
+        case "mode": ws.mode = arg == "edit" ? .edit : .read
+        case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":
             let h = ws.debugHistory
             print("[state] current=\(ws.currentPath ?? "-") history=\(h) panes=\(ws.panes.map { $0.path ?? "-" }) focused=\(ws.focusedPane) recent0=\(ws.recent.first ?? "-")")

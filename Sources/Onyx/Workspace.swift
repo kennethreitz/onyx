@@ -120,8 +120,15 @@ final class Workspace {
 
     // MARK: Opening a vault
 
+    /// Continuous git when the vault is a repository (see GitSync); nil otherwise.
+    var git: GitSync?
+
     func open(vault url: URL, initialNote: String? = nil) {
         root = url.standardizedFileURL
+        git?.stop()
+        git = GitSync.detect(root!)
+        git?.beforeCommit = { [weak self] in self?.flushSave() }
+        git?.start()
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
         bookmarks = UserDefaults.standard.stringArray(forKey: key("bookmarks")) ?? obsidianBookmarks()
@@ -193,6 +200,7 @@ final class Workspace {
         selectedFolder = nil
         guard let snap = snapshot, let note = snap.notes[path] else { return }
         flushSave()
+        if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
         if recordHistory { pushHistory(.note(path)) }
         if currentPath != path { liveTop = 0 }
         currentPath = path
@@ -451,13 +459,15 @@ final class Workspace {
             suppressTextChange = true; text = ""; lastSaved = ""; suppressTextChange = false
             if history.indices.contains(historyIndex), case .note = history[historyIndex].place { go(0) } else { openHome() }
         }
-        toast = "Moved “\(name.hasSuffix(".md") ? String(name.dropLast(3)) : name)” to the Trash"
-        vaultMutated("Delete \(name)", paths: affected)
+        let shown = name.hasSuffix(".md") ? String(name.dropLast(3)) : name
+        toast = "Moved “\(shown)” to the Trash"
+        vaultMutated("Delete \(shown)", paths: affected)
     }
 
     /// Structural changes (delete, rename, move) land here so git can commit them right away.
     func vaultMutated(_ message: String, paths: [String]) {
         chromeLog("vault: \(message) \(paths.count) path(s)")
+        git?.commitNow(reason: message)
     }
 
     // MARK: Editing & saving
@@ -522,6 +532,7 @@ final class Workspace {
             if create && FileManager.default.fileExists(atPath: url.path) { return false }
             try Data(content.utf8).write(to: url, options: .atomic)
             if create { snapshot?.refresh(paths: [rel]) }
+            git?.edited()
             return true
         } catch {
             toast = "Couldn’t save: \(error.localizedDescription)"
@@ -589,7 +600,7 @@ final class Workspace {
         if let cur = currentPath, snap.notes[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
             toast = "“\((cur as NSString).lastPathComponent)” was moved or deleted elsewhere"
         }
-        if external { externalPulse = Date(); lastExternalChange = Date() }
+        if external { externalPulse = Date(); lastExternalChange = Date(); git?.edited() }
     }
 
     func reindex() { if let root { let cur = currentPath; open(vault: root, initialNote: cur) } }
