@@ -17,7 +17,7 @@ const window = { innerHeight: 800, innerWidth: 1000, scrollY: 0, addEventListene
 const ctx = vm.createContext({ window, document: stub(), console, setTimeout, clearTimeout, requestAnimationFrame: f => setTimeout(f, 0),
   getComputedStyle: () => stub(), NodeFilter: { SHOW_COMMENT: 128 }, ResizeObserver: class { observe() {} }, MutationObserver: class { observe() {} } });
 ctx.self = ctx.globalThis = ctx; Object.assign(window, { document: ctx.document });
-for (const f of ['marked.js', 'marked-footnote.js', 'reader.js']) {
+for (const f of ['marked.js', 'marked-footnote.js', 'typeset.js', 'reader.js']) {
   vm.runInContext(fs.readFileSync(path.join(web, f), 'utf8'), ctx, { filename: f });
   if (f !== 'reader.js') {
     Object.assign(ctx, window);   // UMD builds hang their globals on window/self
@@ -155,4 +155,63 @@ test('canvas cards: fragment renders against the card context, without line mark
   assert.doesNotMatch(out, /<!--L\d/);
   // the reader's own links are untouched afterwards
   assert.doesNotMatch(ctx.window.Onyx._html('[[Hecate]]'), /AI\/Hecate/);
+});
+
+// --- Typeset reading (typeset.js) ---------------------------------------------
+const T = () => ctx.window.OnyxTypeset;
+
+test('smart quotes curl by context, including across inline markup', () => {
+  assert.equal(T().smarten('"Quotes," she said, "should curl \'the right way\'."'), '\u201cQuotes,\u201d she said, \u201cshould curl \u2018the right way\u2019.\u201d');
+  assert.equal(T().smarten("don't, it's, Requests' API"), 'don\u2019t, it\u2019s, Requests\u2019 API');
+  assert.equal(T().smarten("the '90s and rock 'n' roll"), 'the \u201990s and rock \u2019n\u2019 roll');
+  // a closing quote right after </em>: the previous text node ended in a letter
+  assert.equal(T().smarten('" next', 'd'), '\u201d next');
+  assert.equal(T().smarten('"open', ' '), '\u201copen');
+});
+
+test('dashes and ellipses', () => {
+  assert.equal(T().smarten('1914--1918'), '1914\u20131918');
+  assert.equal(T().smarten('the em dash---which'), 'the em dash\u2014which');
+  assert.equal(T().smarten('a note -- and more'), 'a note \u2014 and more');
+  assert.equal(T().smarten('Letters - Aleph'), 'Letters \u2013 Aleph');
+  assert.equal(T().smarten('well-known'), 'well-known');
+  assert.equal(T().smarten('wait...'), 'wait\u2026');
+  assert.equal(T().smarten('<!-- x -->'), '<!-- x -->');
+});
+
+test('ties keep short words with the next one', () => {
+  assert.equal(T().tie('I think a cat saw Dr. Who on p. 5'), 'I\u00a0think a\u00a0cat saw Dr.\u00a0Who on p.\u00a05');
+  assert.equal(T().tie('it took 300 ms'), 'it took 300\u00a0ms');
+});
+
+test('runs of capitals become small caps; roman numerals and shouting do not', () => {
+  const words = (s) => Array.from(T().smallCapsRanges(s), ([a, b]) => s.slice(a, b));   // a local array (the scripts run in a vm realm)
+  assert.deepEqual(words('The PSF ships Python; HTTP carries the API.'), ['PSF', 'HTTP', 'API']);
+  assert.deepEqual(words('Two APIs, three PRs and AT&T'), ['API', 'PR', 'AT&T']);
+  assert.deepEqual(words('MP3 and H2O'), ['MP3', 'H2O']);
+  assert.deepEqual(words('World War II, Henry VIII, Part IV'), []);
+  assert.deepEqual(words('WHEN SOMEONE SHOUTS THREE WORDS'), []);
+  assert.deepEqual(words('iOS and macOS, a I'), []);
+});
+
+test('hyphenation language comes from frontmatter lang, else English', () => {
+  assert.equal(T().language([{ key: 'lang', value: 'de' }]), 'de');
+  assert.equal(T().language([{ key: 'language', value: 'pt-BR' }]), 'pt-BR');
+  assert.equal(T().language([{ key: 'lang', value: 'not a tag!' }]), 'en');
+  assert.equal(T().language([]), 'en');
+});
+
+test('numeric table cells are recognised for right alignment', () => {
+  for (const v of ['4.2', '1,234', '45%', '$12.50', '(3.1)', '−7', '302.5']) assert.ok(T().NUM.test(v), v);
+  for (const v of ['2.0 beta', 'n/a', 'Python 3', 'v1.0']) assert.ok(!T().NUM.test(v), v);
+});
+
+test('the specimen fixture parses: notes, table, figure and code survive', () => {
+  const fx = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/typeset-specimen.md'), 'utf8');
+  const out = html(fx.replace(/^---[\s\S]*?\n---\n/, ''));
+  assert.equal((out.match(/data-footnote-ref/g) || []).length, 6);
+  assert.match(out, /<table>/);
+  assert.match(out, /<img src="[^"]*chart\.svg"[^>]*title="Downloads per month/);
+  assert.match(out, /<code class="language-python">print\(&quot;--- don't touch ---&quot;\)/);
+  assert.match(out, /<blockquote>/);
 });
