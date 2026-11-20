@@ -24,6 +24,10 @@ struct PaletteView: View {
     var onCreate: ((String) -> Void)? = nil
     /// Whether a note with exactly this name already exists (hides the Create row).
     var exists: ((String) -> Bool)? = nil
+    /// "note" or "folder": wording of the Create row and hints.
+    var noun = "note"
+    var openVerb = "open"
+    var allowSplit = true
     var dismiss: () -> Void
     @State private var query = ""
     @State private var results: [PaletteItem] = []
@@ -76,7 +80,7 @@ struct PaletteView: View {
                 if onCreate != nil {
                     Divider().overlay(Color.hairline)
                     HStack(spacing: 14) {
-                        hint("↩", "open"); hint("⌘↩", "open in split"); if showCreate { hint("⇧↩", "create") }; hint("esc", "close")
+                        hint("↩", openVerb); if allowSplit { hint("⌘↩", "open in split") }; if showCreate { hint("⇧↩", "create \(noun)") }; hint("esc", "close")
                         Spacer()
                     }
                     .padding(.horizontal, 18).padding(.vertical, 7)
@@ -193,7 +197,7 @@ struct PaletteView: View {
             Image(systemName: "plus").font(.system(size: 12)).foregroundStyle(Color.muted).frame(width: 18)
             VStack(alignment: .leading, spacing: 1) {
                 (Text("Create ").foregroundColor(.muted) + Text(name).foregroundColor(.ink).fontWeight(.medium)).font(.system(size: 13.5)).lineLimit(1)
-                Text(folder.isEmpty ? "new note in the vault root" : "new note in \(folder)").font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1)
+                Text(folder.isEmpty ? "new \(noun) in the vault root" : "new \(noun) in \(folder)").font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1)
             }
             Spacer()
             Text("⇧↩").font(.system(size: 11.5, design: .rounded)).foregroundStyle(Color.faint)
@@ -215,6 +219,8 @@ enum PaletteCommands {
     @MainActor static func all(_ ws: Workspace, appearance: @escaping (String) -> Void) -> [PaletteItem] {
         [
             PaletteItem(id: "switcher", title: "Quick switcher", symbol: "doc.text.magnifyingglass", shortcut: "⌘O") { DispatchQueue.main.async { ws.show(.switcher) } },
+            PaletteItem(id: "rename", title: "Rename note…", symbol: "pencil.line") { DispatchQueue.main.async { ws.confirmRenameCurrent() } },
+            PaletteItem(id: "move", title: "Move note to…", symbol: "folder", shortcut: "⇧⌘M") { DispatchQueue.main.async { ws.beginMoveCurrent() } },
             PaletteItem(id: "delete", title: "Delete note…", symbol: "trash", shortcut: "⌘⌫") { DispatchQueue.main.async { ws.confirmTrashCurrent() } },
             PaletteItem(id: "split", title: "Split side by side", symbol: "rectangle.split.2x1", shortcut: "⌘D") { ws.split(.vertical) },
             PaletteItem(id: "splitdown", title: "Split stacked", symbol: "rectangle.split.1x2", shortcut: "⇧⌘D") { ws.split(.horizontal) },
@@ -262,6 +268,28 @@ enum PaletteCommands {
             var j = i; j.titleHits = m.positions
             return (j, m.score)
         }.sorted { $0.1 > $1.1 }.map(\.0)
+    }
+
+    /// Move to…: folders through the same matcher (on the full folder path).
+    @MainActor static func folders(_ ws: Workspace, for src: String, _ q: String) -> [PaletteItem] {
+        let dests = ws.moveDestinations(for: src)
+        let toks = QuickMatch.tokens(q)
+        var scored: [(Int, PaletteItem)] = []
+        for (i, f) in dests.enumerated() {
+            let shown = f.isEmpty ? "Vault root" : f
+            let key = MatchKey(shown)
+            var score = 0, hits: [Int] = [], ok = true
+            for t in toks {
+                guard let m = QuickMatch.match(t, in: key) else { ok = false; break }
+                score += m.score; hits += m.positions
+            }
+            guard ok else { continue }
+            let item = PaletteItem(id: "folder:" + f, title: shown, subtitle: f.isEmpty ? "/" : "", symbol: "folder", titleHits: hits) {
+                ws.show(.none); ws.move(src, toFolder: f)
+            }
+            scored.append((toks.isEmpty ? -i : score, item))
+        }
+        return scored.sorted { $0.0 > $1.0 }.prefix(60).map(\.1)
     }
 
     @MainActor static func notes(_ ws: Workspace, _ q: String) -> [PaletteItem] {

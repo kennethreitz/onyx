@@ -75,6 +75,7 @@ keep working right alongside it.
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
 | <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
 | <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm; also right-click any file) |
+| <kbd>⇧⌘M</kbd> | Move note to… a folder (fuzzy; type a new name to create one). Rename from File or right-click |
 | <kbd>⌘N</kbd> | New note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌘,</kbd> | Settings |

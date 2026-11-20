@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -462,6 +462,138 @@ final class Workspace {
         let shown = name.hasSuffix(".md") ? String(name.dropLast(3)) : name
         toast = "Moved “\(shown)” to the Trash"
         vaultMutated("Delete \(shown)", paths: affected)
+    }
+
+    // MARK: Rename & move
+
+    /// What "Move to…" is moving (a note, file or folder path).
+    var moveSource: String?
+    func beginMove(_ path: String) { moveSource = path; withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .moveTo } }
+    func beginMoveCurrent() { if let p = currentPath { beginMove(p) } }
+
+    /// Folders for the Move to… picker ("" = vault root), minus where it already is and,
+    /// for a folder, itself and everything under it.
+    func moveDestinations(for path: String) -> [String] {
+        let here = (path as NSString).deletingLastPathComponent
+        let all = [""] + (snapshot?.folders.sorted() ?? [])
+        return all.filter { f in f != here && f != path && !f.hasPrefix(path + "/") && !(f as NSString).lastPathComponent.hasPrefix(".") }
+    }
+
+    func move(_ path: String, toFolder folder: String) {
+        let name = (path as NSString).lastPathComponent
+        let dest = folder.isEmpty ? name : folder + "/" + name
+        let shown = name.lowercased().hasSuffix(".md") ? String(name.dropLast(3)) : name
+        relocate(path, to: dest, reason: "Move \(shown) → \(folder.isEmpty ? "/" : folder)")
+    }
+
+    func confirmRename(_ path: String) {
+        guard let root else { return }
+        let isDir = (try? root.appendingPathComponent(path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        let last = (path as NSString).lastPathComponent
+        let isNote = last.lowercased().hasSuffix(".md")
+        let a = NSAlert()
+        a.messageText = isDir ? "Rename folder" : "Rename"
+        a.informativeText = isNote ? "Links to it are updated across the vault." : ""
+        let field = NSTextField(string: isNote ? String(last.dropLast(3)) : last)
+        field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
+        a.accessoryView = field
+        a.addButton(withTitle: "Rename"); a.addButton(withTitle: "Cancel")
+        a.window.initialFirstResponder = field
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        var new = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        guard !new.isEmpty else { return }
+        if isNote && !new.lowercased().hasSuffix(".md") { new += ".md" }
+        let dir = (path as NSString).deletingLastPathComponent
+        let dest = dir.isEmpty ? new : dir + "/" + new
+        guard dest != path else { return }
+        let from = isNote ? String(last.dropLast(3)) : last, to = isNote ? String(new.dropLast(3)) : new
+        relocate(path, to: dest, reason: "Rename \(from) → \(to)")
+    }
+    func confirmRenameCurrent() { if let p = currentPath { confirmRename(p) } }
+
+    /// Move or rename a note, file or folder. Wikilinks elsewhere that point at a moved note
+    /// are rewritten: path links ([[Folder/Note]]) always, name links ([[Note]]) when the name
+    /// changed; #heading, |alias and embeds are kept. The note stays open in its panes and
+    /// history. Commits right away via `vaultMutated`.
+    @discardableResult
+    func relocate(_ from: String, to dest: String, reason: String) -> Bool {
+        guard let root, var snap = snapshot else { return false }
+        let fm = FileManager.default
+        let src = root.appendingPathComponent(from), dst = root.appendingPathComponent(dest).standardizedFileURL
+        guard dst.path.hasPrefix(root.path + "/"), !dest.contains("..") else { return false }
+        if fm.fileExists(atPath: dst.path), from.lowercased() != dest.lowercased() {
+            toast = "“\((dest as NSString).lastPathComponent)” already exists there"; return false
+        }
+        flushSave()
+        // old → new for every note that moves
+        var map: [String: String] = [:]
+        if snap.notes[from] != nil { map[from] = dest }
+        for p in snap.notes.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
+        // rewrite links (in the files as they are now, before the move)
+        func noExt(_ p: String) -> String { p.lowercased().hasSuffix(".md") ? String(p.dropLast(3)) : p }
+        func title(_ p: String) -> String { (noExt(p) as NSString).lastPathComponent }
+        var edited: [String] = []
+        for (path, note) in snap.notes {
+            var text = note.content as NSString
+            var changed = false
+            for l in note.summary.links.sorted(by: { $0.range.location > $1.range.location }) {
+                guard let target = snap.resolve(l.target, from: path), let newPath = map[target] else { continue }
+                let usesPath = l.target.contains("/")
+                let newTarget: String
+                if usesPath { newTarget = l.target.lowercased().hasSuffix(".md") ? newPath : noExt(newPath) }
+                else if title(target) != title(newPath) {
+                    let clash = (snap.namesIndex[title(newPath).lowercased()]?.filter { $0 != target }.isEmpty == false)
+                    newTarget = clash ? noExt(newPath) : title(newPath)
+                } else { continue }
+                guard NSMaxRange(l.range) <= text.length else { continue }
+                let whole = text.substring(with: l.range) as NSString
+                let open = whole.range(of: "[[")
+                guard open.location != NSNotFound else { continue }
+                let tStart = l.range.location + NSMaxRange(open)
+                let rawTarget = (text.substring(from: tStart) as NSString)
+                let tLen = (l.target as NSString).length
+                guard tLen <= rawTarget.length, rawTarget.substring(to: tLen) == l.target else { continue }
+                text = text.replacingCharacters(in: NSRange(location: tStart, length: tLen), with: newTarget) as NSString
+                changed = true
+            }
+            if changed, write(text as String, to: path, create: false) {
+                snap.update(path: path, content: text as String); edited.append(path)
+                if path == currentPath { suppressTextChange = true; self.text = text as String; lastSaved = text as String; suppressTextChange = false; renderToken += 1 }
+            }
+        }
+        do {
+            try fm.createDirectory(at: dst.deletingLastPathComponent(), withIntermediateDirectories: true)
+            if from.lowercased() == dest.lowercased() {   // case-only rename on a case-insensitive disk
+                let tmp = src.deletingLastPathComponent().appendingPathComponent(".onyx-rename-\(UUID().uuidString)")
+                try fm.moveItem(at: src, to: tmp); try fm.moveItem(at: tmp, to: dst)
+            } else {
+                try fm.moveItem(at: src, to: dst)
+            }
+        } catch {
+            toast = "Couldn’t move: \(error.localizedDescription)"
+            snapshot = snap
+            return false
+        }
+        snap.refresh(paths: Array(map.keys) + Array(map.values) + [from, dest] + edited)
+        snapshot = snap
+        // keep it open everywhere
+        func remap(_ p: String) -> String { map[p] ?? p }
+        func remapHistory(_ h: [NavEntry]) -> [NavEntry] {
+            h.map { e in var e = e; if case .note(let p) = e.place { e.place = .note(remap(p)) }; return e }
+        }
+        if let c = currentPath { currentPath = remap(c) }
+        history = remapHistory(history)
+        for i in panes.indices {
+            panes[i].history = remapHistory(panes[i].history)
+            if let p = panes[i].path { panes[i].path = remap(p) }
+        }
+        recent = recent.map(remap); UserDefaults.standard.set(recent, forKey: key("recent"))
+        bookmarks = bookmarks.map(remap); UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        var parent = (dest as NSString).deletingLastPathComponent
+        while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
+        if edited.isEmpty { toast = reason } else { toast = "\(reason) · updated links in \(edited.count) note\(edited.count == 1 ? "" : "s")" }
+        vaultMutated(reason, paths: [from, dest] + edited)
+        return true
     }
 
     /// Structural changes (delete, rename, move) land here so git can commit them right away.

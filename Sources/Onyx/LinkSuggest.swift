@@ -132,6 +132,12 @@ enum TypeSelfTest {
         case "split": ws.split(.vertical)
         case "back": ws.goBack()
         case "trash": ws.trash(arg)
+        case "move":     // move <path> -> <folder>
+            let parts = arg.components(separatedBy: " -> "); if parts.count == 2 { ws.move(parts[0], toFolder: parts[1]) }
+        case "rename":   // rename <path> -> <new path>
+            let parts = arg.components(separatedBy: " -> "); if parts.count == 2 { ws.relocate(parts[0], to: parts[1], reason: "Rename \((parts[0] as NSString).lastPathComponent) → \((parts[1] as NSString).lastPathComponent)") }
+        case "cat":
+            if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":
