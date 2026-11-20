@@ -176,6 +176,9 @@ struct FileMenu: View {
         }
         if isFolder { Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) } }
         Divider()
+        Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
+        Button("Move to…") { ws.beginMove(path) }
+        Divider()
         Button("Reveal in Finder") { ws.revealInFinder(path) }
         if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }
         Divider()

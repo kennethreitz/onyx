@@ -179,6 +179,8 @@ struct OnyxApp: App {
             Button("Save") { ws.flushSave() }.keyboardShortcut("s")
             Divider()
             // ⌘⌫ (disabled while a palette is open, so text fields there keep it)
+            Button("Rename Note…") { ws.confirmRenameCurrent() }.disabled(ws.currentPath == nil || ws.overlay != .none)
+            Button("Move Note to…") { ws.beginMoveCurrent() }.keyboardShortcut("m", modifiers: [.command, .shift]).disabled(ws.currentPath == nil || ws.overlay != .none)
             Button("Delete Note…") { ws.confirmTrashCurrent() }.keyboardShortcut(.delete).disabled(ws.currentPath == nil || ws.overlay != .none)
         }
         CommandMenu("Go") {

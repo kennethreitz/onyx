@@ -371,6 +371,25 @@ struct RootView: View {
                     .padding(.top, 88)
                 Spacer()
             }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .moveTo:
+            dimmer
+            VStack {
+                if let src = ws.moveSource {
+                    let name = ((src as NSString).lastPathComponent as NSString).deletingPathExtension
+                    PaletteView(placeholder: "Move “\(name)” to…", items: { PaletteCommands.folders(ws, for: src, $0) },
+                                onCreate: { f in
+                                    let folder = f.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))
+                                    ws.show(.none)
+                                    if let r = ws.root { try? FileManager.default.createDirectory(at: r.appendingPathComponent(folder), withIntermediateDirectories: true) }
+                                    ws.move(src, toFolder: folder)
+                                },
+                                exists: { q in ws.snapshot?.folders.contains(q.trimmingCharacters(in: CharacterSet(charactersIn: "/ "))) ?? false },
+                                noun: "folder", openVerb: "move", allowSplit: false,
+                                dismiss: { ws.show(.none) })
+                        .padding(.top, 88)
+                }
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
         case .graph:
             GraphView(ws: ws).transition(.opacity)
         case .none:
@@ -494,7 +513,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note (to the Trash)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note (to the Trash)"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

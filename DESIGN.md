@@ -144,7 +144,7 @@ horizontal swipe when the system setting allows it (outside overlays). The title
 ## Deleting and the file menu
 
 Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
-New Note Here (folders), Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
+New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
 Delete…. Delete Note… is also in the File menu and the palette (⌘⌫). Delete always confirms and
 always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. Afterwards the
 note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),
@@ -180,3 +180,15 @@ keeps it committed and in sync with no buttons to press (GitSync):
 Tested only on /tmp repos: a bare remote plus two clones (Onyx on one, the git CLI as the other
 machine) covering launch pull, edit → commit → push, remote edits arriving, delete commits, a
 same-line conflict (kept both), and offline → backoff → recovery.
+
+## Rename and Move to…
+
+Rename… (File menu, palette, right-click) asks for the new name; Move to… (⇧⌘M, palette,
+right-click; never drag and drop) opens a folder picker on the ⌘O matcher: type to filter,
+↩ moves, ⇧↩ or the Create row makes the typed folder (nested paths fine) and moves there.
+Folders get both. Links across the vault follow: path links (`[[Folder/Note]]`, with or without
+`.md`) are rewritten to the new path, name links (`[[Note]]`) only when the name changed (or
+to a path if the new name would be ambiguous); `#heading`, `|alias` and `![[embeds]]` are kept.
+The note stays open in its panes, history, recent list and bookmarks, and git commits the
+move at once ("Move Venus → Archive", "Rename Mercury → Hermes"). Markdown-style
+`[text](path.md)` links are not rewritten yet.
