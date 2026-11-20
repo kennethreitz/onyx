@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
         ScrollSelfTest.scheduleIfRequested()
+        TypeSelfTest.scheduleIfRequested()
         KeySelfTest.scheduleIfRequested()
         // ⌃⌘F belongs to focus mode; Enter Full Screen keeps its menu item and the green button.
         for delay in [0.3, 1.0, 3.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.freeControlCommandF() } }
