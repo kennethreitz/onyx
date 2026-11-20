@@ -37,6 +37,7 @@ keep working right alongside it.
   colored regions (folders or tags) that open into sub-regions and notes as you zoom.
   Filters by folder, tag and recency; orphans on demand.
 - **Git, continuously**: if your vault is a git repo, Onyx commits as you write (naming the notes), pulls and pushes in the background, never force-pushes, and keeps both versions on a conflict. A tiny footer glyph shows synced / syncing / offline / conflict.
+- **Obsidian Sync, optional**: off by default and opt-in per vault. In Settings ▸ Obsidian Sync, sign in to your Obsidian account (2FA supported), pick a remote vault, enter its encryption password, preview what the first sync will do, then connect. Onyx speaks Obsidian's end-to-end encrypted sync protocol and merges Markdown the way Obsidian does. The first sync never deletes on either side, large deletions pause for confirmation, and credentials live in the macOS Keychain. Unofficial and still new: try it on a throwaway vault first. If you'd rather not, Obsidian's official [`obsidian-headless`](https://www.npmjs.com/package/obsidian-headless) CLI (`npx obsidian-headless`) can keep a folder in sync while Onyx simply edits the files. Protocol notes are in [docs/obsidian-sync-protocol.md](docs/obsidian-sync-protocol.md).
 - **Built in, not bolted on**: daily notes, backlinks, outline, properties, bookmarks, recent
   files, search, a quick switcher and a command palette, Dataview-style `TABLE`/`LIST`
   queries, Kanban boards, git status and commit, and RhymePad highlighting for verse.
