@@ -1,26 +1,25 @@
 import Foundation
 
 public enum Fuzzy {
-    /// Subsequence fuzzy score. Higher is better; nil means no match.
+    /// Score one string against a query (higher is better; nil = no match). Backed by
+    /// QuickMatch, so tiers, word boundaries and diacritic folding apply here too.
     public static func score(_ query: String, _ candidate: String) -> Int? {
-        let q = Array(query.lowercased().filter { $0 != " " })
-        if q.isEmpty { return 0 }
-        let c = Array(candidate.lowercased())
-        var qi = 0, score = 0, streak = 0, lastMatch = -2
-        for (ci, ch) in c.enumerated() where qi < q.count {
-            if ch == q[qi] {
-                var bonus = 1
-                if ci == lastMatch + 1 { streak += 1; bonus += streak * 3 } else { streak = 0 }
-                if ci == 0 { bonus += 8 }
-                else { let prev = c[ci - 1]; if prev == " " || prev == "/" || prev == "-" || prev == "_" || prev == "." { bonus += 6 } }
-                score += bonus
-                lastMatch = ci
-                qi += 1
-            }
+        match(query, candidate)?.score
+    }
+
+    /// Every token must match the candidate; returns the summed score and highlight offsets.
+    public static func match(_ query: String, _ candidate: String) -> (score: Int, positions: [Int])? {
+        let toks = QuickMatch.tokens(query)
+        if toks.isEmpty { return (0, []) }
+        let k = MatchKey(candidate)
+        var total = 0, pos = Set<Int>()
+        for t in toks {
+            guard let m = QuickMatch.match(t, in: k) else { return nil }
+            total += m.score; pos.formUnion(m.positions)
         }
-        guard qi == q.count else { return nil }
-        if candidate.lowercased().hasPrefix(query.lowercased()) { score += 25 }
-        if candidate.lowercased() == query.lowercased() { score += 50 }
-        return score - c.count / 8
+        if toks.count > 1, let m = QuickMatch.match(QuickMatch.fold(query.trimmingCharacters(in: .whitespaces)), in: k, minTier: .boundary) {
+            total += m.tier.rawValue * 1000; pos = Set(m.positions)
+        }
+        return (total - k.text.count / 8, pos.sorted())
     }
 }

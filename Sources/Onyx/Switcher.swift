@@ -7,21 +7,36 @@ struct PaletteItem: Identifiable {
     var subtitle: String = ""
     var symbol: String? = nil
     var shortcut: String = ""
+    var titleHits: [Int] = []         // Character offsets to highlight
+    var subtitleHits: [Int] = []
+    var badge: String = ""            // e.g. the alias that matched
+    var badgeHits: [Int] = []
+    var openInSplit: (() -> Void)? = nil
     var action: () -> Void
 }
 
 /// Spotlight-like list used by both the quick switcher (⌘O) and the command palette (⌘P).
+/// ↑/↓ move, ↩ opens, ⌘↩ opens in a split, ⇧↩ (or the Create row) makes a note with the
+/// typed name, Esc closes.
 struct PaletteView: View {
     var placeholder: String
     var items: (String) -> [PaletteItem]
     var onCreate: ((String) -> Void)? = nil
+    /// Whether a note with exactly this name already exists (hides the Create row).
+    var exists: ((String) -> Bool)? = nil
     var dismiss: () -> Void
     @State private var query = ""
+    @State private var results: [PaletteItem] = []
     @State private var selection = 0
+    @State private var monitor: Any?
     @FocusState private var focused: Bool
 
+    private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
+    private var showCreate: Bool { onCreate != nil && !trimmed.isEmpty && !(exists?(trimmed) ?? false) }
+    private var rowCount: Int { results.count + (showCreate ? 1 : 0) }
+    private var createIndex: Int { results.count }
+
     var body: some View {
-        let results = items(query)
         VStack(spacing: 0) {
             HStack(spacing: 10) {
                 Image(systemName: onCreate != nil ? "doc.text.magnifyingglass" : "command").font(.system(size: 15)).foregroundStyle(Color.faint)
@@ -29,44 +44,140 @@ struct PaletteView: View {
                     .textFieldStyle(.plain)
                     .font(Theme.serif(21))
                     .focused($focused)
-                    .onSubmit { activate(results) }
-                    .onKeyPress(.downArrow) { selection = min(selection + 1, max(0, results.count - 1)); return .handled }
-                    .onKeyPress(.upArrow) { selection = max(selection - 1, 0); return .handled }
+                    .onKeyPress(.downArrow) { move(1); return .handled }
+                    .onKeyPress(.upArrow) { move(-1); return .handled }
                     .onKeyPress(.escape) { dismiss(); return .handled }
             }
             .padding(.horizontal, 18).padding(.vertical, 14)
-            if !results.isEmpty || (onCreate != nil && !query.isEmpty) {
+            if rowCount > 0 {
                 Divider().overlay(Color.hairline)
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 0) {
-                            ForEach(Array(results.enumerated()), id: \.element.id) { i, item in
-                                row(item, selected: i == selection).id(i)
-                                    .onTapGesture { item.action(); dismiss() }
+                        VStack(spacing: 0) {
+                            if query.isEmpty, onCreate != nil, !results.isEmpty {
+                                Text("RECENT").font(.system(size: 9.5, weight: .semibold)).tracking(1.2).foregroundStyle(Color.faint)
+                                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 2)
                             }
-                            if results.isEmpty, onCreate != nil {
-                                HStack { Image(systemName: "plus").foregroundStyle(Color.faint); Text("Create “\(query)”").font(.system(size: 13)); Spacer(); Text("↩").foregroundStyle(Color.faint) }
-                                    .padding(.horizontal, 18).padding(.vertical, 9)
+                            // keyed by position, matching the .id used for scrollTo (two identities confuse LazyVStack)
+                            ForEach(Array(results.enumerated()), id: \.offset) { i, item in
+                                row(item, selected: i == selection).id(i)
+                                    .onTapGesture { selection = i; activate(split: NSEvent.modifierFlags.contains(.command)) }
+                            }
+                            if showCreate {
+                                createRow(selected: selection == createIndex).id(createIndex)
+                                    .onTapGesture { create() }
                             }
                         }.padding(.vertical, 5)
                     }
-                    .frame(maxHeight: 380)
+                    .thinScrollers()
+                    .frame(maxHeight: 400)
                     .onChange(of: selection) { proxy.scrollTo(selection) }
+                }
+                if onCreate != nil {
+                    Divider().overlay(Color.hairline)
+                    HStack(spacing: 14) {
+                        hint("↩", "open"); hint("⌘↩", "open in split"); if showCreate { hint("⇧↩", "create") }; hint("esc", "close")
+                        Spacer()
+                    }
+                    .padding(.horizontal, 18).padding(.vertical, 7)
                 }
             }
         }
-        .frame(width: 620)
+        .frame(width: 640)
         .panelChrome()
-        .onAppear { focused = true }
-        .onChange(of: query) { selection = 0 }
+        .onAppear {
+            if let q = ProcessInfo.processInfo.environment["ONYX_SWITCHER_QUERY"], onCreate != nil { query = q }
+            focused = true; refresh(); install()
+        }
+        .onDisappear { if let monitor { NSEvent.removeMonitor(monitor) }; monitor = nil }
+        .onChange(of: query) { refresh() }
+    }
+
+    private func refresh() {
+        results = items(query)
+        if ProcessInfo.processInfo.environment["ONYX_DEBUG_KEYS"] != nil {
+            print("[switcher] query=“\(query)” → \(results.count): \(results.prefix(3).map(\.title)) create=\(showCreate)"); fflush(stdout)
+        }
+        // Nothing found: the Create row is the thing to do
+        selection = results.isEmpty && showCreate ? createIndex : 0
+    }
+
+    private func move(_ d: Int) {
+        guard rowCount > 0 else { return }
+        selection = min(max(selection + d, 0), rowCount - 1)
+    }
+
+    /// ↩ / ⌘↩ / ⇧↩ arrive here before the menu bar (⌘↩ is also Read ⇄ Edit there).
+    private func install() {
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            guard e.keyCode == 36 || e.keyCode == 76 else { return e }
+            // an input method composing (e.g. kana → kanji) owns Return
+            if let tv = e.window?.firstResponder as? NSTextView, tv.hasMarkedText() { return e }
+            let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
+            switch mods {
+            case []: activate(split: false); return nil
+            case [.command]: activate(split: true); return nil
+            case [.shift]: if showCreate { create() } else { activate(split: false) }; return nil
+            default: return e
+            }
+        }
+    }
+
+    private func activate(split: Bool) {
+        if results.indices.contains(selection) {
+            let item = results[selection]
+            dismiss()
+            if split, let s = item.openInSplit { s() } else { item.action() }
+        } else if showCreate { create() }
+    }
+
+    private func create() {
+        guard let c = onCreate, !trimmed.isEmpty else { return }
+        dismiss(); c(trimmed)
+    }
+
+    func hint(_ k: String, _ label: String) -> some View {
+        HStack(spacing: 4) {
+            Text(k).font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(Color.muted)
+            Text(label).font(.system(size: 10.5)).foregroundStyle(Color.faint)
+        }
+    }
+
+    /// The string with its matched characters drawn in ink and a touch heavier.
+    static func highlighted(_ s: String, _ hits: [Int], base: Color, hit: Color, size: CGFloat, weight: Font.Weight = .regular) -> Text {
+        guard !hits.isEmpty else { return Text(s).font(.system(size: size, weight: weight)).foregroundColor(base) }
+        let set = Set(hits)
+        var out = Text("")
+        var run = "", runHit = false
+        func flush() {
+            guard !run.isEmpty else { return }
+            out = out + Text(run).font(.system(size: size, weight: runHit ? .semibold : weight)).foregroundColor(runHit ? hit : base)
+            run = ""
+        }
+        for (i, ch) in s.enumerated() {
+            let h = set.contains(i)
+            if h != runHit { flush(); runHit = h }
+            run.append(ch)
+        }
+        flush()
+        return out
     }
 
     func row(_ item: PaletteItem, selected: Bool) -> some View {
         HStack(spacing: 10) {
             if let s = item.symbol { Image(systemName: s).font(.system(size: 12)).foregroundStyle(Color.muted).frame(width: 18) }
             VStack(alignment: .leading, spacing: 1) {
-                Text(item.title).font(.system(size: 13.5)).foregroundStyle(Color.ink).lineLimit(1)
-                if !item.subtitle.isEmpty { Text(item.subtitle).font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1) }
+                HStack(spacing: 6) {
+                    Self.highlighted(item.title, item.titleHits, base: .ink.opacity(0.82), hit: .ink, size: 13.5).lineLimit(1)
+                    if !item.badge.isEmpty {
+                        Self.highlighted(item.badge, item.badgeHits, base: .faint, hit: .muted, size: 11).lineLimit(1)
+                            .padding(.horizontal, 5).padding(.vertical, 1)
+                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.hairline))
+                    }
+                }
+                if !item.subtitle.isEmpty {
+                    Self.highlighted(item.subtitle, item.subtitleHits, base: .faint, hit: .muted, size: 11).lineLimit(1).truncationMode(.head)
+                }
             }
             Spacer()
             if !item.shortcut.isEmpty { Text(item.shortcut).font(.system(size: 11.5, design: .rounded)).foregroundStyle(Color.faint) }
@@ -76,9 +187,27 @@ struct PaletteView: View {
         .contentShape(Rectangle())
     }
 
-    func activate(_ results: [PaletteItem]) {
-        if results.indices.contains(selection) { results[selection].action(); dismiss() }
-        else if let c = onCreate, !query.isEmpty { c(query); dismiss() }
+    func createRow(selected: Bool) -> some View {
+        let (folder, name) = Self.split(trimmed)
+        return HStack(spacing: 10) {
+            Image(systemName: "plus").font(.system(size: 12)).foregroundStyle(Color.muted).frame(width: 18)
+            VStack(alignment: .leading, spacing: 1) {
+                (Text("Create ").foregroundColor(.muted) + Text(name).foregroundColor(.ink).fontWeight(.medium)).font(.system(size: 13.5)).lineLimit(1)
+                Text(folder.isEmpty ? "new note in the vault root" : "new note in \(folder)").font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1)
+            }
+            Spacer()
+            Text("⇧↩").font(.system(size: 11.5, design: .rounded)).foregroundStyle(Color.faint)
+        }
+        .padding(.horizontal, 18).padding(.vertical, 6)
+        .background(selected ? Color.ink.opacity(0.07) : .clear)
+        .contentShape(Rectangle())
+    }
+
+    static func split(_ q: String) -> (folder: String, name: String) {
+        var q = q
+        if q.lowercased().hasSuffix(".md") { q = String(q.dropLast(3)) }
+        guard let slash = q.lastIndex(of: "/") else { return ("", q) }
+        return (String(q[..<slash]), String(q[q.index(after: slash)...]))
     }
 }
 
@@ -125,25 +254,33 @@ enum PaletteCommands {
 
     @MainActor static func filter(_ items: [PaletteItem], _ q: String) -> [PaletteItem] {
         if q.isEmpty { return items }
-        return items.compactMap { i in Fuzzy.score(q, i.title).map { (i, $0) } }.sorted { $0.1 > $1.1 }.map(\.0)
+        return items.compactMap { i -> (PaletteItem, Int)? in
+            guard let m = Fuzzy.match(q, i.title) else { return nil }
+            var j = i; j.titleHits = m.positions
+            return (j, m.score)
+        }.sorted { $0.1 > $1.1 }.map(\.0)
     }
 
     @MainActor static func notes(_ ws: Workspace, _ q: String) -> [PaletteItem] {
         guard let snap = ws.snapshot else { return [] }
-        if q.isEmpty {
-            return ws.recent.prefix(12).compactMap { p in snap.notes[p].map { n in PaletteItem(id: p, title: n.name, subtitle: n.folder) { ws.openNote(p) } } }
+        func item(_ path: String, _ title: String, _ folder: String) -> PaletteItem {
+            PaletteItem(id: path, title: title, subtitle: folder,
+                        openInSplit: { ws.split(.vertical); ws.openNote(path) }) { ws.openNote(path) }
         }
-        var scored: [(NoteRecord, Int, String?)] = []
-        for n in snap.notes.values {
-            var best = Fuzzy.score(q, n.name).map { $0 + 10 }
-            var via: String? = nil
-            for a in n.aliases { if let s = Fuzzy.score(q, a), s > (best ?? Int.min) { best = s; via = a } }
-            if best == nil, q.contains("/"), let s = Fuzzy.score(q, n.path) { best = s - 10 }
-            if let b = best { scored.append((n, b, via)) }
+        if q.trimmingCharacters(in: .whitespaces).isEmpty {
+            // recent notes; a fresh vault falls back to the most recently edited
+            var paths = ws.recent.filter { snap.notes[$0] != nil }
+            if paths.count < 12 {
+                let edited = snap.notes.values.sorted { $0.mtime > $1.mtime }.map(\.path)
+                for p in edited where !paths.contains(p) { paths.append(p); if paths.count >= 12 { break } }
+            }
+            return paths.prefix(12).compactMap { p in snap.notes[p].map { item(p, $0.name, $0.folder) } }
         }
-        scored.sort { $0.1 == $1.1 ? $0.0.path.count < $1.0.path.count : $0.1 > $1.1 }
-        return scored.prefix(60).map { n, _, via in
-            PaletteItem(id: n.path, title: n.name, subtitle: via.map { "alias: \($0) · " + n.folder } ?? n.folder) { ws.openNote(n.path) }
+        return ws.quickIndex.search(q, recent: ws.recent).map { h in
+            var i = item(h.entry.path, h.entry.name.text, h.entry.folder.text)
+            i.titleHits = h.nameHits; i.subtitleHits = h.folderHits
+            if let a = h.alias { i.badge = a; i.badgeHits = h.aliasHits }
+            return i
         }
     }
 }

@@ -102,3 +102,26 @@ Debug-only environment switches used to check the "Onyx, in a few keys" sheet ag
 `ONYX_KEY_SELFTEST=1` offers each sheet shortcut to the view hierarchy with the editor / reader
 as first responder (to catch a view swallowing it before the menu), and `ONYX_DEBUG_KEYS=1`
 logs workspace state after each key press.
+
+## Quick switcher (⌘O)
+
+One matcher (`OnyxCore/QuickMatch.swift`) serves ⌘O, the command palette and `[[` completion.
+
+- **Tiers, per query token:** exact > prefix (or a whole later word, so "20" finds 2026-11-20) >
+  word boundary / initials ("hl" → Hebrew Letters, "heblet", "js" → JavaScript via camelCase) >
+  contiguous substring > scattered subsequence. Scattered matches must land two thirds of their
+  letters on word starts or runs, so letters sprinkled across a long title don't count.
+- **Folding:** case, diacritics and width are ignored ("resume" → Résumé, "bahai" → Bahá'í),
+  with a 1:1 character map so highlights line up with the original text.
+- **Multi-token:** split on spaces and "/"; every token must match the title, an alias, or the
+  folder path (real words only, no scattering), in any order. The whole query is also tried
+  as one title, so "onyx plan" prefers *Onyx Plan* over notes that merely contain both words.
+- **Aliases** from frontmatter match a little below the title and show as a badge.
+- **Recency:** recently opened (up to +250) and recently edited (up to +100) nudge order within
+  a tier, never across one; daily-note names count by their own date, newest first. An empty
+  query lists recent notes.
+- **Speed:** keys are folded once per vault snapshot (`QuickIndex`); a query is about 1ms over
+  5,000 notes in a release build.
+- **Keys:** ↑/↓ move, ↩ opens, ⌘↩ opens in a new split, ⇧↩ creates a note with the typed name
+  (a `Folder/Name` query creates it in that folder). The Create row is shown whenever no note
+  has exactly that name, and is preselected when nothing matches. Esc closes.

@@ -69,6 +69,14 @@ final class Workspace {
     /// pane and of each unfocused pane. Reported by the editor and reader as they scroll and
     /// read by a freshly created view, so ⌘↩ and splits land on the same spot. Not observed:
     /// scrolling must not re-render SwiftUI.
+    /// ⌘O's pre-folded index, rebuilt lazily when the vault snapshot changes.
+    @ObservationIgnored private var quickCache: (gen: Int, index: QuickIndex)?
+    var quickIndex: QuickIndex {
+        if let c = quickCache, c.gen == snapshotGen { return c.index }
+        let i = snapshot.map(QuickIndex.init) ?? QuickIndex(entries: [])
+        quickCache = (snapshotGen, i)
+        return i
+    }
     @ObservationIgnored var liveTop: Double = 0
     @ObservationIgnored var paneTop: [UUID: Double] = [:]
     var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
