@@ -135,6 +135,7 @@ final class Workspace {
         obsidianSync = VaultSync.resume(for: root!)
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
+        loadTreeOrder()
         bookmarks = UserDefaults.standard.stringArray(forKey: key("bookmarks")) ?? obsidianBookmarks()
         isIndexing = true
         let root = self.root!
@@ -388,7 +389,32 @@ final class Workspace {
     /// The tree was the last thing clicked, so ⌘⌫ and Esc act on its selection.
     @ObservationIgnored var treeFocused = false
 
-    func visibleTreePaths() -> [String] { snapshot?.tree.visiblePaths(expanded: expanded) ?? [] }
+    func visibleTreePaths() -> [String] { snapshot?.tree.visiblePaths(expanded: expanded, children: treeChildren) ?? [] }
+
+    /// Sidebar order: a vault-wide default plus per-folder overrides, saved per vault.
+    var treeOrder = TreeOrder() { didSet { saveTreeOrder() } }
+    @ObservationIgnored private var treeDatesCache: (gen: Int, dates: TreeDates)?
+    func treeChildren(_ node: FileNode) -> [FileNode] {
+        let kids = node.children ?? []
+        let s = treeOrder.sort(for: node.path)
+        if s == .standard { return kids }   // the snapshot is already in natural order with folders first
+        guard let snap = snapshot else { return kids }
+        if treeDatesCache?.gen != snapshotGen { treeDatesCache = (snapshotGen, TreeDates(snap)) }
+        return treeDatesCache!.dates.ordered(kids, by: s)
+    }
+    func setSort(_ s: TreeSort, folder: String? = nil) {
+        if let f = folder { treeOrder.overrides[f] = s == treeOrder.base ? nil : s } else { treeOrder.base = s }
+    }
+    func clearSortOverride(_ folder: String) { treeOrder.overrides[folder] = nil }
+    func loadTreeOrder() {
+        let d = UserDefaults.standard.data(forKey: key("treeSort"))
+        let o = d.flatMap { try? JSONDecoder().decode(TreeOrder.self, from: $0) } ?? TreeOrder()
+        if o != treeOrder { treeOrder = o }
+    }
+    private func saveTreeOrder() {
+        guard root != nil else { return }
+        UserDefaults.standard.set(try? JSONEncoder().encode(treeOrder), forKey: key("treeSort"))
+    }
 
     /// One code path for real clicks and the test harness. `open` runs only for a plain click.
     func treeClick(_ path: String, modifiers: NSEvent.ModifierFlags, open: () -> Void) {
@@ -682,6 +708,11 @@ final class Workspace {
             if let p = panes[i].path { panes[i].path = remap(p) }
         }
         recent = recent.map(remap); UserDefaults.standard.set(recent, forKey: key("recent"))
+        if treeOrder.overrides.keys.contains(where: { $0 == from || $0.hasPrefix(from + "/") }) {   // per-folder sort follows the folder
+            var o = treeOrder.overrides
+            for (k, v) in treeOrder.overrides where k == from || k.hasPrefix(from + "/") { o[k] = nil; o[dest + String(k.dropFirst(from.count))] = v }
+            treeOrder.overrides = o
+        }
         bookmarks = bookmarks.map(remap); UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
         var parent = (dest as NSString).deletingLastPathComponent
         while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }

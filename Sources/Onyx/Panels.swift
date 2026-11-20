@@ -21,6 +21,7 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
     var label: (Tab) -> String
     @Binding var pinned: Bool
     var onPin: ((Bool) -> Void)? = nil
+    var accessory: AnyView? = nil
     var body: some View {
         // tabs compress (28pt → 17pt each) so the header still fits a 140pt sidebar
         HStack(spacing: 1) {
@@ -37,6 +38,7 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
                 .help(label(t))
             }
             Spacer(minLength: 0)
+            if let accessory { accessory }
             Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { pinned.toggle() }; onPin?(pinned) } label: {
                 Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 20, height: 24)
             }.buttonStyle(.plain).help(pinned ? "Unpin" : "Pin (three-pane layout)")
@@ -51,7 +53,8 @@ struct SidebarView: View {
     @Bindable var ws: Workspace
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(tabs: SidebarTab.allCases, selection: $ws.sidebarTab, symbol: \.symbol, label: \.title, pinned: $ws.sidebarPinned, onPin: { UserDefaults.standard.set($0, forKey: "onyx.sidebarOpen") })
+            PanelHeader(tabs: SidebarTab.allCases, selection: $ws.sidebarTab, symbol: \.symbol, label: \.title, pinned: $ws.sidebarPinned, onPin: { UserDefaults.standard.set($0, forKey: "onyx.sidebarOpen") },
+                        accessory: ws.sidebarTab == .files ? AnyView(SortMenu(ws: ws)) : nil)
             Divider().overlay(Color.hairline)
             Group {
                 switch ws.sidebarTab {
@@ -83,7 +86,7 @@ struct FileTreeView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     if let tree = ws.snapshot?.tree {
-                        ForEach(tree.children ?? []) { node in TreeNodeView(ws: ws, node: node, depth: 0) }
+                        ForEach(ws.treeChildren(tree)) { node in TreeNodeView(ws: ws, node: node, depth: 0) }
                     } else {
                         ProgressView().controlSize(.small).padding()
                     }
@@ -158,7 +161,7 @@ struct TreeNodeView: View {
                 }
             }
             if node.isFolder && isOpen {
-                ForEach(node.children ?? []) { c in TreeNodeView(ws: ws, node: c, depth: depth + 1) }
+                ForEach(ws.treeChildren(node)) { c in TreeNodeView(ws: ws, node: c, depth: depth + 1) }
             }
         }
     }
@@ -177,6 +180,39 @@ struct TreeNodeView: View {
 }
 
 /// The right-click menu wherever a note, file or folder appears (tree, recent, bookmarks, search).
+/// The sidebar header's sort control (vault default).
+struct SortMenu: View {
+    var ws: Workspace
+    var body: some View {
+        Menu { SortChoices(ws: ws, folder: nil) } label: {
+            Image(systemName: "arrow.up.arrow.down").font(.system(size: 10.5)).foregroundStyle(ws.treeOrder.base == .standard ? Color.faint : Color.ink)
+        }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize().frame(width: 22, height: 24)
+        .help("Sort: \(ws.treeOrder.base.key.title), \(ws.treeOrder.base.ascending ? "ascending" : "descending")")
+    }
+}
+
+/// Name / Modified / Created, direction and folders-on-top, for the vault or for one folder.
+struct SortChoices: View {
+    var ws: Workspace
+    var folder: String?
+    var body: some View {
+        let cur = folder.map { ws.treeOrder.sort(for: $0) } ?? ws.treeOrder.base
+        ForEach(TreeSort.Key.allCases, id: \.self) { k in
+            Toggle(k.title, isOn: Binding(get: { cur.key == k }, set: { _ in ws.setSort(TreeSort(key: k, foldersFirst: cur.foldersFirst), folder: folder) }))
+        }
+        Divider()
+        Toggle(cur.key == .name ? "A → Z" : "Oldest First", isOn: Binding(get: { cur.ascending }, set: { _ in var s = cur; s.ascending = true; ws.setSort(s, folder: folder) }))
+        Toggle(cur.key == .name ? "Z → A" : "Newest First", isOn: Binding(get: { !cur.ascending }, set: { _ in var s = cur; s.ascending = false; ws.setSort(s, folder: folder) }))
+        Divider()
+        Toggle("Folders on Top", isOn: Binding(get: { cur.foldersFirst }, set: { v in var s = cur; s.foldersFirst = v; ws.setSort(s, folder: folder) }))
+        if let f = folder, ws.treeOrder.overrides[f] != nil {
+            Divider()
+            Button("Use Vault Order") { ws.clearSortOverride(f) }
+        }
+    }
+}
+
 struct FileMenu: View {
     var ws: Workspace
     var path: String
@@ -188,7 +224,10 @@ struct FileMenu: View {
             Button("Open") { ws.openNote(note) }
             Button("Open in Split") { ws.split(.vertical); ws.openNote(note) }
         }
-        if isFolder { Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) } }
+        if isFolder {
+            Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
+            Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
+        }
         Divider()
         Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
         Button("Move to…") { ws.beginMove(path) }
