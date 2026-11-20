@@ -603,6 +603,12 @@ struct WindowConfigurator: NSViewRepresentable {
     nonisolated(unsafe) static var idFile: String?
     static func writeWindowID(_ w: NSWindow) {
         guard let f = idFile else { return }
+        // Screenshot runs on a machine someone is using: ONYX_SHOT_QUIET=1 parks the window off
+        // screen and deaf to the pointer, so it neither covers their work nor sprouts hover cards.
+        if ProcessInfo.processInfo.environment["ONYX_SHOT_QUIET"] == "1", !w.ignoresMouseEvents {
+            w.ignoresMouseEvents = true
+            w.setFrameOrigin(NSPoint(x: -w.frame.width - 3000, y: 0))
+        }
         try? String(w.windowNumber).write(toFile: f, atomically: true, encoding: .utf8)
     }
 }

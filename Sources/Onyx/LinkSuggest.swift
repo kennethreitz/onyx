@@ -131,6 +131,9 @@ enum TypeSelfTest {
         switch line.split(separator: " ").first ?? "" {
         case "open": ws.openNote(arg)
         case "split": ws.split(.vertical)
+        case "openat":   // openat <line> <path>: open a note scrolled to a source line
+            let parts = arg.split(separator: " ", maxSplits: 1).map(String.init); if parts.count == 2, let l = Int(parts[0]) { ws.openNote(parts[1], line: l) }
+        case "exportpdf": NotePrinter.run("export", ws: ws, to: URL(fileURLWithPath: arg))   // exportpdf <path>: the book-page PDF
         case "back": ws.goBack()
         case "trash": ws.trash(arg)
         case "move":     // move <path> -> <folder>
