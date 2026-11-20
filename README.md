@@ -30,6 +30,10 @@ keep working right alongside it.
 
 - **Obsidian vaults, as they are**: wikilinks with aliases and headings, embeds, frontmatter
   properties, nested tags, folder notes, `%%comments%%`, callouts, footnotes, Mermaid.
+- **Dataview fields as relationships**: `partOf:: [[Knowledge]]` (or a bare `partOf:: Knowledge`),
+  `related::` and other `key:: value` fields render as link chips, count as links, draw their own
+  graph edges, list Part of / Parts / Related in the inspector, and follow renames. Hover a
+  link for a small graph card of that note.
 - **Two modes, one keystroke**: a calm Plex Mono editor with live Markdown styling, and a
   typeset reader. <kbd>⌘↩</kbd> flips between them and saves.
 - **A graph worth opening**: the *focus graph* puts the current note at the center with its

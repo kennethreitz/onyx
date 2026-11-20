@@ -205,7 +205,7 @@
 
   function props(list) {
     if (!list || !list.length) return '';
-    const rows = list.map(p => `<tr><td>${esc(p.key)}</td><td>${esc(p.value)}</td></tr>`).join('');
+    const rows = list.map(p => `<tr><td>${esc(p.key)}</td><td>${p.html || esc(p.value)}</td></tr>`).join('');
     return `<div class="properties"><span class="toggle"></span><div class="rows"><table>${rows}</table></div></div>`;
   }
 
@@ -309,7 +309,19 @@
     },
   };
 
+  // The native graph card is shared with inspector links. Swift owns the 400 ms delay.
+  document.addEventListener('mouseover', e => {
+    const a = e.target.closest('a.internal-link[data-path]');
+    if (!a || !a.dataset.path || a.contains(e.relatedTarget)) return;
+    const r = a.getBoundingClientRect();
+    post({ type: 'preview', path: a.dataset.path, x: r.x, y: r.y, width: r.width, height: r.height });
+  });
+  document.addEventListener('mouseout', e => {
+    const a = e.target.closest('a.internal-link');
+    if (a && !a.contains(e.relatedTarget)) post({ type: 'previewEnd' });
+  });
   document.addEventListener('click', (e) => {
+    post({ type: 'previewEnd' });
     const cb = e.target.closest('input[type=checkbox][data-task]');
     if (cb) { e.preventDefault(); post({ type: 'task', index: +cb.dataset.task }); return; }
     const a = e.target.closest('a');

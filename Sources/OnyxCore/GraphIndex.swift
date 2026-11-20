@@ -12,6 +12,9 @@ public struct GraphIndex: Sendable {
     public var inn: [[Int]] = []
     public var degree: [Int] = []
     public var index: [String: Int] = [:]
+    /// Directed `partOf` edges (child -> parents) and symmetric related edges.
+    public var partOf: [[Int]] = []
+    public var related: [Set<Int>] = []
 
     public init() {}
 
@@ -21,6 +24,8 @@ public struct GraphIndex: Sendable {
         for (i, p) in g.ids.enumerated() { g.index[p] = i }
         g.out = Array(repeating: [], count: g.ids.count)
         g.inn = Array(repeating: [], count: g.ids.count)
+        g.partOf = Array(repeating: [], count: g.ids.count)
+        g.related = Array(repeating: [], count: g.ids.count)
         for (i, p) in g.ids.enumerated() {
             let n = snap.notes[p]!
             g.names.append(n.name)
@@ -29,8 +34,13 @@ public struct GraphIndex: Sendable {
             g.tags.append(n.summary.tags)
             var seen = Set<Int>()
             for l in n.summary.links {
-                guard let t = snap.resolve(l.target, from: p), let j = g.index[t], j != i, !seen.contains(j) else { continue }
+                guard let t = snap.resolve(l.target, from: p), let j = g.index[t], j != i else { continue }
                 seen.insert(j)
+                switch l.fieldKey.map(InlineField.kind) {
+                case "partof": g.partOf[i].append(j)
+                case "related", "relatesto": g.related[i].insert(j); g.related[j].insert(i)
+                default: break
+                }
             }
             g.out[i] = seen.sorted()
         }
@@ -40,6 +50,12 @@ public struct GraphIndex: Sendable {
     }
 
     public func neighbors(_ i: Int) -> Set<Int> { Set(out[i]).union(inn[i]) }
+    public enum EdgeKind: Sendable { case link, partOf, related }
+    public func edgeKind(_ a: Int, _ b: Int) -> EdgeKind {
+        if partOf[a].contains(b) || partOf[b].contains(a) { return .partOf }
+        if related[a].contains(b) { return .related }
+        return .link
+    }
     public var count: Int { ids.count }
 }
 

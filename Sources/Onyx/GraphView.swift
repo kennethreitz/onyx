@@ -401,7 +401,9 @@ struct GraphView: View {
                 let hot = hover == n.node || hover == j
                 var path = Path(); path.move(to: screen(p, c))
                 path.addQuadCurve(to: screen(q, c), control: screen((p + q) * 0.35 + cp * 0.3, c))
-                ctx.stroke(path, with: .color(ink.opacity(hot ? 0.5 : (hover == nil ? 0.07 : 0.03))), lineWidth: 0.6)
+                let kind = g.edgeKind(n.node, j)
+                ctx.stroke(path, with: .color((kind == .related ? accent : ink).opacity(hot ? 0.5 : (hover == nil ? (kind == .link ? 0.07 : 0.14) : 0.03))),
+                           style: StrokeStyle(lineWidth: kind == .partOf ? 0.95 : 0.6, dash: kind == .related ? [1.5, 3] : []))
             }
         }
         for n in ring1 {
@@ -410,8 +412,15 @@ struct GraphView: View {
             let hot = hover == n.node || hover == f
             var path = Path(); path.move(to: center); path.addLine(to: screen(p, c))
             let w = n.outgoing && n.incoming ? 1.3 : 0.8
-            let style = n.outgoing ? StrokeStyle(lineWidth: w) : StrokeStyle(lineWidth: w, dash: [3, 3])
-            ctx.stroke(path, with: .color(ink.opacity((hot ? 0.75 : (hover == nil ? 0.32 : 0.1)) * a)), style: style)
+            let kind = g.edgeKind(f, n.node)
+            let style: StrokeStyle
+            switch kind {
+            case .partOf: style = StrokeStyle(lineWidth: w + 0.55, lineCap: .round)   // hierarchy reads as a firmer stem
+            case .related: style = StrokeStyle(lineWidth: w, dash: [1.5, 3])
+            case .link: style = n.outgoing ? StrokeStyle(lineWidth: w) : StrokeStyle(lineWidth: w, dash: [3, 3])
+            }
+            let tone = kind == .related ? accent : (kind == .partOf ? Color.muted : ink)
+            ctx.stroke(path, with: .color(tone.opacity((hot ? 0.75 : (hover == nil ? (kind == .link ? 0.32 : 0.42) : 0.1)) * a)), style: style)
         }
         // nodes
         var placer = LabelPlacer()
@@ -770,6 +779,8 @@ struct GraphView: View {
                 HStack(spacing: 5) { Circle().fill(Color.ink).frame(width: 7, height: 7); Text("links to") }
                 HStack(spacing: 5) { Circle().strokeBorder(Color.ink, lineWidth: 1).frame(width: 8, height: 8); Text("links here") }
                 HStack(spacing: 5) { Circle().fill(Color.muted.opacity(0.6)).frame(width: 6, height: 6); Text("two steps away") }
+                HStack(spacing: 5) { Capsule().fill(Color.muted).frame(width: 16, height: 2); Text("part of") }
+                HStack(spacing: 5) { Text("┄").foregroundStyle(Color.cursorBlue); Text("related") }
                 Text("click to travel · double-click or ↩ to open · ⌫ back").foregroundStyle(Color.faint)
             }
             Spacer()

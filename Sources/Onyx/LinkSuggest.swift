@@ -1,4 +1,5 @@
 import AppKit
+import WebKit
 import SwiftUI
 import OnyxCore
 
@@ -146,6 +147,25 @@ enum TypeSelfTest {
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
         case "trashsel": ws.trash(Array(ws.treeSelection.selected))       // what ⌘⌫ does after its confirm
         case "movesel": ws.move(Array(ws.treeSelection.selected), toFolder: arg)
+        case "relations":
+            if let snap = ws.snapshot { print("[relations] \(arg): parents=\(snap.parents(of: arg)) parts=\(snap.parts(of: arg)) related=\(snap.related(to: arg)) backlinks=\(snap.backlinks[arg]?.count ?? 0)") }
+        case "preview":   // the same card a 400 ms hover opens, anchored to the window
+            if let v = MainWindow.current?.contentView { GraphPreviewController.shared.show(ws: ws, path: arg, rect: CGRect(x: v.bounds.midX - 40, y: v.bounds.maxY - 120, width: 80, height: 20), in: v); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")") }
+        case "previewclose": GraphPreviewController.shared.close(); print("[preview] shown=\(GraphPreviewController.shared.shownPath ?? "-")")
+        case "cardshot":   // cardshot <note> -> <png>: renders only the card, never the screen
+            let parts = arg.components(separatedBy: " -> ")
+            if parts.count == 2, let snap = ws.snapshot {
+                let r = ImageRenderer(content: GraphPreviewCard(graph: RelationGraph.build(snap, center: parts[0]), path: parts[0], open: { _ in }, hover: { _ in }))
+                r.scale = 2
+                if let img = r.nsImage, let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff), let png = rep.representation(using: .png, properties: [:]) {
+                    try? png.write(to: URL(fileURLWithPath: parts[1])); print("[cardshot] \(parts[1])")
+                }
+            }
+        case "js":   // evaluate in the reader and print the result
+            func find(_ v: NSView) -> WKWebView? { if let w = v as? WKWebView { return w }; for s in v.subviews { if let r = find(s) { return r } }; return nil }
+            if let w = MainWindow.current?.contentView.flatMap(find) {
+                w.evaluateJavaScript(arg) { r, e in print("[js] \(r.map { "\($0)" } ?? e.map { "error \($0)" } ?? "nil")"); fflush(stdout) }
+            } else { print("[js] no reader") }
         case "mode": ws.mode = arg == "edit" ? .edit : .read
         case "git": print("[git] \(ws.git.map { "\($0.state) · \($0.detail) · last=\($0.lastCommit ?? "-")" } ?? "no git")")
         case "state":

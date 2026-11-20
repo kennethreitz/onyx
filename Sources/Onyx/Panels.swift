@@ -241,6 +241,7 @@ struct NoteRow: View {
     @Bindable var ws: Workspace
     var path: String
     var detail: String? = nil
+    var preview = false
     @State private var hover = false
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -251,9 +252,10 @@ struct NoteRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 5).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.horizontal, 5))
         .contentShape(Rectangle())
+        .background { if preview { GraphPreviewTrigger(ws: ws, path: path) } }
         .contextMenu { FileMenu(ws: ws, path: path) }
         .onHover { hover = $0 }
-        .onTapGesture { ws.openNote(path) }
+        .onTapGesture { GraphPreviewController.shared.close(); ws.openNote(path) }
     }
 }
 
@@ -382,7 +384,29 @@ struct InspectorView: View {
         }
     }
 
+    @ViewBuilder func relations(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
+        let parents = snap.parents(of: note.path), parts = snap.parts(of: note.path), related = snap.related(to: note.path)
+        let unresolved = note.summary.links.filter { $0.fieldKey.map(InlineField.kind) == "partof" && snap.resolve($0.target, from: note.path) == nil }
+        if !parents.isEmpty || !unresolved.isEmpty {
+            sectionTitle("Part of")
+            ForEach(parents, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
+            ForEach(unresolved, id: \.target) { l in
+                Button { ws.openLink(l.target) } label: { Text("\(l.alias ?? l.target)  · create").font(.system(size: 12)).foregroundStyle(Color.muted) }
+                    .buttonStyle(.plain).padding(.horizontal, 17).padding(.vertical, 4)
+            }
+        }
+        if !parts.isEmpty {
+            sectionTitle("Parts · \(parts.count)")
+            ForEach(parts, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
+        }
+        if !related.isEmpty {
+            sectionTitle("Related · \(related.count)")
+            ForEach(related, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
+        }
+    }
+
     @ViewBuilder func backlinks(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
+        relations(note, snap)
         let links = snap.backlinks(to: note.path)
         sectionTitle("Linked mentions · \(links.count)")
         if links.isEmpty { Text("Nothing links here yet.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.vertical, 4) }

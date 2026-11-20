@@ -48,6 +48,11 @@ struct MarkdownHighlighter {
         }
         for r in codeBlocks { ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) }
 
+        for f in InlineFields.parse(s) where !f.isFrontmatter {
+            let r = NSRange(location: f.keyRange.location, length: f.keyRange.length + 2)
+            ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r)
+        }
+
         // Line-level: headings, quotes, lists, rules, tasks
         var loc = fm.bodyOffset
         while loc < ns.length {

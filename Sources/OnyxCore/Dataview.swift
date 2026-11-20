@@ -350,6 +350,14 @@ public enum Dataview {
             }
             return v
         }
+        let fields = n.summary.fields.filter { norm($0.key) == norm(name) }
+        if !fields.isEmpty {
+            let vals: [DVValue] = fields.flatMap { f -> [DVValue] in
+                if f.links.isEmpty { return [.string(f.value)] }
+                return f.links.map { l in snap.resolve(l.target, from: n.path).map { DVValue.link(path: $0, name: l.alias ?? (($0 as NSString).lastPathComponent as NSString).deletingPathExtension) } ?? .string(l.target) }
+            }
+            return vals.count == 1 ? vals[0] : .list(vals)
+        }
         return .null
     }
 

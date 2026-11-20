@@ -149,6 +149,14 @@ struct ReaderView: NSViewRepresentable {
                 if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil {
                     ws.openNote(p, heading: body["heading"] as? String)
                 } else if let t = body["target"] as? String { ws.openLink(t) }
+            case "preview":
+                if let p = body["path"] as? String, !p.isEmpty, let webView,
+                   let x = body["x"] as? Double, let y = body["y"] as? Double,
+                   let w = body["width"] as? Double, let h = body["height"] as? Double {
+                    let rect = CGRect(x: x, y: webView.isFlipped ? y : webView.bounds.height - y - h, width: w, height: h)
+                    GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView)
+                }
+            case "previewEnd": GraphPreviewController.shared.leaveLink()
             case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
             case "tag":
                 if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
@@ -167,7 +175,7 @@ enum ReaderPayload {
 
     static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0) -> String {
         let fm = Frontmatter.parse(text)
-        var body = (text as NSString).substring(from: fm.bodyOffset)
+        var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
         var dv: [String] = []
         let ns = body as NSString
@@ -195,7 +203,8 @@ enum ReaderPayload {
                     if let note = snap.notes[r] {
                         var md = (note.content as NSString).substring(from: note.summary.frontmatter.bodyOffset)
                         if let h = l.heading { md = section(md, heading: h) }
-                        embeds[key] = ["type": "note", "path": r, "markdown": md, "name": note.name]
+                        let pretty = l.heading == nil ? fieldsHTML(note.content, path: r, snap: snap) : fieldsHTML(md, path: r, snap: snap)
+                        embeds[key] = ["type": "note", "path": r, "markdown": pretty, "name": note.name]
                         if depth < 1 { resolveAll(md, from: r, depth: depth + 1) }
                     } else {
                         let ext = (r as NSString).pathExtension.lowercased()
@@ -207,7 +216,12 @@ enum ReaderPayload {
         }
         resolveAll(body, from: path, depth: 0)
 
-        let props = fm.properties.map { ["key": $0.key, "value": $0.value.display] }
+        let fields = InlineFields.parse(text)
+        let props = fm.properties.map { p -> [String: String] in
+            let fs = fields.filter { $0.isFrontmatter && $0.key == p.key }
+            let html = fs.isEmpty ? "" : fs.map { fieldValueHTML($0, path: path, snap: snap) }.joined(separator: " ")
+            return ["key": InlineField.kind(p.key) == "partof" ? "Part of" : p.key, "value": p.value.display, "html": html]
+        }
         var kanban: Any = NSNull()
         if KanbanBoard.isBoard(fm) {
             let b = KanbanBoard.parse(text)
@@ -224,6 +238,36 @@ enum ReaderPayload {
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)
         return String(decoding: data, as: UTF8.self)
+    }
+
+    /// All markup here is generated and escaped; note values never become executable HTML.
+    static func fieldLinkHTML(_ l: WikiLink, path: String, snap: VaultSnapshot) -> String {
+        let resolved = snap.resolve(l.target, from: path) ?? ""
+        let label = l.alias ?? ((l.target as NSString).lastPathComponent as NSString).deletingPathExtension
+        return "<a class=\"internal-link field-chip\(resolved.isEmpty ? " is-unresolved" : "")\" data-path=\"\(esc(resolved))\" data-target=\"\(esc(l.target))\" data-heading=\"\(esc(l.heading ?? ""))\">\(esc(label))</a>"
+    }
+    static func fieldValueHTML(_ f: InlineField, path: String, snap: VaultSnapshot) -> String {
+        if InlineField.isRelation(f.key) { return f.links.map { fieldLinkHTML($0, path: path, snap: snap) }.joined(separator: " ") }
+        let ns = f.value as NSString
+        var last = 0, html = ""
+        for l in f.links.sorted(by: { $0.range.location < $1.range.location }) {
+            let start = l.range.location - f.valueRange.location
+            guard start >= last, start + l.range.length <= ns.length else { continue }
+            html += esc(ns.substring(with: NSRange(location: last, length: start - last)))
+            html += fieldLinkHTML(l, path: path, snap: snap)
+            last = start + l.range.length
+        }
+        return html + esc(ns.substring(from: last))
+    }
+    static func fieldsHTML(_ text: String, path: String, snap: VaultSnapshot) -> String {
+        let fm = Frontmatter.parse(text)
+        var ns = text as NSString
+        for f in InlineFields.parse(text).filter({ !$0.isFrontmatter }).reversed() {
+            let atLine = f.range.location == 0 || ns.character(at: f.range.location - 1) == 10
+            let html = "<span class=\"inline-field\(atLine ? " is-line" : "") field-\(esc(f.kind))\"><span class=\"field-key\">\(esc(f.label))</span> \(fieldValueHTML(f, path: path, snap: snap))</span>"
+            ns = ns.replacingCharacters(in: f.range, with: html) as NSString
+        }
+        return ns.substring(from: fm.bodyOffset)
     }
 
     static func section(_ md: String, heading: String) -> String {

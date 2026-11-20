@@ -202,3 +202,24 @@ to a path if the new name would be ambiguous); `#heading`, `|alias` and `![[embe
 The note stays open in its panes, history, recent list and bookmarks, and git commits the
 move at once ("Move Venus → Archive", "Rename Mercury → Hermes"). Markdown-style
 `[text](path.md)` links are not rewritten yet.
+
+## Inline fields and relationships
+
+Dataview-style fields are parsed by `InlineFields`: whole-line `key:: value` (also as a list item),
+mid-line `[key:: value]` / `(key:: value)`, and frontmatter properties whose values are links.
+Fields inside code spans, fences and `%%comments%%` are ignored. `partOf`, `related`, `relatesTo`
+and `correspondsTo` are relation keys: their values may be bare note names (`partOf:: Knowledge`),
+`[[links]]`, quoted YAML strings or comma-separated lists, and every value resolves like a wikilink.
+Other keys turn only explicit `[[links]]` into links.
+
+Field links are ordinary `WikiLink`s tagged with `fieldKey` (bare values carry `isBare` and the exact
+source range), so they count as links and backlinks, show up as unresolved links (clicking creates the note), and
+are rewritten by rename/move like any wikilink, bare names included. `VaultSnapshot.relationsOut/In` index them by
+kind: `parents(of:)`, `parts(of:)`, `siblings(of:)` and the symmetric `related(to:)`.
+
+The reader renders a field as a small monospace key plus link chips; the editor tints `key::`.
+The inspector's Links tab lists Part of, Parts and Related above the backlinks. In the focus graph, `partOf`
+spokes are firmer muted stems and related ones blue dotted lines. Hovering any resolved reader link or an inspector
+relation for 400 ms opens a card: the note's parents above, parts below (two staggered lanes, "+N more"),
+siblings faint at the side, related to the right, or its plain links when it has no fields. Click a node
+to open it, the card background for the note itself; leaving the link or the card closes it.

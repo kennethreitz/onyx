@@ -211,3 +211,12 @@ html { scrollbar-width: none; }
 html.dark #onyx-sb > i { background: rgba(255, 255, 255, .26); }
 #onyx-sb.hot > i { width: 5px; background: rgba(0, 0, 0, .32); }
 html.dark #onyx-sb.hot > i { background: rgba(255, 255, 255, .38); }
+
+/* Dataview inline fields: quiet label, real clickable note chips. */
+.inline-field { display: inline; font-size: .85em; }
+.field-key { color: var(--text-muted); font: 500 .78em/1.5 var(--mono, monospace); margin-right: .45em; }
+a.field-chip { display: inline-block; font-size: .94em; line-height: 1.65; padding: 0 .5em; margin: .12em .2em .12em 0; border-radius: 4px; background: color-mix(in srgb, currentColor 6%, transparent); text-decoration: none; cursor: pointer; }
+a.field-chip:hover { background: color-mix(in srgb, currentColor 12%, transparent); }
+a.field-chip.is-unresolved { border-bottom: 1px dotted currentColor; }
+.inline-field.is-line { display: block; margin: .15em 0; }
+.inline-field.is-line + br { display: none; }

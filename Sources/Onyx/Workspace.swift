@@ -636,10 +636,14 @@ final class Workspace {
                     newTarget = clash ? noExt(newPath) : title(newPath)
                 } else { continue }
                 guard NSMaxRange(l.range) <= text.length else { continue }
-                let whole = text.substring(with: l.range) as NSString
-                let open = whole.range(of: "[[")
-                guard open.location != NSNotFound else { continue }
-                let tStart = l.range.location + NSMaxRange(open)
+                let tStart: Int
+                if l.isBare { tStart = l.range.location }   // `partOf:: Knowledge` or YAML `partOf: Knowledge`
+                else {
+                    let whole = text.substring(with: l.range) as NSString
+                    let open = whole.range(of: "[[")
+                    guard open.location != NSNotFound else { continue }
+                    tStart = l.range.location + NSMaxRange(open)
+                }
                 let rawTarget = (text.substring(from: tStart) as NSString)
                 let tLen = (l.target as NSString).length
                 guard tLen <= rawTarget.length, rawTarget.substring(to: tLen) == l.target else { continue }

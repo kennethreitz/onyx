@@ -7,6 +7,9 @@ public struct WikiLink: Hashable, Sendable {
     public var isEmbed: Bool
     public var range: NSRange      // range of the whole [[...]] in the source
 
+    public var fieldKey: String? = nil
+    public var isBare: Bool = false
+
     /// Raw inner text, e.g. "Note#Heading|Alias"
     public var raw: String {
         var s = target
@@ -26,6 +29,7 @@ public struct Heading: Hashable, Sendable {
 public struct NoteSummary: Sendable {
     public var frontmatter: Frontmatter
     public var links: [WikiLink]
+    public var fields: [InlineField]
     public var markdownLinks: [String]
     public var tags: [String]
     public var headings: [Heading]
@@ -96,7 +100,12 @@ public enum NoteParser {
         let code = codeRanges(text)
         func inCode(_ r: NSRange) -> Bool { code.contains { NSIntersectionRange($0, r).length > 0 } }
 
-        let links = parseWikiLinks(text, in: body).filter { !inCode($0.range) }
+        let fields = InlineFields.parse(text)
+        let fieldLinks = fields.flatMap(\.links)
+        // Keep a field wikilink once, carrying its relationship kind.
+        let links = parseWikiLinks(text, in: body).filter { l in
+            !inCode(l.range) && !fieldLinks.contains { NSIntersectionRange($0.range, l.range).length > 0 }
+        } + fieldLinks
         let mdLinks = mdLinkRegex.matches(in: text, range: body).filter { !inCode($0.range) }.map {
             ns.substring(with: $0.range(at: 1)).removingPercentEncoding ?? ns.substring(with: $0.range(at: 1))
         }
@@ -113,7 +122,7 @@ public enum NoteParser {
         }
         let headings = parseHeadings(text, skipping: code, from: fm.bodyOffset)
         let words = countWords(ns.substring(with: body))
-        return NoteSummary(frontmatter: fm, links: links, markdownLinks: mdLinks, tags: tags.sorted(), headings: headings, wordCount: words)
+        return NoteSummary(frontmatter: fm, links: links, fields: fields, markdownLinks: mdLinks, tags: tags.sorted(), headings: headings, wordCount: words)
     }
 
     public static func parseHeadings(_ text: String, skipping code: [NSRange]? = nil, from start: Int = 0) -> [Heading] {

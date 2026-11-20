@@ -55,6 +55,10 @@ public struct VaultSnapshot: Sendable {
     public private(set) var backlinks: [String: Set<String>] = [:]
     public private(set) var tags: [String: Set<String>] = [:]
     public private(set) var unresolved: [String: Set<String>] = [:]
+    /// Field relationships keyed by normalized field kind: source -> kind -> targets.
+    public private(set) var relationsOut: [String: [String: Set<String>]] = [:]
+    /// Reverse index: target -> kind -> sources.
+    public private(set) var relationsIn: [String: [String: Set<String>]] = [:]
     public private(set) var tree: FileNode = FileNode(name: "", path: "", isFolder: true, children: [])
 
     public init(root: URL) { self.root = root }
@@ -107,6 +111,12 @@ public struct VaultSnapshot: Sendable {
                     found = true
                     break
                 }
+            }
+            if !found, let l = note.summary.links.first(where: { $0.isBare && resolve($0.target, from: s) == path }) {
+                let prefix = (note.content as NSString).substring(to: min(l.range.location, (note.content as NSString).length))
+                let i = prefix.reduce(0) { $1 == "\n" ? $0 + 1 : $0 }
+                out.append(Backlink(source: s, line: i, context: i < lines.count ? lines[i].trimmingCharacters(in: .whitespaces) : ""))
+                found = true
             }
             if !found { out.append(Backlink(source: s, line: 0, context: "")) }
         }
@@ -250,9 +260,17 @@ public struct VaultSnapshot: Sendable {
         var bl: [String: Set<String>] = [:]
         var unres: [String: Set<String>] = [:]
         var tg: [String: Set<String>] = [:]
+        var rout: [String: [String: Set<String>]] = [:], rin: [String: [String: Set<String>]] = [:]
         for (p, n) in notes {
             for l in n.summary.links {
-                if let t = resolve(l.target, from: p) { if t != p { bl[t, default: []].insert(p) } }
+                if let t = resolve(l.target, from: p) {
+                    if t != p { bl[t, default: []].insert(p) }
+                    if let key = l.fieldKey, t != p {
+                        let k = InlineField.kind(key)
+                        rout[p, default: [:]][k, default: []].insert(t)
+                        rin[t, default: [:]][k, default: []].insert(p)
+                    }
+                }
                 else if !l.target.isEmpty { unres[l.target, default: []].insert(p) }
             }
             for m in n.summary.markdownLinks {
@@ -262,7 +280,7 @@ public struct VaultSnapshot: Sendable {
             }
             for t in n.summary.tags { tg[t, default: []].insert(p) }
         }
-        backlinks = bl; unresolved = unres; tags = tg
+        backlinks = bl; unresolved = unres; tags = tg; relationsOut = rout; relationsIn = rin
         tree = buildTree()
     }
 
@@ -293,6 +311,21 @@ public struct VaultSnapshot: Sendable {
             return FileNode(name: b.name, path: b.path, isFolder: true, children: subs + files, folderNote: hasFolderNote ? folderNotePath : nil)
         }
         return convert(root)
+    }
+
+    // MARK: Relationships
+
+    public func parents(of path: String) -> [String] { (relationsOut[path]?["partof"] ?? []).sorted() }
+    public func parts(of path: String) -> [String] { (relationsIn[path]?["partof"] ?? []).sorted() }
+    /// `related::` is symmetric for display: outgoing and incoming collapse to one list.
+    public func related(to path: String) -> [String] {
+        let ks = ["related", "relatesto"]
+        var r = Set<String>()
+        for k in ks { r.formUnion(relationsOut[path]?[k] ?? []); r.formUnion(relationsIn[path]?[k] ?? []) }
+        return r.subtracting([path]).sorted()
+    }
+    public func siblings(of path: String) -> [String] {
+        Set(parents(of: path).flatMap(parts(of:))).subtracting([path]).sorted()
     }
 
     // MARK: Search
