@@ -367,15 +367,98 @@ final class Workspace {
         createNote(named: "Untitled", folder: folder)
     }
 
-    func trashCurrent() {
-        guard let p = currentPath, let root else { return }
-        let url = root.appendingPathComponent(p)
-        NSWorkspace.shared.recycle([url]) { _, _ in }
-        snapshot?.refresh(paths: [p])
-        currentPath = nil
-        goBackOrHome()
+    // MARK: Deleting
+
+    /// Ask, then move a note, file or folder to the Trash.
+    func confirmTrash(_ path: String) {
+        guard let root else { return }
+        let isDir = (try? root.appendingPathComponent(path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+        let last = (path as NSString).lastPathComponent
+        let name = path.lowercased().hasSuffix(".md") ? (last as NSString).deletingPathExtension : last
+        let a = NSAlert()
+        a.messageText = "Move “\(name)” to the Trash?"
+        if isDir {
+            let n = snapshot?.notes.keys.filter { $0.hasPrefix(path + "/") }.count ?? 0
+            a.informativeText = "The folder and the \(n) note\(n == 1 ? "" : "s") in it. You can restore it from the Trash in Finder."
+        } else {
+            a.informativeText = "You can restore it from the Trash in Finder."
+        }
+        a.addButton(withTitle: "Move to Trash"); a.addButton(withTitle: "Cancel")
+        a.buttons.first?.hasDestructiveAction = true
+        if a.runModal() == .alertFirstButtonReturn { trash(path) }
     }
-    private func goBackOrHome() { if canGoBack { goBack() } else { openHome() } }
+    /// For the test harness: "a, [b], c" with the current entry bracketed.
+    var debugHistory: String {
+        history.enumerated().map { i, e in
+            let s: String
+            switch e.place { case .note(let p): s = ((p as NSString).lastPathComponent as NSString).deletingPathExtension; case .graph: s = "graph" }
+            return i == historyIndex ? "[\(s)]" : s
+        }.joined(separator: ", ")
+    }
+    func confirmTrashCurrent() { if let p = currentPath { confirmTrash(p) } }
+
+    /// Move to the Trash (recoverable). Every pane showing it moves on (back in its history,
+    /// else Home) and it drops out of every history and the recent list.
+    func trash(_ path: String) {
+        guard let root else { return }
+        let gone: (String) -> Bool = { $0 == path || $0.hasPrefix(path + "/") }
+        if let c = currentPath, gone(c) { flushSave() }   // the Trash gets the latest words
+        let affected = Array(Set((snapshot?.notes.keys.filter(gone) ?? []) + [path])).sorted()
+        NSWorkspace.shared.recycle([root.appendingPathComponent(path)]) { [weak self] _, err in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let err { self.toast = "Couldn’t move to Trash: \(err.localizedDescription)"; return }
+                self.afterTrash(affected, gone: gone, name: (path as NSString).lastPathComponent)
+            }
+        }
+    }
+
+    private func afterTrash(_ affected: [String], gone: (String) -> Bool, name: String) {
+        snapshot?.refresh(paths: affected)
+        recent.removeAll(where: gone)
+        UserDefaults.standard.set(recent, forKey: key("recent"))
+        func purge(_ h: inout [NavEntry], _ idx: inout Int) {
+            var out: [NavEntry] = [], newIdx = idx
+            for (i, e) in h.enumerated() {
+                if case .note(let p) = e.place, gone(p) { if i <= idx { newIdx -= 1 }; continue }
+                if let l = out.last, l.place == e.place { if i <= idx { newIdx -= 1 }; continue }   // A, ✕, A → A
+                out.append(e)
+            }
+            h = out
+            idx = out.isEmpty ? -1 : min(max(newIdx, 0), out.count - 1)
+        }
+        // unfocused panes
+        if isSplit {
+            for i in panes.indices.reversed() where i != focusedPane {
+                var h = panes[i].history, hi = panes[i].historyIndex
+                purge(&h, &hi)
+                panes[i].history = h; panes[i].historyIndex = hi
+                guard let p = panes[i].path, gone(p) else { continue }
+                if panes[i].history.indices.contains(panes[i].historyIndex), case .note(let np) = panes[i].history[panes[i].historyIndex].place,
+                   let n = snapshot?.notes[np] {
+                    panes[i].path = np; panes[i].text = n.content
+                } else {
+                    panes.remove(at: i)
+                    if i < focusedPane { focusedPane -= 1 }
+                }
+            }
+            if panes.count <= 1 { panes = []; focusedPane = 0 }
+        }
+        // the focused pane
+        purge(&history, &historyIndex)
+        if let c = currentPath, gone(c) {
+            currentPath = nil
+            suppressTextChange = true; text = ""; lastSaved = ""; suppressTextChange = false
+            if history.indices.contains(historyIndex), case .note = history[historyIndex].place { go(0) } else { openHome() }
+        }
+        toast = "Moved “\(name.hasSuffix(".md") ? String(name.dropLast(3)) : name)” to the Trash"
+        vaultMutated("Delete \(name)", paths: affected)
+    }
+
+    /// Structural changes (delete, rename, move) land here so git can commit them right away.
+    func vaultMutated(_ message: String, paths: [String]) {
+        chromeLog("vault: \(message) \(paths.count) path(s)")
+    }
 
     // MARK: Editing & saving
 
@@ -596,9 +679,11 @@ final class Workspace {
         if bookmarks.contains(p) { bookmarks.removeAll { $0 == p } } else { bookmarks.append(p) }
         UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
     }
-    func revealInFinder() { if let p = currentPath, let root { NSWorkspace.shared.activateFileViewerSelecting([root.appendingPathComponent(p)]) } }
-    func openInObsidian() {
-        guard let p = currentPath, let root else { return }
+    func revealInFinder() { if let p = currentPath { revealInFinder(p) } }
+    func revealInFinder(_ p: String) { if let root { NSWorkspace.shared.activateFileViewerSelecting([root.appendingPathComponent(p)]) } }
+    func openInObsidian() { if let p = currentPath { openInObsidian(p) } }
+    func openInObsidian(_ p: String) {
+        guard let root else { return }
         var c = URLComponents(); c.scheme = "obsidian"; c.host = "open"
         c.queryItems = [URLQueryItem(name: "vault", value: root.lastPathComponent), URLQueryItem(name: "file", value: p)]
         if let u = c.url { NSWorkspace.shared.open(u) }

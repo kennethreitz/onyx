@@ -493,7 +493,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note (to the Trash)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

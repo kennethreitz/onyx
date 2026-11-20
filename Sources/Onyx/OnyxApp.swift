@@ -114,6 +114,7 @@ struct OnyxApp: App {
 
     func boot() {
         apply(appearance)
+        TypeSelfTest.ws = ws
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
         let url = options.vault ?? UserDefaults.standard.string(forKey: "onyx.vault").map { URL(fileURLWithPath: $0) }
@@ -153,7 +154,9 @@ struct OnyxApp: App {
         }
         CommandGroup(after: .saveItem) {
             Button("Save") { ws.flushSave() }.keyboardShortcut("s")
-            Button("Move Note to Trash") { confirmTrash() }
+            Divider()
+            // ⌘⌫ (disabled while a palette is open, so text fields there keep it)
+            Button("Delete Note…") { ws.confirmTrashCurrent() }.keyboardShortcut(.delete).disabled(ws.currentPath == nil || ws.overlay != .none)
         }
         CommandMenu("Go") {
             Button("Today’s Daily Note") { ws.openDaily() }.keyboardShortcut("t")
@@ -220,14 +223,6 @@ struct OnyxApp: App {
         if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
     }
 
-    func confirmTrash() {
-        guard let n = ws.currentNote else { return }
-        let a = NSAlert()
-        a.messageText = "Move “\(n.name)” to the Trash?"
-        a.informativeText = "You can restore it from the Trash in Finder."
-        a.addButton(withTitle: "Move to Trash"); a.addButton(withTitle: "Cancel")
-        if a.runModal() == .alertFirstButtonReturn { ws.trashCurrent() }
-    }
 }
 
 /// Debug (ONYX_KEY_SELFTEST=1): offer every help-sheet shortcut to the window's view hierarchy
