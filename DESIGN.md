@@ -53,7 +53,8 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | ⌘D / ⇧⌘D | Split side by side / stacked |
 | ⌘W | Close the focused pane; with one pane, close the window |
 | ⌃⇥ / ⌃⇧⇥ | Next / previous pane (click also focuses) |
-| ⌘[ ⌘] | Previous / next daily note (history back / forward elsewhere) |
+| ⌘[ ⌘] | Back / forward through this pane's history (also mouse buttons 4/5, swipe) |
+| ⌥⌘[ ⌥⌘] | Previous / next daily note |
 | ⌘N | New note |
 | ⌃⌘F | Focus mode |
 | Esc | Put away the topmost layer (overlay → floating panel → inspector → focus mode) |
@@ -125,3 +126,16 @@ One matcher (`OnyxCore/QuickMatch.swift`) serves ⌘O, the command palette and `
 - **Keys:** ↑/↓ move, ↩ opens, ⌘↩ opens in a new split, ⇧↩ creates a note with the typed name
   (a `Folder/Name` query creates it in that folder). The Create row is shown whenever no note
   has exactly that name, and is preselected when nothing matches. Esc closes.
+
+## Back and forward
+
+Each pane keeps its own history (cap 200) of places: notes and the graph view (focus or atlas).
+Opening a note pushes an entry; going somewhere new from the middle of the history drops the
+forward entries, as in a browser. Each note entry remembers its source line at the top of the view and its mode, so going back
+lands where you were reading or writing, in read or edit mode. Closing the graph (Esc, ⌘G) counts as a step back, so ⌘] reopens it.
+Notes deleted since are skipped. Splitting copies the history into both panes.
+
+Triggers: ⌘[ / ⌘] (Go menu, also caught by the window's key monitor so the editor and web
+view can't claim them), mouse buttons 4/5, three-finger "swipe between pages", and a two-finger
+horizontal swipe when the system setting allows it (outside overlays). The title bar shows
+‹ before the path and › after the title, dimmed when there's nowhere to go. The graph header has both chevrons side by side.

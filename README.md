@@ -71,7 +71,8 @@ keep working right alongside it.
 | <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked |
 | <kbd>⌘W</kbd> | Close the focused pane (the window, when there's one pane) |
 | <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane (or just click one) |
-| <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Previous / next daily note (back / forward elsewhere) |
+| <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
+| <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
 | <kbd>⌘N</kbd> | New note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌘,</kbd> | Settings |

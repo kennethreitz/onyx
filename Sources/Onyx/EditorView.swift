@@ -203,6 +203,7 @@ struct EditorView: NSViewRepresentable {
         let start = ws.initialTop(paneID)
         scroll.contentView.postsBoundsChangedNotifications = true
         scroll.onResize = { [weak c] in c?.holdAnchor() }
+        c.scrollHandled = ws.scrollRequest?.id   // a new view opens at initialTop; don't replay old requests
         c.anchor = start
         NotificationCenter.default.addObserver(c, selector: #selector(Coordinator.scrolled), name: NSView.boundsDidChangeNotification, object: scroll.contentView)
         if start > 0 {
@@ -224,6 +225,13 @@ struct EditorView: NSViewRepresentable {
             c.loadedToken = ws.renderToken
             if tv.string != text { c.load(text, keepSelection: c.loadedPath == path) }
             c.loadedPath = path
+        }
+        // back/forward: land where you were (after any reload above)
+        if live, let r = ws.scrollRequest, r.id != c.scrollHandled {
+            c.scrollHandled = r.id
+            c.anchor = r.line
+            c.restoring = true
+            c.restore(r.line, caret: true, tries: 30)
         }
         if live, let line = ws.editorJump {
             DispatchQueue.main.async { c.reveal(line: line); ws.editorJump = nil }
@@ -253,6 +261,7 @@ struct EditorView: NSViewRepresentable {
         var typeKey = ""
         var restoring = false
         var anchor: Double = 0   // last position the writer chose (scroll or restore)
+        var scrollHandled: Int?
         private var reportQueued = false
         private var rhymeTask: Task<Void, Never>?
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }

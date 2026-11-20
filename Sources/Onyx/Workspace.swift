@@ -46,8 +46,12 @@ final class Workspace {
     var text: String = "" { didSet { if text != oldValue { textDidChange() } } }
     private(set) var lastSaved: String = ""
     var mode: ViewMode = .read
-    private(set) var history: [String] = []
+    /// Back/forward for the focused pane (each split pane keeps its own; see Pane).
+    private(set) var history: [NavEntry] = []
     private(set) var historyIndex = -1
+    /// A source line for the live editor/reader to scroll to (going back restores your place).
+    private(set) var scrollRequest: ScrollRequest? = nil
+    @ObservationIgnored private var navigating = false
     var recent: [String] = []
     var bookmarks: [String] = []
     var conflict: String? = nil          // disk content that differs from both buffer and last save
@@ -85,10 +89,16 @@ final class Workspace {
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
     var inspectorTab: InspectorTab = .outline
-    var overlay: Overlay = .none
+    var overlay: Overlay = .none { didSet { if overlay != oldValue { overlayChanged(from: oldValue) } } }
     var searchQuery = ""
     var focusSearch = 0
-    var graphAtlas = false
+    var graphAtlas = false {
+        didSet {   // atlas ⇄ focus inside the graph updates its history entry rather than adding one
+            if overlay == .graph, history.indices.contains(historyIndex), case .graph = history[historyIndex].place {
+                history[historyIndex].place = .graph(atlas: graphAtlas)
+            }
+        }
+    }
     var rhymesOn = false
     var sidenotes = true
     var externalPulse: Date? = nil
@@ -183,6 +193,7 @@ final class Workspace {
         selectedFolder = nil
         guard let snap = snapshot, let note = snap.notes[path] else { return }
         flushSave()
+        if recordHistory { pushHistory(.note(path)) }
         if currentPath != path { liveTop = 0 }
         currentPath = path
         conflict = nil
@@ -191,10 +202,6 @@ final class Workspace {
         lastSaved = note.content
         suppressTextChange = false
         renderToken += 1
-        if recordHistory {
-            if historyIndex < history.count - 1 { history.removeSubrange((historyIndex + 1)...) }
-            history.append(path); historyIndex = history.count - 1
-        }
         recent.removeAll { $0 == path }
         recent.insert(path, at: 0)
         if recent.count > 50 { recent.removeLast(recent.count - 50) }
@@ -206,13 +213,71 @@ final class Workspace {
             readerJump = idx; editorJump = note.summary.headings[idx].line
         }
         if !sidebarPinned { sidebarVisible = false }
-        if overlay != .none { overlay = .none }
+        if overlay != .none { navigating = true; overlay = .none; navigating = false }
     }
+
+    // MARK: Back / forward (⌘[ ⌘], mouse buttons, swipe)
 
     var canGoBack: Bool { historyIndex > 0 }
     var canGoForward: Bool { historyIndex < history.count - 1 }
-    func goBack() { guard canGoBack else { return }; historyIndex -= 1; openNote(history[historyIndex], recordHistory: false) }
-    func goForward() { guard canGoForward else { return }; historyIndex += 1; openNote(history[historyIndex], recordHistory: false) }
+    func goBack() { go(-1) }
+    func goForward() { go(1) }
+
+    /// Remember where we are in the current entry before leaving it.
+    private func saveHistoryPlace() {
+        guard history.indices.contains(historyIndex), case .note(let p) = history[historyIndex].place, p == currentPath else { return }
+        history[historyIndex].top = liveTop
+        history[historyIndex].mode = mode
+    }
+
+    private func pushHistory(_ place: NavEntry.Place) {
+        saveHistoryPlace()
+        if history.indices.contains(historyIndex), history[historyIndex].place == place { return }
+        if historyIndex < history.count - 1 { history.removeSubrange((historyIndex + 1)...) }
+        history.append(NavEntry(place: place, mode: mode))
+        historyIndex = history.count - 1
+        if history.count > 200 { history.removeFirst(history.count - 200); historyIndex = history.count - 1 }
+    }
+
+    private func go(_ step: Int) {
+        let j = historyIndex + step
+        guard history.indices.contains(j) else { return }
+        // a note that's gone (trashed, renamed elsewhere) is skipped
+        if case .note(let p) = history[j].place, snapshot?.notes[p] == nil {
+            history.remove(at: j)
+            if step < 0 { historyIndex = j } // current entry slid down into j
+            return go(step)
+        }
+        saveHistoryPlace()
+        historyIndex = j
+        let e = history[j]
+        navigating = true
+        defer { navigating = false }
+        switch e.place {
+        case .note(let p):
+            if overlay != .none { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .none } }
+            if p != currentPath { openNote(p, recordHistory: false) }
+            if let m = e.mode, m != mode { mode = m }
+            liveTop = e.top
+            scrollRequest = ScrollRequest(line: e.top, id: (scrollRequest?.id ?? 0) + 1)
+        case .graph(let atlas):
+            graphAtlas = atlas
+            if overlay != .graph { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .graph } }
+        }
+        chromeLog("history \(step < 0 ? "back" : "forward") → \(historyIndex)/\(history.count) \(e.place) top=\(String(format: "%.1f", e.top))")
+    }
+
+    /// Opening the graph is a place you can go back to; closing it (Esc, ⌘G) steps back to
+    /// the note and leaves the graph one ⌘] away.
+    private func overlayChanged(from old: Overlay) {
+        guard !navigating else { return }
+        if overlay == .graph, old != .graph {
+            pushHistory(.graph(atlas: graphAtlas))
+        } else if old == .graph, overlay != .graph,
+                  history.indices.contains(historyIndex), case .graph = history[historyIndex].place, historyIndex > 0 {
+            historyIndex -= 1
+        }
+    }
 
     // MARK: Daily notes
 
@@ -535,7 +600,20 @@ struct Pane: Identifiable, Equatable {
     var path: String?
     var text: String
     var mode: ViewMode
+    var history: [NavEntry] = []
+    var historyIndex = -1
 }
+
+/// One stop in back/forward: a note (with where you were in it and how you were viewing it)
+/// or the graph.
+struct NavEntry: Equatable {
+    enum Place: Equatable { case note(String), graph(atlas: Bool) }
+    var place: Place
+    var top: Double = 0
+    var mode: ViewMode? = nil
+}
+
+struct ScrollRequest: Equatable { var line: Double; var id: Int }
 
 /// .vertical = side by side (⌘D), .horizontal = stacked (⇧⌘D), as in iTerm and VS Code.
 enum SplitAxis { case vertical, horizontal }
@@ -548,6 +626,9 @@ extension Workspace {
         panes[focusedPane].path = currentPath
         panes[focusedPane].text = text
         panes[focusedPane].mode = mode
+        saveHistoryPlace()
+        panes[focusedPane].history = history
+        panes[focusedPane].historyIndex = historyIndex
         paneTop[panes[focusedPane].id] = liveTop
     }
 
@@ -564,12 +645,13 @@ extension Workspace {
     /// ⌘D / ⇧⌘D: split the focused pane; the new pane shows the same note and takes focus.
     func split(_ axis: SplitAxis) {
         flushSave()
-        if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode)]; focusedPane = 0 }
+        if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)]; focusedPane = 0 }
         guard panes.count < 4 else { toast = "Four panes is the limit"; return }
         captureFocused()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             splitAxis = axis
-            let fresh = Pane(id: UUID(), path: currentPath, text: text, mode: mode)
+            // like duplicating a browser tab, the new pane starts with the same history
+            let fresh = Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)
             paneTop[fresh.id] = liveTop   // the new pane opens where the source pane is
             panes.insert(fresh, at: focusedPane + 1)
             focusedPane += 1
@@ -584,7 +666,8 @@ extension Workspace {
         captureFocused()
         focusedPane = i
         let p = panes[i]
-        if let path = p.path, path != currentPath { openNote(path) }
+        if let path = p.path, path != currentPath { openNote(path, recordHistory: false) }
+        history = p.history; historyIndex = p.historyIndex
         liveTop = paneTop[p.id] ?? 0
         mode = p.mode
         chromeLog("focusPane \(i) → \(currentPath ?? "-") \(mode)")
@@ -605,7 +688,8 @@ extension Workspace {
             focusedPane = min(focusedPane, panes.count - 1)
         }
         let p = panes[focusedPane]
-        if let path = p.path, path != currentPath { openNote(path) }
+        if let path = p.path, path != currentPath { openNote(path, recordHistory: false) }
+        history = p.history; historyIndex = p.historyIndex
         liveTop = paneTop[p.id] ?? liveTop
         mode = p.mode
         if panes.count == 1 { panes = [] ; focusedPane = 0 }

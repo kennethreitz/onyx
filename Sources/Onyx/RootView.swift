@@ -22,6 +22,7 @@ struct RootView: View {
     @State private var keyMonitor: Any?
     @State private var moveMonitor: Any?
     @State private var clickMonitor: Any?
+    @State private var navMonitor: Any?
 
     // Drag the inner edge to resize; double-click it to reset. Persisted per panel.
     static let sidebarDefault = 270.0, sidebarRange = 140.0...560.0
@@ -58,7 +59,8 @@ struct RootView: View {
         .ignoresSafeArea()
         .background(WindowConfigurator(showLights: !ws.focusMode || showLights || ws.anyChrome || ws.root == nil))
         .onAppear(perform: installMonitors)
-        .onDisappear { [keyMonitor, moveMonitor, clickMonitor] in
+        .onDisappear { [keyMonitor, moveMonitor, clickMonitor, navMonitor] in
+            if let navMonitor { NSEvent.removeMonitor(navMonitor) }
             if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
             if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
             if let moveMonitor { NSEvent.removeMonitor(moveMonitor) }
@@ -71,6 +73,7 @@ struct RootView: View {
         VStack(spacing: 0) {
             HStack(spacing: 5) {
                 if let n = ws.currentNote {
+                    NavChevrons(ws: ws, only: .back).padding(.trailing, 3)
                     let parts = n.folder.isEmpty ? [] : n.folder.split(separator: "/").map(String.init)
                     ForEach(Array(parts.enumerated()), id: \.offset) { i, name in
                         PathSegment(text: name, color: Color.faint.opacity(0.85), help: "Reveal \(name) in the sidebar") {
@@ -86,6 +89,7 @@ struct RootView: View {
                     } else if ws.isDirty {
                         Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity)
                     }
+                    NavChevrons(ws: ws, only: .forward).padding(.leading, 3)
                 }
             }
             .onChange(of: ws.copiedFlash) {
@@ -408,9 +412,44 @@ struct RootView: View {
                e.window != nil, e.window === MainWindow.current {
                 ws.toggleInspector(); return nil
             }
+            // ⌘[ / ⌘]: back/forward. Here as well as in the Go menu so the web view and the
+            // text view can never claim them first; not while a palette or sheet is up.
+            if mods == [.command], let ch = e.charactersIgnoringModifiers, ch == "[" || ch == "]",
+               e.window != nil, e.window === MainWindow.current, ws.overlay == .none || ws.overlay == .graph {
+                ch == "[" ? ws.goBack() : ws.goForward(); return nil
+            }
             if e.keyCode == 53 { // Esc
                 if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
                 return ws.dismissTop() ? nil : e
+            }
+            return e
+        }
+        // Back/forward: mouse buttons 4/5, three-finger swipe ("swipe between pages"), and a
+        // two-finger horizontal swipe when the system setting allows it.
+        navMonitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown, .swipe, .scrollWheel]) { e in
+            guard e.window != nil, e.window === MainWindow.current else { return e }
+            switch e.type {
+            case .otherMouseDown:
+                if e.buttonNumber == 3 { ws.goBack(); return nil }
+                if e.buttonNumber == 4 { ws.goForward(); return nil }
+            case .swipe:
+                if e.deltaX > 0 { ws.goBack(); return nil }
+                if e.deltaX < 0 { ws.goForward(); return nil }
+            case .scrollWheel:
+                guard ws.overlay == .none, e.phase == .began, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
+                      abs(e.scrollingDeltaX) > abs(e.scrollingDeltaY) * 2, ws.canGoBack || ws.canGoForward else { return e }
+                var fired = false
+                e.trackSwipeEvent(options: [.lockDirection, .clampGestureAmount],
+                                  dampenAmountThresholdMin: ws.canGoForward ? -1 : 0, max: ws.canGoBack ? 1 : 0) { amount, phase, complete, _ in
+                    // positive amount = fingers moving right = back, as in Safari
+                    if phase == .ended, !fired, abs(amount) >= 0.5 {
+                        fired = true
+                        DispatchQueue.main.async { amount > 0 ? ws.goBack() : ws.goForward() }
+                    }
+                    _ = complete
+                }
+                return nil
+            default: break
             }
             return e
         }
@@ -453,7 +492,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 
@@ -517,6 +556,43 @@ struct WelcomeView: View {
 
 
 /// One clickable piece of the title path: quiet until hovered, then underlined with a pointer.
+/// The quiet ‹ › flanking the title path (‹ folder / Note ›), side by side in the graph header. Dim when there's
+/// nowhere to go; a hint of ink on hover.
+struct NavChevrons: View {
+    enum Which { case both, back, forward }
+    @Bindable var ws: Workspace
+    var only: Which = .both
+    var body: some View {
+        HStack(spacing: 1) {
+            if only != .forward { chevron("chevron.left", enabled: ws.canGoBack, help: "Back (⌘[)") { ws.goBack() } }
+            if only != .back { chevron("chevron.right", enabled: ws.canGoForward, help: "Forward (⌘])") { ws.goForward() } }
+        }
+    }
+    func chevron(_ symbol: String, enabled: Bool, help: String, action: @escaping () -> Void) -> some View {
+        NavChevronButton(symbol: symbol, enabled: enabled, action: action).help(help)
+    }
+}
+
+struct NavChevronButton: View {
+    var symbol: String
+    var enabled: Bool
+    var action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(enabled ? (hover ? Color.ink : Color.muted) : Color.faint.opacity(0.4))
+                .frame(width: 18, height: 20)
+                .background(RoundedRectangle(cornerRadius: 4).fill(Color.ink.opacity(hover && enabled ? 0.06 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+    }
+}
+
 struct PathSegment: View {
     let text: String
     let color: Color

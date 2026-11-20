@@ -49,6 +49,7 @@ struct ReaderView: NSViewRepresentable {
         let c = Coordinator(ws: ws)
         c.paneID = paneID
         c.startLine = ws.initialTop(paneID)   // open where this pane was (⌘↩ or a fresh split)
+        c.scrollHandled = ws.scrollRequest?.id
         return c
     }
 
@@ -83,6 +84,10 @@ struct ReaderView: NSViewRepresentable {
             c.typeKey = "\(fontSize)/\(measure)"
             c.eval("Onyx.setType(\(fontSize), \(measure))")
         }
+        if source == nil, let r = ws.scrollRequest, r.id != c.scrollHandled {
+            c.scrollHandled = r.id
+            c.eval("Onyx.scrollToLine(\(r.line))")
+        }
         if source == nil, let j = ws.readerJump {
             c.eval("Onyx.scrollToHeading(\(j))")
             DispatchQueue.main.async { ws.readerJump = nil }
@@ -104,6 +109,7 @@ struct ReaderView: NSViewRepresentable {
         var typeKey = ""
         var paneID: UUID?
         var startLine: Double = 0
+        var scrollHandled: Int?
 
         init(ws: Workspace) { self.ws = ws }
 

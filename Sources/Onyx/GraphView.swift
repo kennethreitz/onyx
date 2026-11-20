@@ -628,6 +628,7 @@ struct GraphView: View {
 
     var header: some View {
         HStack(spacing: 12) {
+            NavChevrons(ws: ws)
             Picker("", selection: $ws.graphAtlas) {
                 Text("Focus").tag(false)
                 Text("Atlas").tag(true)
