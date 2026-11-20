@@ -7,12 +7,26 @@ public struct ObsidianAPI: Sendable {
     public struct HTTPError: Error { public let status: Int }
 
     public var baseURL: URL
-    /// Obsidian's own headless CLI sends `obsidian-headless/<version>`; the desktop app sends none.
+    /// Sent on every request. Obsidian's official headless CLI sends `obsidian-headless/<version>` (set once at
+    /// startup via `Jr(...)`); the Electron desktop app sends Chromium's. nil leaves URLSession's default.
     public var userAgent: String?
     public var session: URLSession
 
-    public init(baseURL: URL = URL(string: "https://api.obsidian.md")!, userAgent: String? = "Onyx", session: URLSession = .shared) {
+    /// The User-Agent of the official `obsidian-headless` 0.0.14 CLI, the client whose signin we mirror.
+    public static let headlessUserAgent = "obsidian-headless/0.0.14"
+    /// `obsidian-headless` signs in with `{preflight: true, headers: {Origin: "https://obsidian.md"}}`.
+    public static let signInOrigin = "https://obsidian.md"
+
+    public init(baseURL: URL = URL(string: "https://api.obsidian.md")!, userAgent: String? = ObsidianAPI.headlessUserAgent,
+                session: URLSession = .shared) {
         self.baseURL = baseURL; self.userAgent = userAgent; self.session = session
+    }
+
+    /// Thrown by `signIn` when the account has 2FA and no (or an empty) code was sent: the server's error
+    /// mentions "2FA code" (but not "2FA code is incorrect"). Prompt for the code and call `signIn` again.
+    public static func needsMFA(_ error: Error) -> Bool {
+        guard let e = error as? APIError else { return false }
+        return e.message.contains("2FA code") && !e.message.contains("2FA code is incorrect")
     }
 
     public struct SignIn: Decodable, Sendable { public let token: String?; public let email: String?; public let name: String?; public let license: String? }
@@ -33,8 +47,14 @@ public struct ObsidianAPI: Sendable {
     public struct Region: Decodable, Sendable { public let name: String; public let value: String }
     public struct Regions: Decodable, Sendable { public let regions: [Region] }
 
+    /// Exactly what `obsidian-headless` sends (cli.js `As`): an OPTIONS preflight, then a POST with
+    /// `Origin: https://obsidian.md`, `Content-Type: application/json` and body `{email, password, mfa}`.
+    /// Values are sent verbatim: no trimming, case-folding or Unicode normalisation. The CLI first sends
+    /// `mfa: ""`, and only when the server answers with a "2FA code" error prompts and retries with the code
+    /// (see `needsMFA`).
     public func signIn(email: String, password: String, mfa: String = "") async throws -> SignIn {
-        try await post("/user/signin", ["email": email, "password": password, "mfa": mfa])
+        try await post("/user/signin", ["email": email, "password": password, "mfa": mfa],
+                       preflight: true, headers: ["Origin": Self.signInOrigin])
     }
     public func signOut(token: String) async throws { let _: Empty = try await post("/user/signout", ["token": token]) }
     public func listVaults(token: String, supportedEncryptionVersion: Int = ObsidianCrypto.currentEncryptionVersion) async throws -> VaultList {
@@ -60,12 +80,22 @@ public struct ObsidianAPI: Sendable {
 
     struct Empty: Decodable {}
 
-    func post<T: Decodable>(_ path: String, _ body: [String: Any]) async throws -> T {
-        var req = URLRequest(url: baseURL.appendingPathComponent(String(path.dropFirst())))
+    /// Mirrors obsidian-headless `z(path, body, {preflight, headers})`.
+    func post<T: Decodable>(_ path: String, _ body: [String: Any], preflight: Bool = false, headers: [String: String] = [:]) async throws -> T {
+        let url = baseURL.appendingPathComponent(String(path.dropFirst()))
+        var common = headers
+        if let userAgent { common["User-Agent"] = userAgent }
+        if preflight {
+            var opt = URLRequest(url: url)
+            opt.httpMethod = "OPTIONS"
+            for (k, v) in common { opt.setValue(v, forHTTPHeaderField: k) }
+            _ = try await session.data(for: opt)   // result ignored, as in the CLI
+        }
+        var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        for (k, v) in common { req.setValue(v, forHTTPHeaderField: k) }
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let userAgent { req.setValue(userAgent, forHTTPHeaderField: "User-Agent") }
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [.withoutEscapingSlashes])
         let (data, resp) = try await session.data(for: req)
         if let http = resp as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw HTTPError(status: http.statusCode) }
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any], let err = obj["error"] {

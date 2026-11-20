@@ -24,7 +24,7 @@ the body (not a header).
 
 | Path | Body | Response (fields used by the client) |
 |---|---|---|
-| `/user/signin` | `email, password, mfa` | `token, email, name, license` |
+| `/user/signin` | `email, password, mfa` (verbatim; `mfa: ""` first) | `token, email, name, license`. 2FA accounts get an error containing "2FA code"; retry with the code. **obsidian-headless sends an `OPTIONS` preflight first and `Origin: https://obsidian.md` on both requests** — mirror that exactly (see below) |
 | `/user/signout` | `token` | |
 | `/user/info` | `token` | account info |
 | `/user/authtoken` | `token` | (token refresh/exchange) |
@@ -37,6 +37,13 @@ the body (not a header).
 | `/vault/rename` | `token, vault_uid, name` | |
 | `/vault/delete` | `token, vault_uid` | |
 | `/vault/share/{list,invite,remove}` | `token, vault_uid, email / share_uid` | |
+
+**Sign-in, exactly as `ob login` does it** (cli.js 0.0.14, `As` → `z`): `OPTIONS /user/signin` with
+`Origin: https://obsidian.md` + `User-Agent: obsidian-headless/0.0.14`, then `POST /user/signin` with those two plus
+`Content-Type: application/json` and `{"email","password","mfa"}` as typed (its prompt strips only the newline; no
+trim/lowercase/NFKC). First attempt uses `mfa: ""`; on an error containing "2FA code" (but not "2FA code is
+incorrect") it prompts and resends. Onyx's first attempt (no preflight, no Origin, `User-Agent: Onyx-sync-poc`,
+code sent up front, password via getpass) was refused with "Login failed, please double check your email and password."
 
 Vault object (from `/vault/list`): `id, name, host, salt, password?, encryption_version, share_uid?`, plus size
 fields. `host` is the websocket host, e.g. `sync-NN.obsidian.md` **[guess on exact naming; it's whatever the server returns]**.

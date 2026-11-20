@@ -14,10 +14,17 @@ import OnyxSync
 let prefix = "onyx-throwaway-"
 let keep = CommandLine.arguments.contains("--keep")
 
+/// Prompts like obsidian-headless's `Ke`: the line exactly as typed, minus the newline (no trimming).
+/// Secrets use readpassphrase(3) with a 4 KB buffer: getpass(3) on macOS silently truncates at 128 chars.
 func ask(_ prompt: String, secret: Bool = false) -> String {
-    if secret { return String(cString: getpass(prompt)) }
+    if secret {
+        var buf = [CChar](repeating: 0, count: 4096)
+        guard readpassphrase(prompt, &buf, buf.count, RPP_REQUIRE_TTY) != nil else { return "" }
+        defer { for i in buf.indices { buf[i] = 0 } }
+        return String(cString: buf)
+    }
     print(prompt, terminator: ""); fflush(stdout)
-    return readLine() ?? ""
+    return readLine(strippingNewline: true) ?? ""
 }
 func step(_ s: String) { print("→ \(s)") }
 func ok(_ s: String) { print("  ✓ \(s)") }
@@ -30,7 +37,7 @@ func next(_ it: inout AsyncStream<SyncEvent>.AsyncIterator) async throws -> Sync
     return e
 }
 
-let api = ObsidianAPI(userAgent: "Onyx-sync-poc")
+let api = ObsidianAPI()   // same headers as the official obsidian-headless CLI
 print("""
 Onyx ⇄ Obsidian Sync proof of concept
 This signs in, creates a new end-to-end-encrypted vault named \(prefix)…, syncs a few test files
@@ -39,13 +46,17 @@ through it, verifies them, and \(keep ? "leaves it in place" : "deletes it"). Yo
 guard ask("Continue? [yes/no] ") == "yes" else { exit(0) }
 let email = ask("Obsidian email: ")
 let password = ask("Obsidian password: ", secret: true)
-let mfa = ask("2FA code (blank if none): ")
 
 var token = ""
 var created: ObsidianAPI.RemoteVault?
 do {
     step("Signing in")
-    let s = try await api.signIn(email: email, password: password, mfa: mfa)
+    // Same order as `ob login`: try without a code; if the server asks for one, prompt then retry.
+    var s: ObsidianAPI.SignIn
+    do { s = try await api.signIn(email: email, password: password, mfa: "") }
+    catch where ObsidianAPI.needsMFA(error) {
+        s = try await api.signIn(email: email, password: password, mfa: ask("2FA code: "))
+    }
     guard let t = s.token else { throw Fail(description: "no token in signin response") }
     token = t; ok("signed in")
 
