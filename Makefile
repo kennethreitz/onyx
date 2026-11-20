@@ -24,6 +24,7 @@ dev:
 
 test:
 	swift test
+	node --test Tests/reader
 
 icon:
 	@[ -f build/Onyx.icns ] || swift scripts/make-icon.swift build

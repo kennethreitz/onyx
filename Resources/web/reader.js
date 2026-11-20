@@ -109,10 +109,13 @@
     },
   };
 
-  const mainMarked = new marked.Marked({ gfm: true, breaks: false });
+  // breaks: Obsidian's default ("Strict line breaks" off): a single newline inside a paragraph
+  // is a line break; blank lines still separate paragraphs. Code, tables and list structure are
+  // unaffected (marked only applies it to inline text).
+  const mainMarked = new marked.Marked({ gfm: true, breaks: true });
   mainMarked.use({ extensions: [wikilink, highlight, tag], renderer });
   if (window.markedFootnote) mainMarked.use(markedFootnote({ description: 'Notes', refMarkers: false }));
-  const embedMarked = new marked.Marked({ gfm: true });
+  const embedMarked = new marked.Marked({ gfm: true, breaks: true });
   embedMarked.use({ extensions: [wikilink, highlight, tag], renderer });
 
   function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, m => m.replace(/[^\n]/g, '')); }  // keep line numbers
@@ -297,6 +300,8 @@
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');
     },
     scrollToLine(line) { restoreLine(line); },
+    // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
+    _html(md) { return parseWithLines(stripComments(md), 0); },
     scrollToHeading(i) {
       const hs = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
       const h = hs[i];
