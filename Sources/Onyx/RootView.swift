@@ -21,6 +21,7 @@ struct RootView: View {
     @State private var showLights = false
     @State private var keyMonitor: Any?
     @State private var moveMonitor: Any?
+    @State private var clickMonitor: Any?
 
     let sidebarWidth: CGFloat = 270
     let inspectorWidth: CGFloat = 300
@@ -51,7 +52,8 @@ struct RootView: View {
         .ignoresSafeArea()
         .background(WindowConfigurator(showLights: !ws.focusMode || showLights || ws.anyChrome || ws.root == nil))
         .onAppear(perform: installMonitors)
-        .onDisappear { [keyMonitor, moveMonitor] in
+        .onDisappear { [keyMonitor, moveMonitor, clickMonitor] in
+            if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
             if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
             if let moveMonitor { NSEvent.removeMonitor(moveMonitor) }
         }
@@ -60,7 +62,7 @@ struct RootView: View {
     // MARK: Title line — the note, its folder a shade lighter
 
     var titleLine: some View {
-        VStack {
+        VStack(spacing: 0) {
             HStack(spacing: 5) {
                 if let n = ws.currentNote {
                     let parts = n.folder.isEmpty ? [] : n.folder.split(separator: "/").map(String.init)
@@ -89,6 +91,12 @@ struct RootView: View {
             .padding(.horizontal, 90)
             .frame(maxWidth: .infinity)
             .frame(height: 28)
+            .background(alignment: .top) {
+                // body text scrolls up under a soft paper fade instead of colliding with the path
+                LinearGradient(stops: [.init(color: Color.paper, location: 0), .init(color: Color.paper, location: 0.55), .init(color: Color.paper.opacity(0), location: 1)],
+                               startPoint: .top, endPoint: .bottom)
+                    .frame(height: 46).allowsHitTesting(false)
+            }
             Spacer().allowsHitTesting(false)
         }
     }
@@ -102,6 +110,7 @@ struct RootView: View {
                 FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
                 FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
                 FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
+                FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
                 FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
                 FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
                 FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
@@ -192,12 +201,49 @@ struct RootView: View {
                         }
                     }
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if ws.isSplit {
+                splitPanes
             } else if ws.mode == .edit {
                 EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
             } else {
                 ReaderView(ws: ws, fontSize: readerSize, measure: measure).transition(.opacity)
             }
             if let disk = ws.conflict { conflictBanner(disk) }
+        }
+    }
+
+    // MARK: Split panes — hairline dividers; each pane keeps its own note and mode
+
+    @ViewBuilder var splitPanes: some View {
+        let layout = ws.splitAxis == .vertical ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+        layout {
+            ForEach(Array(ws.panes.enumerated()), id: \.element.id) { i, pane in
+                if i > 0 {
+                    Rectangle().fill(Color.hairline)
+                        .frame(width: ws.splitAxis == .vertical ? 0.8 : nil, height: ws.splitAxis == .horizontal ? 0.8 : nil)
+                        .padding(ws.splitAxis == .vertical ? .vertical : .horizontal, ws.splitAxis == .vertical ? 0 : 24)
+                }
+                paneView(i, pane)
+                    .padding(.top, ws.splitAxis == .horizontal && i > 0 ? 8 : 0)
+                    .background(GeometryReader { g in
+                        Color.clear
+                            .onAppear { ws.paneFrames[pane.id] = g.frame(in: .global) }
+                            .onChange(of: g.frame(in: .global)) { ws.paneFrames[pane.id] = g.frame(in: .global) }
+                    })
+                    .opacity(i == ws.focusedPane ? 1 : 0.86)
+            }
+        }
+        .onDisappear { ws.paneFrames = [:] }
+    }
+
+    @ViewBuilder func paneView(_ i: Int, _ pane: Pane) -> some View {
+        let focused = i == ws.focusedPane
+        let mode = focused ? ws.mode : pane.mode
+        let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
+        if mode == .edit {
+            EditorView(ws: ws, fontSize: editorSize, measure: measure, source: src).id("\(pane.id)-e")
+        } else {
+            ReaderView(ws: ws, fontSize: readerSize, measure: measure, source: src).id("\(pane.id)-r")
         }
     }
 
@@ -329,6 +375,11 @@ struct RootView: View {
             if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
                 ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
             }
+            // ⌘W: close the focused pane when split; otherwise let the window close
+            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "w", ws.isSplit, e.window?.isKeyWindow == true,
+               !(e.window is NSPanel), ws.overlay == .none {
+                ws.closePane(); return nil
+            }
             // ⌘I: the inspector, even while the editor has focus (NSTextView otherwise
             // swallows ⌘I before the menu sees it, so a docked inspector couldn't be put away).
             if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "i", e.window?.isKeyWindow == true,
@@ -339,6 +390,13 @@ struct RootView: View {
                 if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
                 return ws.dismissTop() ? nil : e
             }
+            return e
+        }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { e in
+            // a click in an unfocused pane focuses it first, then the click lands as usual
+            guard ws.isSplit, ws.overlay == .none, let w = e.window, let content = w.contentView else { return e }
+            let p = CGPoint(x: e.locationInWindow.x, y: content.bounds.height - e.locationInWindow.y)
+            if let i = ws.panes.firstIndex(where: { ws.paneFrames[$0.id]?.contains(p) == true }), i != ws.focusedPane { ws.focusPane(i) }
             return e
         }
         moveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { e in
@@ -373,7 +431,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Files"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph · ⇧⌘G atlas"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

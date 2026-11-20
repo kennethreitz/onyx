@@ -39,6 +39,9 @@ keep working right alongside it.
 - **Built in, not bolted on**: daily notes, backlinks, outline, properties, bookmarks, recent
   files, search, a quick switcher and a command palette, Dataview-style `TABLE`/`LIST`
   queries, Kanban boards, git status and commit, and RhymePad highlighting for verse.
+- **Split panes**: <kbd>⌘D</kbd> side by side, <kbd>⇧⌘D</kbd> stacked, up to four, divided by a
+  hairline. Each pane keeps its own note and its own read/edit mode; the title path follows
+  the focused one.
 - **Quiet chrome**: a whisper of a title path (click a folder to reveal it and open its folder
   note), an auto-dimming footer with word count, a sidebar that remembers itself, and a
   focus mode that leaves only text.
@@ -60,7 +63,10 @@ keep working right alongside it.
 | <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> | Focus graph · atlas |
 | <kbd>⌘↩</kbd> | Read ⇄ edit, and save (also <kbd>⌘E</kbd>) |
-| <kbd>⌘T</kbd> · <kbd>⌘\\</kbd> · <kbd>⌘D</kbd> | Today's daily note |
+| <kbd>⌘T</kbd> · <kbd>⌘\\</kbd> | Today's daily note |
+| <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked |
+| <kbd>⌘W</kbd> | Close the focused pane (the window, when there's one pane) |
+| <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane (or just click one) |
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Previous / next daily note (back / forward elsewhere) |
 | <kbd>⌘N</kbd> | New note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |

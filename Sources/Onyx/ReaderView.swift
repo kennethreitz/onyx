@@ -36,7 +36,12 @@ struct ReaderView: NSViewRepresentable {
     @Bindable var ws: Workspace
     var fontSize: Double = 19
     var measure: Double = 41
+    /// Set for an unfocused split pane: render this note instead of the focused one.
+    var source: (path: String?, text: String)? = nil
     @Environment(\.colorScheme) var scheme
+
+    var path: String? { source == nil ? ws.currentPath : source!.path }
+    var text: String { source?.text ?? ws.text }
 
     func makeCoordinator() -> Coordinator { Coordinator(ws: ws) }
 
@@ -61,16 +66,16 @@ struct ReaderView: NSViewRepresentable {
         c.ws = ws
         c.handler?.vaultRoot = ws.root
         let dark = scheme == .dark
-        if c.renderedToken != ws.renderToken || c.renderedPath != ws.currentPath || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != ws.text {
-            let sameNote = c.renderedPath == ws.currentPath
-            c.renderedToken = ws.renderToken; c.renderedPath = ws.currentPath; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = ws.text
+        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text {
+            let sameNote = c.renderedPath == path
+            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text
             c.render(keepScroll: sameNote)
         }
         if c.typeKey != "\(fontSize)/\(measure)" {
             c.typeKey = "\(fontSize)/\(measure)"
             c.eval("Onyx.setType(\(fontSize), \(measure))")
         }
-        if let j = ws.readerJump {
+        if source == nil, let j = ws.readerJump {
             c.eval("Onyx.scrollToHeading(\(j))")
             DispatchQueue.main.async { ws.readerJump = nil }
         }
@@ -101,8 +106,8 @@ struct ReaderView: NSViewRepresentable {
         }
 
         func render(keepScroll: Bool) {
-            guard let snap = ws.snapshot, let path = ws.currentPath else { return }
-            let payload = ReaderPayload.build(text: ws.text, path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll)
+            guard let snap = ws.snapshot, let path = renderedPath else { return }
+            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes, keepScroll: keepScroll)
             eval("Onyx.render(\(payload))")
         }
 

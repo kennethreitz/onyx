@@ -128,7 +128,12 @@ struct EditorView: NSViewRepresentable {
     @Bindable var ws: Workspace
     var fontSize: Double = 14
     var measure: Double = 41
+    /// Set for an unfocused split pane: show this note, read-only until the pane is focused.
+    var source: (path: String?, text: String)? = nil
     @Environment(\.colorScheme) var scheme
+
+    var path: String? { source == nil ? ws.currentPath : source!.path }
+    var text: String { source?.text ?? ws.text }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -173,8 +178,11 @@ struct EditorView: NSViewRepresentable {
         scroll.backgroundColor = Theme.paper
         scroll.automaticallyAdjustsContentInsets = false
         context.coordinator.textView = tv
-        context.coordinator.load(ws.text)
-        DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
+        context.coordinator.load(text)
+        context.coordinator.loadedPath = path
+        tv.isEditable = source == nil
+        context.coordinator.wasLive = source == nil
+        if source == nil { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) } }
         return scroll
     }
 
@@ -182,12 +190,16 @@ struct EditorView: NSViewRepresentable {
         let c = context.coordinator
         c.parent = self
         guard let tv = c.textView else { return }
-        if c.loadedToken != ws.renderToken || (tv.string != ws.text && !c.isEditing) {
+        let live = source == nil
+        if tv.isEditable != live { tv.isEditable = live }
+        if live && !c.wasLive { DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) } }
+        c.wasLive = live
+        if c.loadedToken != ws.renderToken || (tv.string != text && !c.isEditing) {
             c.loadedToken = ws.renderToken
-            if tv.string != ws.text { c.load(ws.text, keepSelection: c.loadedPath == ws.currentPath) }
-            c.loadedPath = ws.currentPath
+            if tv.string != text { c.load(text, keepSelection: c.loadedPath == path) }
+            c.loadedPath = path
         }
-        if let line = ws.editorJump {
+        if live, let line = ws.editorJump {
             DispatchQueue.main.async { c.reveal(line: line); ws.editorJump = nil }
         }
         if c.scheme != scheme { c.scheme = scheme; c.rehighlight() }
@@ -209,6 +221,7 @@ struct EditorView: NSViewRepresentable {
         var loadedToken = -1
         var loadedPath: String?
         var isEditing = false
+        var wasLive = true
         var scheme: ColorScheme?
         var rhymesOn = false
         var typeKey = ""
@@ -260,7 +273,7 @@ struct EditorView: NSViewRepresentable {
             guard let tv = textView, let ts = tv.textStorage else { return }
             isEditing = true
             highlighter.apply(to: ts)
-            parent.ws.text = tv.string
+            if parent.source == nil { parent.ws.text = tv.string }
             isEditing = false
             updateRhymes(force: false)
         }

@@ -86,6 +86,10 @@ enum PaletteCommands {
     @MainActor static func all(_ ws: Workspace, appearance: @escaping (String) -> Void) -> [PaletteItem] {
         [
             PaletteItem(id: "switcher", title: "Quick switcher", symbol: "doc.text.magnifyingglass", shortcut: "⌘O") { DispatchQueue.main.async { ws.show(.switcher) } },
+            PaletteItem(id: "split", title: "Split side by side", symbol: "rectangle.split.2x1", shortcut: "⌘D") { ws.split(.vertical) },
+            PaletteItem(id: "splitdown", title: "Split stacked", symbol: "rectangle.split.1x2", shortcut: "⇧⌘D") { ws.split(.horizontal) },
+            PaletteItem(id: "closepane", title: "Close pane", symbol: "xmark.square", shortcut: "⌘W") { ws.closePane() },
+            PaletteItem(id: "nextpane", title: "Next pane", symbol: "arrow.right.square", shortcut: "⌃⇥") { ws.focusNextPane() },
             PaletteItem(id: "daily", title: "Open today’s daily note", symbol: "calendar", shortcut: "⌘T  ⌘\\") { ws.openDaily() },
             PaletteItem(id: "daily-prev", title: "Previous daily note", symbol: "chevron.left", shortcut: "⌘[") { ws.openDaily(offset: -1) },
             PaletteItem(id: "daily-next", title: "Next daily note", symbol: "chevron.right", shortcut: "⌘]") { ws.openDaily(offset: 1) },

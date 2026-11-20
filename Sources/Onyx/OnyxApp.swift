@@ -133,7 +133,6 @@ struct OnyxApp: App {
         CommandMenu("Go") {
             Button("Today’s Daily Note") { ws.openDaily() }.keyboardShortcut("t")
             Button("Today’s Daily Note ") { ws.openDaily() }.keyboardShortcut("\\")
-            Button("Today’s Daily Note  ") { ws.openDaily() }.keyboardShortcut("d")
             Button("Previous Daily Note / Back") { if ws.currentPath?.hasPrefix(ws.dailyFolder + "/") == true { ws.openDaily(offset: -1) } else { ws.goBack() } }.keyboardShortcut("[")
             Button("Next Daily Note / Forward") { if ws.currentPath?.hasPrefix(ws.dailyFolder + "/") == true { ws.openDaily(offset: 1) } else { ws.goForward() } }.keyboardShortcut("]")
             Divider()
@@ -143,6 +142,14 @@ struct OnyxApp: App {
             Divider()
             Button("Focus Graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }.keyboardShortcut("g")
             Button("Atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }.keyboardShortcut("g", modifiers: [.command, .shift])
+        }
+        CommandMenu("Pane") {
+            Button("Split Side by Side") { ws.split(.vertical) }.keyboardShortcut("d")
+            Button("Split Stacked") { ws.split(.horizontal) }.keyboardShortcut("d", modifiers: [.command, .shift])
+            Button("Close Pane  (⌘W)") { ws.closePane() }.disabled(!ws.isSplit)
+            Divider()
+            Button("Next Pane") { ws.focusNextPane() }.keyboardShortcut(.tab, modifiers: .control).disabled(!ws.isSplit)
+            Button("Previous Pane") { ws.focusNextPane(-1) }.keyboardShortcut(.tab, modifiers: [.control, .shift]).disabled(!ws.isSplit)
         }
         CommandGroup(after: .toolbar) {
             Button(ws.mode == .read ? "Edit Note" : "Read Note") { ws.toggleMode() }.keyboardShortcut("e")

@@ -59,6 +59,12 @@ final class Workspace {
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
     var sidebarTab: SidebarTab = .files
+    // Split panes. Empty = one pane. The focused pane's note lives in currentPath/text/mode;
+    // the others keep their own path, text and mode until focused (swap model).
+    var panes: [Pane] = []
+    var focusedPane = 0
+    var splitAxis: SplitAxis = .vertical
+    var paneFrames: [UUID: CGRect] = [:]   // window coords, top-left origin
     var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
     var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
     var copiedFlash = 0                  // bump to flash "Copied" in the title line
@@ -506,4 +512,77 @@ func chromeLog(_ s: String) {
     guard ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil else { return }
     let st = Thread.callStackSymbols.dropFirst(2).prefix(6).map { l in l.split(separator: " ", omittingEmptySubsequences: true).dropFirst(3).first.map(String.init) ?? l }
     FileHandle.standardError.write("[chrome] \(s)  ← \(st.joined(separator: " ← "))\n".data(using: .utf8)!)
+}
+
+
+struct Pane: Identifiable, Equatable {
+    let id: UUID
+    var path: String?
+    var text: String
+    var mode: ViewMode
+}
+
+/// .vertical = side by side (⌘D), .horizontal = stacked (⇧⌘D), as in iTerm and VS Code.
+enum SplitAxis { case vertical, horizontal }
+
+extension Workspace {
+    var isSplit: Bool { panes.count > 1 }
+
+    private func captureFocused() {
+        guard panes.indices.contains(focusedPane) else { return }
+        panes[focusedPane].path = currentPath
+        panes[focusedPane].text = text
+        panes[focusedPane].mode = mode
+    }
+
+    /// ⌘D / ⇧⌘D: split the focused pane; the new pane shows the same note and takes focus.
+    func split(_ axis: SplitAxis) {
+        flushSave()
+        if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode)]; focusedPane = 0 }
+        guard panes.count < 4 else { toast = "Four panes is the limit"; return }
+        captureFocused()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            splitAxis = axis
+            panes.insert(Pane(id: UUID(), path: currentPath, text: text, mode: mode), at: focusedPane + 1)
+            focusedPane += 1
+        }
+        chromeLog("split \(axis) panes=\(panes.count) focused=\(focusedPane)")
+    }
+
+    /// Click or ⌃⇥: hand the live editor state to another pane.
+    func focusPane(_ i: Int) {
+        guard isSplit, panes.indices.contains(i), i != focusedPane else { return }
+        flushSave()
+        captureFocused()
+        focusedPane = i
+        let p = panes[i]
+        if let path = p.path, path != currentPath { openNote(path) }
+        mode = p.mode
+        chromeLog("focusPane \(i) → \(currentPath ?? "-") \(mode)")
+    }
+    func focusNextPane(_ step: Int = 1) {
+        guard isSplit else { return }
+        focusPane((focusedPane + step + panes.count) % panes.count)
+    }
+
+    /// ⌘W with panes: close the focused one. Returns false when there is nothing to close
+    /// (one pane), so ⌘W falls through to closing the window.
+    @discardableResult
+    func closePane() -> Bool {
+        guard isSplit else { return false }
+        flushSave()
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            panes.remove(at: focusedPane)
+            focusedPane = min(focusedPane, panes.count - 1)
+        }
+        let p = panes[focusedPane]
+        if let path = p.path, path != currentPath { openNote(path) }
+        mode = p.mode
+        if panes.count == 1 { panes = [] ; focusedPane = 0 }
+        chromeLog("closePane → panes=\(panes.count) \(currentPath ?? "-")")
+        return true
+    }
+
+    /// Text an unfocused pane should show: live text if it's the same note as the focused pane.
+    func displayText(_ p: Pane) -> String { p.path != nil && p.path == currentPath ? text : p.text }
 }

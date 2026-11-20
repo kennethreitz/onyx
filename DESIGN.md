@@ -18,6 +18,13 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   remembered across launches (`onyx.inspectorOpen`). There is deliberately no right-edge
   hover: a pointer parked at the window's right edge kept re-summoning it ("stuck").
   ⌘I is caught ahead of the editor so it works while typing. Esc puts it away too.
+- **Title fade**: a paper-colored gradient sits behind the title path, so body text scrolls
+  up into a soft fade instead of colliding with the path.
+- **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes with hairline
+  dividers; a new split sets the axis for the whole group. Swap model: the focused pane
+  drives the live editor/reader state; unfocused panes keep their own path, text and mode
+  and render read-only (dimmed a touch) until clicked or reached with ⌃⇥. Two panes on the
+  same note show the live text in both.
 - **Focus mode** ⌃⌘F: pure text; the same keys restore exactly what was showing.
 
 ## Keys
@@ -31,7 +38,10 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | ⌘I | Inspector |
 | ⌘G / ⇧⌘G | Focus graph / Atlas |
 | ⌘E, ⌘↩ | Read ⇄ edit; ⌘↩ also saves immediately |
-| ⌘T, ⌘\\, ⌘D | Today's daily note |
+| ⌘T, ⌘\\ | Today's daily note (⌘D is no longer bound to it) |
+| ⌘D / ⇧⌘D | Split side by side / stacked |
+| ⌘W | Close the focused pane; with one pane, close the window |
+| ⌃⇥ / ⌃⇧⇥ | Next / previous pane (click also focuses) |
 | ⌘[ ⌘] | Previous / next daily note (history back / forward elsewhere) |
 | ⌘N | New note |
 | ⌃⌘F | Focus mode |
