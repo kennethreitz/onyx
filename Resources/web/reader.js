@@ -427,7 +427,8 @@
   function applyFind(reveal) {
     clearFind();
     if (!FIND || !FIND.q) return { count: 0, index: 0 };
-    const q = FIND.cs ? FIND.q : FIND.q.toLowerCase();
+    const fold = (x) => x.replace(/[\u2018\u2019]/g, "'").replace(/[\u201c\u201d]/g, '"').replace(/[\u2013\u2014]/g, '-').replace(/\u00a0/g, ' ');
+    const q = fold(FIND.cs ? FIND.q : FIND.q.toLowerCase());
     const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode(n) {
       const e = n.parentElement;
       return !e || e.closest('script, style, svg, .doc-backlinks, .properties .toggle') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
@@ -436,7 +437,7 @@
     while (walker.nextNode()) nodes.push(walker.currentNode);
     const marks = [];
     for (const n of nodes) {
-      const t = FIND.cs ? n.data : n.data.toLowerCase();
+      const t = fold(FIND.cs ? n.data : n.data.toLowerCase());
       let i = t.indexOf(q), node = n, off = 0;
       while (i >= 0) {
         const hit = node.splitText(i - off);
@@ -461,10 +462,16 @@
     return { count: marks.length, index: FIND.i };
   }
 
+  // Typeset reading (Settings ▸ Typography): body classes the typeset.css rules key off.
+  function typesetClasses(t) {
+    if (!t || !t.on) return '';
+    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.face === 'et' ? ' face-et' : '') + (t.print ? ' print' : '');
+  }
+
   window.Onyx = {
     render(payload) {
       P = payload;
-      document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '') + (payload.preview ? ' preview' : '');
+      document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '') + (payload.preview ? ' preview' : '') + typesetClasses(payload.typeset);
       document.documentElement.classList.toggle('dark', !!payload.dark);
       const y = window.scrollY;
       const md = stripComments(payload.markdown);
@@ -488,6 +495,7 @@
       markLines();
       decorate();
       if (payload.sidenotes) sidenotes();
+      if (window.OnyxTypeset) OnyxTypeset.apply(page, Object.assign({ props: payload.props }, payload.typeset || {}));
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
       if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;

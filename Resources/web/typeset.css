@@ -1,0 +1,128 @@
+/* Onyx typeset reading — Reitz LaTeX, elevated. Everything here is scoped to body.typeset,
+   so "Typeset reading" off is exactly the plain Reitz LaTeX page from reader.css.
+   Latin Modern stays the voice; this adds what TeX would have done: real small caps
+   (LM Roman Caps), old-style figures, hyphenation tuned like \hyphenpenalty, hanging
+   punctuation, a baseline rhythm, booktabs, figure captions, an opening lead-in,
+   epigraphs, and a book page for print. ET Book is the Tufte alternative. */
+
+@font-face { font-family: 'Latin Modern Roman Caps'; font-weight: 400; font-style: normal; src: url(../fonts/LatinModernRomanCaps-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'Latin Modern Roman Caps'; font-weight: 400; font-style: italic; src: url(../fonts/LatinModernRomanCaps-Oblique.woff2) format('woff2'); }
+@font-face { font-family: 'ET Book'; font-weight: 400; font-style: normal; src: url(../fonts/ETBook-Roman.woff2) format('woff2'); }
+@font-face { font-family: 'ET Book'; font-weight: 400; font-style: italic; src: url(../fonts/ETBook-Italic.woff2) format('woff2'); }
+@font-face { font-family: 'ET Book'; font-weight: 700; font-style: normal; src: url(../fonts/ETBook-Bold.woff2) format('woff2'); }
+
+body.typeset {
+  --font-caps: 'Latin Modern Roman Caps', var(--font-text);
+  --lh: calc(var(--font-text-size) * var(--line-height-normal));   /* one baseline */
+  --sc-spacing: 0.045em;
+}
+body.typeset.face-et {
+  --font-text: 'ET Book', Palatino, 'Palatino Linotype', Georgia, serif;
+  --font-title: 'ET Book', Palatino, Georgia, serif;
+  --font-small: 'ET Book', Palatino, Georgia, serif;
+  --font-caps: 'ET Book', Palatino, Georgia, serif;
+  --line-height-normal: 1.4;
+  --sc-spacing: 0.05em;
+}
+
+/* ---- The text block ------------------------------------------------------------------ */
+body.typeset .markdown-preview-view {
+  font-kerning: normal;
+  font-variant-ligatures: common-ligatures contextual;
+  font-feature-settings: 'kern' 1, 'liga' 1;                   /* drop reader.css's 'onum' 0 */
+  font-variant-numeric: lining-nums proportional-nums;
+  font-optical-sizing: auto;
+}
+body.typeset.onum .markdown-preview-view { font-variant-numeric: oldstyle-nums proportional-nums; }
+body.typeset .markdown-preview-view :is(h1, h2, h3, h4, h5, h6, sup, .sidenote .num, .fig-label, .callout-title) { font-variant-numeric: lining-nums proportional-nums; }
+body.typeset .markdown-preview-view :is(table, code, pre, kbd, .kanban, .properties) { font-variant-numeric: lining-nums tabular-nums; }
+
+body.typeset .markdown-preview-view :is(p, li, blockquote, figcaption, .sidenote) {
+  text-wrap: pretty;                                           /* no runts, even rag */
+  hanging-punctuation: first allow-end last;                   /* quotes and stops hang */
+}
+body.typeset.hyph .markdown-preview-view :is(p, li, blockquote) {
+  -webkit-hyphens: auto; hyphens: auto;
+  -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3;
+  hyphenate-limit-chars: 6 3 3;                                /* TeX's \lefthyphenmin / \righthyphenmin */
+  -webkit-hyphenate-limit-lines: 2; hyphenate-limit-lines: 2;  /* no ladders */
+  hyphenate-limit-last: always;                                /* never hyphenate the last word of a paragraph */
+}
+body.typeset:not(.hyph) .markdown-preview-view :is(p, li, blockquote, .sidenote) { -webkit-hyphens: manual; hyphens: manual; }
+body.typeset:not(.hyph) .markdown-preview-view :is(p, li) { text-align: left; }   /* no hyphens: ragged right beats rivers */
+body.typeset .sidenote { -webkit-hyphens: auto; hyphens: auto; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; }
+
+/* Optical margin kerns for quotes that open a line mid-paragraph (typeset.js pairs them) */
+body.typeset .push-dq { margin-right: 0.42em; } body.typeset .pull-dq { margin-left: -0.42em; }
+body.typeset .push-sq { margin-right: 0.24em; } body.typeset .pull-sq { margin-left: -0.24em; }
+
+/* ---- Rhythm: margins in half-baselines --------------------------------------------- */
+body.typeset .markdown-preview-view p { margin: 0 0 calc(var(--lh) * 0.5); }
+body.typeset .markdown-preview-view :is(ul, ol) { margin: calc(var(--lh) * 0.25) 0 calc(var(--lh) * 0.5); }
+body.typeset .markdown-preview-view li { margin: 0 0 calc(var(--lh) * 0.1); }
+body.typeset .markdown-preview-view li > :is(ul, ol) { margin: calc(var(--lh) * 0.1) 0 0; }
+
+/* ---- Headings: LaTeX article's scale, tighter to what follows than to what precedes -- */
+body.typeset .markdown-preview-view :is(h1, h2, h3, h4, h5, h6) { text-wrap: balance; font-kerning: normal; break-after: avoid; page-break-after: avoid; }
+body.typeset .markdown-preview-view h1 { font-size: 1.5em; line-height: 1.15; margin: calc(var(--lh) * 0.5) 0 calc(var(--lh) * 1); letter-spacing: 0.005em; }
+body.typeset .markdown-preview-view h1 + p.byline { text-align: center; margin-top: calc(var(--lh) * -0.5); margin-bottom: calc(var(--lh) * 1); }   /* \date under \maketitle */
+body.typeset .markdown-preview-view h2 { font-size: 1.24em; line-height: 1.2; margin: calc(var(--lh) * 1.75) 0 calc(var(--lh) * 0.5); }
+body.typeset .markdown-preview-view h3 { font-size: 1.08em; line-height: 1.25; margin: calc(var(--lh) * 1.25) 0 calc(var(--lh) * 0.35); }
+body.typeset .markdown-preview-view h4 { font-size: 1em; margin: calc(var(--lh) * 1) 0 calc(var(--lh) * 0.25); }
+body.typeset .markdown-preview-view :is(h5, h6) { font-size: 1em; font-weight: 400; font-style: italic; margin: calc(var(--lh) * 0.75) 0 calc(var(--lh) * 0.2); }
+body.typeset .markdown-preview-view :is(h2, h3, h4) + :is(h2, h3, h4) { margin-top: calc(var(--lh) * 0.5); }
+body.typeset.face-et .markdown-preview-view h1 { font-weight: 400; font-size: 2em; text-align: left; line-height: 1.1; }
+body.typeset.face-et .markdown-preview-view h1 + p.byline { text-align: left; }
+body.typeset.face-et .markdown-preview-view :is(h2, h3) { font-weight: 400; font-style: italic; }
+body.typeset.face-et .markdown-preview-view h2 { font-size: 1.45em; }
+body.typeset.face-et .markdown-preview-view h3 { font-size: 1.2em; }
+
+/* ---- Small caps: abbreviations, the lead-in, labels -------------------------------- */
+/* LM Roman Caps sets lowercase as true small caps; lowercasing the acronym gives c2sc. */
+body.typeset abbr.sc { font-family: var(--font-caps); text-transform: lowercase; letter-spacing: var(--sc-spacing); text-decoration: none; font-variant-numeric: inherit; }
+body.typeset.face-et abbr.sc { text-transform: none; font-variant-caps: all-small-caps; }
+body.typeset :is(em, i) abbr.sc { font-style: italic; }
+body.typeset .lead-in { font-family: var(--font-caps); letter-spacing: 0.035em; }
+body.typeset.face-et .lead-in { font-variant-caps: small-caps; }
+body.typeset p.has-dropcap .lead-in { font-family: inherit; letter-spacing: 0; }
+body.typeset p.has-dropcap::first-letter {
+  -webkit-initial-letter: 3 2; initial-letter: 3 2;            /* three lines tall, sunk two */
+  font-family: var(--font-text); font-weight: 400; margin-right: 0.08em; color: var(--text-normal);
+}
+body.typeset .callout-title { font-family: var(--font-caps); font-variant-caps: normal; text-transform: lowercase; letter-spacing: 0.05em; }
+body.typeset.face-et .callout-title { font-family: inherit; text-transform: none; font-variant-caps: all-small-caps; }
+
+/* ---- Quotations ----------------------------------------------------------------------- */
+body.typeset blockquote { margin: calc(var(--lh) * 0.75) 2.5em; }
+body.typeset blockquote .attribution { display: block; text-align: right; margin-top: calc(var(--lh) * 0.2); font-style: normal; }
+body.typeset blockquote .attribution .attribution-dash { color: var(--text-muted); }
+body.typeset blockquote.epigraph { margin: calc(var(--lh) * 0.25) 0 calc(var(--lh) * 1.5) auto; width: 62%; font-style: italic; text-align: left; font-size: 0.95em; -webkit-hyphens: manual; hyphens: manual; }
+body.typeset blockquote.epigraph p { text-align: left; -webkit-hyphens: manual; hyphens: manual; margin: 0; }
+body.typeset blockquote.epigraph .attribution { font-family: var(--font-caps); font-style: normal; letter-spacing: 0.03em; }
+body.typeset blockquote.epigraph em { font-style: normal; }
+
+/* ---- Booktabs ------------------------------------------------------------------------- */
+body.typeset table { border-top: 0.08em solid var(--table-border-color); border-bottom: 0.08em solid var(--table-border-color); }
+body.typeset thead { border-bottom: 0.05em solid var(--table-border-color); }
+body.typeset th, body.typeset td { padding: 0.28em 0.9em; }
+body.typeset thead th { padding-top: 0.45em; padding-bottom: 0.35em; }
+body.typeset tbody tr:last-child td { padding-bottom: 0.45em; }
+body.typeset :is(td, th).num { text-align: right; font-variant-numeric: lining-nums tabular-nums; }
+body.typeset caption { caption-side: top; padding: 0 0 0.55em; font-size: 0.9em; text-align: center; text-wrap: balance; }
+
+/* ---- Figures -------------------------------------------------------------------------- */
+body.typeset figure { margin: calc(var(--lh) * 1) 0; break-inside: avoid; page-break-inside: avoid; }
+body.typeset figure img { margin: 0 auto; }
+body.typeset figcaption { margin: calc(var(--lh) * 0.4) auto 0; max-width: 85%; font-size: 0.85em; line-height: 1.35; text-align: center; text-wrap: balance; color: var(--text-normal); }
+body.typeset .fig-label { font-family: var(--font-caps); letter-spacing: 0.03em; margin-right: 0.15em; }
+body.typeset.face-et .fig-label { font-variant-caps: small-caps; }
+
+/* ---- Notes ------------------------------------------------------------------------- */
+body.typeset sup a[data-footnote-ref] { font-variant-numeric: lining-nums; }
+body.typeset .sidenote { font-variant-numeric: oldstyle-nums proportional-nums; text-wrap: pretty; }
+body.typeset .sidenote .num { font-variant-numeric: lining-nums; }
+body.typeset .marginnote .num { display: none; }
+
+/* ---- Rules, code --------------------------------------------------------------------- */
+body.typeset hr { margin: calc(var(--lh) * 1.25) auto; }
+body.typeset pre { margin: calc(var(--lh) * 0.5) 0; break-inside: avoid; page-break-inside: avoid; }
