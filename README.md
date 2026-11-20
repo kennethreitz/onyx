@@ -43,7 +43,8 @@ keep working right alongside it.
   hairline. Each pane keeps its own note and its own read/edit mode; the title path follows
   the focused one.
 - **Quiet chrome**: a whisper of a title path (click a folder to reveal it and open its folder
-  note), an auto-dimming footer with word count, a sidebar that remembers itself, and a
+  note), an auto-dimming footer with word count, a sidebar and inspector you can drag as narrow
+  as 140pt (double-click the edge to reset), and a
   focus mode that leaves only text.
 - **Light, dark or auto**, set in <kbd>⌘,</kbd> along with text size and line measure.
 

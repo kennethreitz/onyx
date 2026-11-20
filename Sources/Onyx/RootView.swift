@@ -23,8 +23,14 @@ struct RootView: View {
     @State private var moveMonitor: Any?
     @State private var clickMonitor: Any?
 
-    let sidebarWidth: CGFloat = 270
-    let inspectorWidth: CGFloat = 300
+    // Drag the inner edge to resize; double-click it to reset. Persisted per panel.
+    static let sidebarDefault = 270.0, sidebarRange = 140.0...560.0
+    static let inspectorDefault = 300.0, inspectorRange = 150.0...600.0
+    @AppStorage("onyx.sidebarWidth") private var sidebarW = RootView.sidebarDefault
+    @AppStorage("onyx.inspectorWidth") private var inspectorW = RootView.inspectorDefault
+    @State private var resizing = false
+    var sidebarWidth: CGFloat { CGFloat(min(max(sidebarW, Self.sidebarRange.lowerBound), Self.sidebarRange.upperBound)) }
+    var inspectorWidth: CGFloat { CGFloat(min(max(inspectorW, Self.inspectorRange.lowerBound), Self.inspectorRange.upperBound)) }
     var leftInset: CGFloat { ws.sidebarPinned && ws.sidebarVisible ? sidebarWidth : 0 }
     var rightInset: CGFloat { ws.inspectorPinned && ws.inspectorVisible ? inspectorWidth : 0 }
 
@@ -292,12 +298,15 @@ struct RootView: View {
                     .frame(width: sidebarWidth)
                     .padding(.top, ws.sidebarPinned ? 28 : 0)
                     .panelChrome(pinned: ws.sidebarPinned)
+                    .overlay(alignment: .trailing) {
+                        ResizeHandle(width: $sidebarW, range: Self.sidebarRange, defaultWidth: Self.sidebarDefault, growsRight: true,
+                                     showLine: ws.sidebarPinned, dragging: $resizing).offset(x: 4.5)
+                    }
                     .padding(ws.sidebarPinned ? 0 : 10)
                     .padding(.top, ws.sidebarPinned ? 0 : 28)
-                    .overlay(alignment: .trailing) { if ws.sidebarPinned { Rectangle().fill(Color.hairline).frame(width: 0.8) } }
                     .onHover { inside in
                         if !inside && hoverSummonedSidebar && !ws.sidebarPinned {
-                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedSidebar && !ws.sidebarPinned && !leftEdgeHover { hoverSummonedSidebar = false; if ws.sidebarVisible { ws.toggleSidebar() } } }
+                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedSidebar && !ws.sidebarPinned && !leftEdgeHover && !resizing { hoverSummonedSidebar = false; if ws.sidebarVisible { ws.toggleSidebar() } } }
                         } else if inside { hoverSummonedSidebar = hoverSummonedSidebar && true }
                     }
                     .transition(.move(edge: .leading).combined(with: .opacity))
@@ -308,12 +317,15 @@ struct RootView: View {
                     .frame(width: inspectorWidth)
                     .padding(.top, ws.inspectorPinned ? 28 : 0)
                     .panelChrome(pinned: ws.inspectorPinned)
+                    .overlay(alignment: .leading) {
+                        ResizeHandle(width: $inspectorW, range: Self.inspectorRange, defaultWidth: Self.inspectorDefault, growsRight: false,
+                                     showLine: ws.inspectorPinned, dragging: $resizing).offset(x: -4.5)
+                    }
                     .padding(ws.inspectorPinned ? 0 : 10)
                     .padding(.top, ws.inspectorPinned ? 0 : 28)
-                    .overlay(alignment: .leading) { if ws.inspectorPinned { Rectangle().fill(Color.hairline).frame(width: 0.8) } }
                     .onHover { inside in
                         if !inside && hoverSummonedInspector && !ws.inspectorPinned {
-                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedInspector && !ws.inspectorPinned && !rightEdgeHover { hoverSummonedInspector = false; if ws.inspectorVisible { ws.toggleInspector() } } }
+                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedInspector && !ws.inspectorPinned && !rightEdgeHover && !resizing { hoverSummonedInspector = false; if ws.inspectorVisible { ws.toggleInspector() } } }
                         }
                     }
                     .transition(.move(edge: .trailing).combined(with: .opacity))
@@ -508,5 +520,51 @@ struct PathSegment: View {
             }
             .onTapGesture(perform: action)
             .help(help)
+    }
+}
+
+
+/// The inner edge of a panel: a hairline that shows a small grip and a resize cursor on hover.
+/// Drag to resize (clamped to `range`), double-click to go back to the default width.
+struct ResizeHandle: View {
+    @Binding var width: Double
+    let range: ClosedRange<Double>
+    let defaultWidth: Double
+    let growsRight: Bool          // left sidebar: dragging right grows it; inspector: dragging left
+    let showLine: Bool
+    @Binding var dragging: Bool
+    @State private var hover = false
+    @State private var start: Double? = nil
+    @State private var cursorPushed = false
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(showLine ? Color.hairline : .clear).frame(width: 0.8)
+            Capsule().fill(Color.ink.opacity(dragging ? 0.34 : hover ? 0.22 : 0))
+                .frame(width: 3, height: 36)
+                .animation(.easeOut(duration: 0.15), value: hover || dragging)
+        }
+        .frame(width: 9)
+        .frame(maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onHover { h in hover = h; updateCursor() }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { v in
+                    if start == nil { start = width; dragging = true; updateCursor() }
+                    let dx = Double(v.translation.width) * (growsRight ? 1 : -1)
+                    width = min(range.upperBound, max(range.lowerBound, (start ?? width) + dx)).rounded()
+                }
+                .onEnded { _ in start = nil; dragging = false; updateCursor() }
+        )
+        .onTapGesture(count: 2) { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { width = defaultWidth } }
+        .help("Drag to resize · double-click to reset")
+        .onDisappear { if cursorPushed { NSCursor.pop(); cursorPushed = false } }
+    }
+
+    private func updateCursor() {
+        let want = hover || dragging
+        if want && !cursorPushed { NSCursor.resizeLeftRight.push(); cursorPushed = true }
+        else if !want && cursorPushed { NSCursor.pop(); cursorPushed = false }
     }
 }

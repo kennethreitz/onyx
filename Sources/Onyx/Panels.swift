@@ -22,12 +22,13 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
     @Binding var pinned: Bool
     var onPin: ((Bool) -> Void)? = nil
     var body: some View {
-        HStack(spacing: 2) {
+        // tabs compress (28pt → 17pt each) so the header still fits a 140pt sidebar
+        HStack(spacing: 1) {
             ForEach(tabs) { t in
                 Button { withAnimation(.easeOut(duration: 0.15)) { selection = t } } label: {
                     Image(systemName: symbol(t))
                         .font(.system(size: 12.5, weight: selection == t ? .semibold : .regular))
-                        .frame(width: 28, height: 24)
+                        .frame(minWidth: 17, idealWidth: 28, maxWidth: 28, minHeight: 24, maxHeight: 24)
                         .foregroundStyle(selection == t ? Color.ink : Color.faint)
                         .background(selection == t ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 6))
                         .contentShape(Rectangle())
@@ -35,12 +36,12 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
                 .buttonStyle(.plain)
                 .help(label(t))
             }
-            Spacer()
+            Spacer(minLength: 0)
             Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { pinned.toggle() }; onPin?(pinned) } label: {
-                Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 24, height: 24)
+                Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 20, height: 24)
             }.buttonStyle(.plain).help(pinned ? "Unpin" : "Pin (three-pane layout)")
         }
-        .padding(.horizontal, 8).padding(.top, 8).padding(.bottom, 4)
+        .padding(.horizontal, 6).padding(.top, 8).padding(.bottom, 4)
     }
 }
 
