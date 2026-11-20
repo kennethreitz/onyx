@@ -170,7 +170,7 @@
         if (m && m[1].trim() && m[1].length < 160) {
           const f = document.createElement('footer');
           f.className = 'attribution';
-          f.innerHTML = `<span class="attribution-dash">\u2014</span>\u2009${m[1].trim()}`;
+          f.innerHTML = `<span class="attribution-dash">\u2014</span> ${m[1].trim()}`;
           const before = html.slice(0, m.index).trim();
           if (before) last.innerHTML = before; else last.remove();
           bq.appendChild(f);
@@ -250,9 +250,12 @@
     page.lang = language(opts.props);
     if (!opts.on) return;
     smartenDOM(page);
-    const h1 = page.querySelector(':scope > h1'), by = h1 && h1.nextElementSibling;
-    if (by && by.tagName === 'P' && words(by) < 15 && !by.querySelector('img')) by.classList.add('byline');
     quotes(page);
+    // A short line right under the title (or under its epigraph) is a date or byline: \date.
+    const h1 = page.querySelector(':scope > h1');
+    let by = h1 && h1.nextElementSibling;
+    if (by && by.matches('blockquote.epigraph')) by = by.nextElementSibling;
+    if (by && by.tagName === 'P' && words(by) < 15 && !by.querySelector('img')) by.classList.add('byline');
     figures(page);
     if (opts.smallCaps !== false) smallCapsDOM(page);
     hangQuotes(page);

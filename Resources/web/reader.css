@@ -165,6 +165,11 @@ sup a[data-footnote-ref] { cursor: pointer; }
   body.sidenotes .sidenote.is-open p { display: inline; margin: 0; }
 }
 
+/* Margin notes (`[^x]: {-} …`): unnumbered; the ⊕ that opens one shows only where notes fold inline. */
+@media (min-width: 1120px) { body.sidenotes sup.mn-ref { display: none; } }
+sup.mn-ref a { text-decoration: none; color: var(--text-faint); font-size: 0.9em; }
+.sidenote { break-inside: avoid; page-break-inside: avoid; }
+
 /* Tasks — a plain hairline square */
 li.task-list-item { list-style: none; margin-left: -1.3em; }
 input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 0.8em; height: 0.8em; border: 1px solid var(--text-normal); border-radius: 0; background: transparent; margin: 0 0.45em 0.15em 0; vertical-align: middle; cursor: pointer; }

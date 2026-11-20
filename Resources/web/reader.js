@@ -357,6 +357,7 @@
   document.addEventListener('dragleave', e => { const l = e.target.closest && e.target.closest('.lane.collapsed'); if (l && !l.contains(e.relatedTarget)) l.classList.remove('kb-over'); });
 
   function sidenotes() {
+    let i = 0;
     page.querySelectorAll('a[data-footnote-ref]').forEach((ref) => {
       if (ref.closest('.sidenote')) return;
       const href = ref.getAttribute('href') || '';
@@ -367,27 +368,73 @@
       clone.querySelectorAll('[data-footnote-backref]').forEach(b => b.remove());
       const s = document.createElement('aside');
       s.className = 'sidenote';
-      s.innerHTML = `<span class="num">${ref.textContent}</span>` + clone.innerHTML;
+      s.id = 'sn-' + (++i);
+      ref.dataset.sn = s.id;
       const sup = ref.closest('sup') || ref;
-      sup.after(s);
+      // `[^x]: {-} text` is an unnumbered margin note (Tufte's \marginnote): no number in
+      // the text or the margin; at narrow widths a small ⊕ opens it.
+      const mark = unmark(clone);
+      if (mark) { s.classList.add('marginnote'); sup.classList.add('mn-ref'); ref.textContent = '\u2295'; }
+      s.innerHTML = (mark ? '' : `<span class="num">${ref.textContent}</span>`) + clone.innerHTML;
+      // A float can't leave a scrolling box (a wide table): set the note just before it.
+      const host = sup.closest('.table-wrap, .kanban, pre, .mermaid, .onyx-dataview');
+      if (host) host.before(s); else sup.after(s);
     });
+    // Margin notes don't take a number; keep the numbered ones 1, 2, 3…
+    if (page.querySelector('.marginnote')) {
+      let n = 0;
+      page.querySelectorAll('a[data-footnote-ref][data-sn]').forEach(ref => {
+        if ((ref.closest('sup') || ref).classList.contains('mn-ref')) return;
+        ref.textContent = ++n;
+        const num = document.getElementById(ref.dataset.sn)?.querySelector('.num');
+        if (num) num.textContent = n;
+      });
+    }
     layoutSidenotes();
   }
+  // Strip a leading "{-}" from a note's first text; true if it was there.
+  function unmark(root) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    while (w.nextNode()) {
+      const t = w.currentNode;
+      if (!t.nodeValue.trim()) continue;
+      if (!/^\s*\{-\}\s*/.test(t.nodeValue)) return false;
+      t.nodeValue = t.nodeValue.replace(/^\s*\{-\}\s*/, '');
+      return true;
+    }
+    return false;
+  }
 
-  // Pack margin notes so a long one doesn't overlap the next. Floats in
-  // separate paragraphs don't always clear each other.
+  // Pack margin notes so none overlaps the one above: each note sits as close to its
+  // reference as it can, nudged down just enough to clear the previous note plus a gap.
+  // Late layout (fonts, images, Mermaid, details, a resize) re-runs it; see scheduleNotes.
   const NOTE_GAP = 8;
+  const inMargin = () => window.innerWidth >= 1120 || document.body.classList.contains('print');
   function layoutSidenotes() {
     const notes = [...page.querySelectorAll('.sidenote')];
     notes.forEach(s => { s.style.marginTop = ''; });
-    if (window.innerWidth < 1120) return;
+    if (!inMargin()) return;
     let lastBottom = -Infinity;
     for (const s of notes) {
+      if (!s.getClientRects().length) continue;   // hidden (a closed <details>)
       const rect = s.getBoundingClientRect();
-      const overlap = lastBottom - rect.top;
-      if (overlap > 0) s.style.marginTop = overlap + NOTE_GAP + 'px';
+      const overlap = lastBottom + NOTE_GAP - rect.top;
+      if (overlap > 0) s.style.marginTop = overlap + 'px';
       lastBottom = s.getBoundingClientRect().bottom;
     }
+  }
+  let notesQueued = false;
+  function scheduleNotes() {
+    if (notesQueued || !page.querySelector('.sidenote')) return;
+    notesQueued = true;
+    setTimeout(() => { notesQueued = false; layoutSidenotes(); }, 0);   // not rAF: throttled in occluded windows
+  }
+  page.addEventListener('load', scheduleNotes, true);            // images, video posters
+  document.addEventListener('toggle', scheduleNotes, true);      // <details> callouts and backlinks
+  if (document.fonts) document.fonts.addEventListener('loadingdone', scheduleNotes);
+  if (window.ResizeObserver) {
+    let w = 0;
+    new ResizeObserver(es => { const nw = Math.round(es[0].contentRect.width); if (nw !== w) { w = nw; scheduleNotes(); } }).observe(page);
   }
 
   async function mermaids() {
@@ -405,6 +452,7 @@
     });
     try { await document.fonts.load('15px "Latin Modern Roman"'); await document.fonts.ready; } catch (e) { }
     try { await mermaid.run({ nodes, suppressErrors: true }); } catch (e) { }
+    scheduleNotes();
   }
 
   function decorate() {
@@ -464,8 +512,10 @@
 
   // Typeset reading (Settings ▸ Typography): body classes the typeset.css rules key off.
   function typesetClasses(t) {
-    if (!t || !t.on) return '';
-    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.face === 'et' ? ' face-et' : '') + (t.print ? ' print' : '');
+    if (!t) return '';
+    const print = t.print ? ' print' : '';
+    if (!t.on) return print;
+    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.face === 'et' ? ' face-et' : '') + print;
   }
 
   window.Onyx = {
@@ -495,7 +545,9 @@
       markLines();
       decorate();
       if (payload.sidenotes) sidenotes();
+      page.querySelectorAll('.footnotes li').forEach(unmark);   // a margin note at the end is just a note
       if (window.OnyxTypeset) OnyxTypeset.apply(page, Object.assign({ props: payload.props }, payload.typeset || {}));
+      if (payload.sidenotes) { layoutSidenotes(); if (document.fonts) document.fonts.ready.then(scheduleNotes); }
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
       if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;
@@ -518,6 +570,25 @@
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');
     },
     scrollToLine(line) { restoreLine(line); },
+    // Export as PDF / Print: Swift sizes the page (CSS px), then waits for printReady().
+    setPrint(g) {
+      // Everything in points, so the screen layout (where sidenotes are packed) and the
+      // printed page are the same layout; @page carries the paper and its margins.
+      const r = document.documentElement.style;
+      for (const k of ['text', 'note', 'gap']) if (g[k]) r.setProperty('--print-' + k, g[k] + 'pt');
+      if (g.size) r.setProperty('--font-text-size', g.size + 'pt');
+      let st = document.getElementById('onyx-page');
+      if (!st) { st = document.createElement('style'); st.id = 'onyx-page'; document.head.appendChild(st); }
+      if (g.paper) st.textContent = `@page { size: ${g.paper[0]}pt ${g.paper[1]}pt; margin: ${g.margin.map(m => m + 'pt').join(' ')}; }`;
+      layoutSidenotes();
+    },
+    printReady() {
+      const imgs = [...page.querySelectorAll('img')].every(i => i.complete);
+      const mer = !page.querySelector('pre.mermaid:not([data-processed])') || !window.mermaid;
+      const ok = (!document.fonts || document.fonts.status === 'loaded') && imgs && mer;
+      if (ok) layoutSidenotes();
+      return ok;
+    },
     find(q, cs, i, reveal) { FIND = { q, cs, i }; return applyFind(reveal); },
     findClear() { FIND = null; clearFind(); },
     setUnlinked(list) {
@@ -573,7 +644,7 @@
     const href = a.getAttribute('href') || '';
     if (a.hasAttribute('data-footnote-ref')) {
       e.preventDefault();
-      const note = (a.closest('sup') || a).nextElementSibling;
+      const note = (a.dataset.sn && document.getElementById(a.dataset.sn)) || (a.closest('sup') || a).nextElementSibling;
       if (note && note.classList.contains('sidenote') && window.innerWidth < 1120) {
         const open = note.classList.toggle('is-open');
         page.querySelectorAll('.sidenote.is-open').forEach(s => { if (s !== note) s.classList.remove('is-open'); });
