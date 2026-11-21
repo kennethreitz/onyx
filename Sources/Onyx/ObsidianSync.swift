@@ -205,6 +205,7 @@ struct SyncBadge: View {
 
 struct ObsidianSyncSettings: View {
     @Bindable var ws: Workspace
+    var onShowLog: (() -> Void)? = nil
     @State private var account = SyncAccount.shared
     @State private var email = UserDefaults.standard.string(forKey: "onyx.sync.email") ?? ""
     @State private var password = ""
@@ -229,6 +230,10 @@ struct ObsidianSyncSettings: View {
             if !account.signedIn { signInForm } else { signedInBody }
             if let busy { HStack(spacing: 6) { ProgressView().controlSize(.small); Text(busy).font(.system(size: 11)).foregroundStyle(Color.faint) } }
             if let error { Text(error).font(.system(size: 11)).foregroundStyle(.orange) }
+            // When the vault isn't connected, the Sync-now row (which also has Show Log) isn't shown.
+            if onShowLog != nil, ws.obsidianSync == nil {
+                AppKitPushButton(title: "Show Log", id: SettingsSyncLog.buttonID) { onShowLog?() }
+            }
         } header: {
             Text("Obsidian Sync").font(Theme.serif(14, bold: true)).foregroundStyle(Color.ink).textCase(nil)
         }
@@ -262,6 +267,7 @@ struct ObsidianSyncSettings: View {
                 Button("Sync now") { s.syncNow() }
                 Button(s.isPaused ? "Resume" : "Pause") { s.setPaused(!s.isPaused) }
                 if case .needsAttention = s.status.phase { Button("Continue anyway") { s.confirmPendingAction() } }
+                if let onShowLog { AppKitPushButton(title: "Show Log", id: SettingsSyncLog.buttonID, action: onShowLog) }
                 Spacer()
                 Button("Disconnect…", role: .destructive) { disconnect(s) }
             }

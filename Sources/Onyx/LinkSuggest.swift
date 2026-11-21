@@ -167,6 +167,15 @@ enum TypeSelfTest {
         case "newfolder":
             let p = ws.createFolder(in: arg.isEmpty ? nil : arg, prompt: false)
             print("[newfolder] \(p ?? "failed") folders=\(ws.snapshot?.folders.sorted().joined(separator: ",") ?? "-") selected=\(ws.selectedFolder ?? "-")")
+        case "clicksynclog":
+            let ok = SettingsSyncLog.clickShowLogButton()
+            func report(_ tag: String) {
+                let titles = NSApp.windows.filter { SettingsSyncLog.isSettings($0) && $0.isVisible }.map(\.title).joined(separator: ",")
+                print("[clicksynclog] \(tag) \(ok ? "clicked" : "no button") overlay=\(ws.overlay) settings=\(titles.isEmpty ? "(none)" : titles)")
+                fflush(stdout)
+            }
+            report("now")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { report("after") }
         case "split": ws.split(.vertical)
         case "openat":   // openat <line> <path>: open a note scrolled to a source line
             let parts = arg.split(separator: " ", maxSplits: 1).map(String.init); if parts.count == 2, let l = Int(parts[0]) { ws.openNote(parts[1], line: l) }

@@ -285,12 +285,136 @@ struct GraphSettingsPage: View {
 
 struct SyncSettingsPage: View {
     @Bindable var ws: Workspace
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Form {
-            ObsidianSyncSettings(ws: ws)
+            Section {
+                if let g = ws.git {
+                    Text(g.help).font(.system(size: 11)).foregroundStyle(Color.faint)
+                } else {
+                    Text("This vault isn’t a git repository, so Onyx isn’t auto-committing.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+                ShowSyncLogButton(ws: ws, dismiss: dismiss)
+            } header: { settingsHeader("Git") }
+            ObsidianSyncSettings(ws: ws, onShowLog: { SettingsSyncLog.show(ws, dismiss: dismiss) })
         }
         .settingsPage()
+    }
+}
+
+/// Opens the Sync Log on the main window and closes Settings so the panel is visible.
+struct ShowSyncLogButton: View {
+    var ws: Workspace
+    var dismiss: DismissAction
+    var body: some View {
+        AppKitPushButton(title: "Show Log", id: SettingsSyncLog.buttonID) {
+            SettingsSyncLog.show(ws, dismiss: dismiss)
+        }
+    }
+}
+
+/// A real NSButton so UI tests can `performClick` it. SwiftUI `Button` in a Settings
+/// `Form` often lives in the out-of-process render tree (`TUINSWindow`) with no NSButton.
+struct AppKitPushButton: NSViewRepresentable {
+    var title: String
+    var id: String
+    var action: () -> Void
+
+    final class Button: NSButton {
+        var onPress: (() -> Void)?
+        @objc func tapped(_ sender: Any?) { onPress?() }
+    }
+
+    func makeNSView(context: Context) -> Button {
+        let b = Button(title: title, target: nil, action: nil)
+        b.bezelStyle = .rounded
+        b.setButtonType(.momentaryPushIn)
+        b.controlSize = .regular
+        b.target = b
+        b.action = #selector(Button.tapped(_:))
+        b.onPress = action
+        b.identifier = NSUserInterfaceItemIdentifier(id)
+        b.setAccessibilityIdentifier(id)
+        b.setAccessibilityTitle(title)
+        b.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        b.setContentHuggingPriority(.required, for: .vertical)
+        return b
+    }
+
+    func updateNSView(_ b: Button, context: Context) {
+        b.title = title
+        b.onPress = action
+        b.identifier = NSUserInterfaceItemIdentifier(id)
+        b.setAccessibilityIdentifier(id)
+    }
+}
+
+enum SettingsSyncLog {
+    static let buttonID = "settings-show-sync-log"
+
+    @MainActor static func show(_ ws: Workspace, dismiss: DismissAction? = nil) {
+        ws.show(.syncLog)
+        dismiss?()
+        closeSettingsWindows()
+        DispatchQueue.main.async { closeSettingsWindows() }
+    }
+
+    @MainActor static func closeSettingsWindows() {
+        for w in NSApp.windows where w !== MainWindow.current && !(w is NSPanel) {
+            guard isSettings(w) else { continue }
+            w.performClose(nil)
+            if w.isVisible { w.close() }
+            if w.isVisible { w.orderOut(nil) }
+        }
+    }
+
+    static func isSettings(_ w: NSWindow) -> Bool {
+        if w.identifier?.rawValue == "onyx-settings" { return true }
+        let t = w.title
+        if t == "Settings" || t.hasSuffix(" Settings") || t.hasPrefix("Settings") { return true }
+        return SettingsTab.allCases.contains { $0.title == t }
+    }
+
+    @MainActor static func clickShowLogButton() -> Bool {
+        for w in NSApp.windows {
+            if press(findView(w.contentView, id: buttonID)) { return true }
+            if press(findLabeled(w.contentView, "Show Log")) { return true }
+        }
+        let dump = NSApp.windows.map { w in
+            "\(w.title)[\(type(of: w)) id=\(w.identifier?.rawValue ?? "-")]"
+        }.joined(separator: "; ")
+        print("[clicksynclog] windows=\(dump.isEmpty ? "(none)" : dump)")
+        fflush(stdout)
+        return false
+    }
+
+    @MainActor private static func press(_ v: NSView?) -> Bool {
+        guard let v else { return false }
+        if let b = v as? NSButton { b.performClick(nil); return true }
+        if let c = v as? NSControl { c.performClick(nil); return true }
+        if v.accessibilityPerformPress() { return true }
+        if v.responds(to: #selector(NSControl.performClick(_:))) {
+            v.perform(#selector(NSControl.performClick(_:)), with: nil)
+            return true
+        }
+        return false
+    }
+
+    private static func findView(_ v: NSView?, id: String) -> NSView? {
+        guard let v else { return nil }
+        if v.accessibilityIdentifier() == id || v.identifier?.rawValue == id { return v }
+        for s in v.subviews { if let r = findView(s, id: id) { return r } }
+        return nil
+    }
+
+    private static func findLabeled(_ v: NSView?, _ title: String) -> NSView? {
+        guard let v else { return nil }
+        if let b = v as? NSButton, b.title == title { return b }
+        if v.accessibilityLabel() == title || v.accessibilityTitle() == title { return v }
+        for s in v.subviews { if let r = findLabeled(s, title) { return r } }
+        return nil
     }
 }
 
@@ -350,6 +474,7 @@ private struct SettingsWindowHook: NSViewRepresentable {
         } else if quiet, w.frame.origin.x > -1000 {
             w.setFrameOrigin(NSPoint(x: -w.frame.width - 3000, y: 0))
         }
+        w.identifier = NSUserInterfaceItemIdentifier("onyx-settings")
         if ProcessInfo.processInfo.environment["ONYX_OPEN_SETTINGS"] != nil, let file = WindowConfigurator.idFile {
             try? String(w.windowNumber).write(toFile: file, atomically: true, encoding: .utf8)
         }

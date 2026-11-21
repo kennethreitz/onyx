@@ -18,7 +18,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place
 - **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N
-- **Obsidian Sync and git** — optional, and only if you ask
+- **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync
 
 ## Download
 
