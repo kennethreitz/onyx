@@ -468,7 +468,7 @@
   function decorate() {
     let task = 0;
     page.querySelectorAll('input[type=checkbox]').forEach(cb => {
-      if (cb.closest('.markdown-embed') || cb.closest('.kanban')) return;
+      if (cb.closest('.markdown-embed') || cb.closest('.kanban') || cb.closest('.onyx-dataview')) return;
       cb.removeAttribute('disabled');
       cb.dataset.task = task++;
       const li = cb.closest('li');
@@ -641,6 +641,8 @@
   });
   document.addEventListener('click', (e) => {
     post({ type: 'previewEnd' });
+    const dv = e.target.closest('input[type=checkbox][data-dv-task]');
+    if (dv) { e.preventDefault(); post({ type: 'dvtask', path: dv.dataset.path || '', index: +dv.dataset.index }); return; }
     const cb = e.target.closest('input[type=checkbox][data-task]');
     if (cb) { e.preventDefault(); post({ type: 'task', index: +cb.dataset.task }); return; }
     const a = e.target.closest('a');

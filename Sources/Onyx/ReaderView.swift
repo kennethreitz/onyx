@@ -227,6 +227,10 @@ struct ReaderView: NSViewRepresentable {
             case "tag":
                 if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }
+            case "dvtask":
+                if !preview, let p = body["path"] as? String, let i = body["index"] as? Int {
+                    ws.toggleDataviewTask(path: p, index: i)
+                }
             case "edit": ws.toggleMode()
             case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
             default: break
@@ -378,6 +382,7 @@ enum ReaderPayload {
         switch v {
         case .link(let p, let n): return "<a class=\"internal-link\" data-path=\"\(esc(p))\">\(esc(n))</a>"
         case .list(let l): return l.map(cell).joined(separator: ", ")
+        case .task(let t): return esc(t.text)
         case .string(let s):
             if s.hasPrefix("[["), s.hasSuffix("]]") { return "<span class=\"onyx-inline-md\">\(esc(s))</span>" }
             return "<span class=\"onyx-inline-md\">\(esc(s))</span>"
@@ -385,9 +390,24 @@ enum ReaderPayload {
         }
     }
 
+    static func taskItem(_ t: DVTask) -> String {
+        let checked = t.completed ? " checked" : ""
+        return "<li class=\"task-list-item\(t.completed ? " is-checked" : "")\"><input type=\"checkbox\" data-dv-task data-path=\"\(esc(t.path))\" data-index=\"\(t.indexInFile)\"\(checked)>\(esc(t.text))</li>"
+    }
+
+    static func taskHTML(_ r: DVResult) -> String {
+        if r.taskGroups.allSatisfy({ $0.tasks.isEmpty }) { return "<p class=\"dataview-empty\">No tasks.</p>" }
+        let groups = r.taskGroups.filter { !$0.tasks.isEmpty }.map { g -> String in
+            let title = "<div class=\"dataview-task-title\">\(cell(g.heading))</div>"
+            return "<div class=\"dataview-task-group\">\(title)<ul class=\"dataview-list dataview-tasks\">" + g.tasks.map(taskItem).joined() + "</ul></div>"
+        }.joined()
+        return "<div class=\"dataview-task-list\">\(groups)</div>"
+    }
+
     static func dataviewHTML(_ query: String, snap: VaultSnapshot, path: String) -> String {
         do {
             let r = try Dataview.run(query, in: snap, from: path)
+            if r.isTask { return taskHTML(r) }
             if r.isList {
                 return "<ul class=\"dataview-list\">" + r.rows.map { "<li>" + $0.map(cell).joined(separator: ": ") + "</li>" }.joined() + "</ul>"
             }

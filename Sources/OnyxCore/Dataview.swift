@@ -190,10 +190,17 @@ public struct DVQuery: Sendable {
     public var pipeline: [DVClause] = []
 }
 
+public struct DVTaskGroup: Sendable {
+    public var heading: DVValue
+    public var tasks: [DVTask]
+}
+
 public struct DVResult: Sendable {
     public var headers: [String]
     public var rows: [[DVValue]]
     public var isList: Bool
+    public var isTask: Bool = false
+    public var taskGroups: [DVTaskGroup] = []
 }
 
 public enum DataviewError: Error, CustomStringConvertible {
@@ -578,6 +585,7 @@ public enum Dataview {
     struct Env {
         var snap: VaultSnapshot
         var page: NoteRecord?
+        var task: DVTask? = nil
         var bindings: [String: DVValue] = [:]
         var now: Date
         var currentPath: String?
@@ -585,13 +593,27 @@ public enum Dataview {
 
     public static func run(_ source: String, in snap: VaultSnapshot, from currentPath: String? = nil, now: Date = Date()) throws -> DVResult {
         let q = try parse(source)
-        if q.kind == .task { throw DataviewError.parse("TASK isn’t supported yet") }
         if q.kind == .calendar { throw DataviewError.parse("CALENDAR isn’t supported yet") }
         var pages = snap.notes.values.filter { matchesFrom(q.from, $0, snap: snap, current: currentPath) }
-        if !q.pipeline.contains(where: { if case .sort = $0 { return true }; return false }) {
-            pages.sort { $0.path < $1.path }
+        pages.sort { $0.path < $1.path }
+        let hasSort = q.pipeline.contains { if case .sort = $0 { return true }; return false }
+        var rows: [Env]
+        if q.kind == .task {
+            rows = pages.flatMap { page -> [Env] in
+                tasks(in: page).map { t in
+                    var env = Env(snap: snap, page: page, task: t, now: now, currentPath: currentPath)
+                    env.bindings = taskBindings(t)
+                    return env
+                }
+            }
+            if !hasSort { rows.sort { a, b in
+                let pa = a.task?.path ?? "", pb = b.task?.path ?? ""
+                if pa != pb { return pa < pb }
+                return (a.task?.line ?? 0) < (b.task?.line ?? 0)
+            } }
+        } else {
+            rows = pages.map { Env(snap: snap, page: $0, now: now, currentPath: currentPath) }
         }
-        var rows: [Env] = pages.map { Env(snap: snap, page: $0, now: now, currentPath: currentPath) }
         for clause in q.pipeline {
             switch clause {
             case .flatten(let e, let name):
@@ -627,10 +649,10 @@ public enum Dataview {
                 }
                 rows = order.map { id in
                     let g = groups[id]!
-                    let pages = g.rows.map { $0.page.map { DVValue.page($0.path) } ?? .null }
+                    let items = g.rows.map(rowValue)
                     var bindings: [String: DVValue] = [
                         "key": g.key,
-                        "rows": .list(pages),
+                        "rows": .list(items),
                     ]
                     bindings[norm(name)] = g.key
                     return Env(snap: snap, page: nil, bindings: bindings, now: now, currentPath: currentPath)
@@ -663,9 +685,87 @@ public enum Dataview {
                 return r
             }
             return DVResult(headers: headers, rows: out, isList: false)
-        case .task, .calendar:
-            throw DataviewError.parse("\(q.kind == .task ? "TASK" : "CALENDAR") isn’t supported yet")
+        case .task:
+            return taskResult(rows, snap: snap, grouped: groupExpr(q) != nil)
+        case .calendar:
+            throw DataviewError.parse("CALENDAR isn’t supported yet")
         }
+    }
+
+    static func rowValue(_ env: Env) -> DVValue {
+        if let t = env.task { return .task(t) }
+        if let p = env.page { return .page(p.path) }
+        return .null
+    }
+
+    static func taskBindings(_ t: DVTask) -> [String: DVValue] {
+        [
+            "text": .string(t.text),
+            "visual": .string(t.text),
+            "completed": .bool(t.completed),
+            "done": .bool(t.completed),
+            "path": .string(t.path),
+            "line": .number(Double(t.line)),
+            "due": t.due.map { .date($0, dayOnly: true) } ?? .null,
+            "scheduled": t.scheduled.map { .date($0, dayOnly: true) } ?? .null,
+            "created": t.created.map { .date($0, dayOnly: true) } ?? .null,
+            "completion": t.completion.map { .date($0, dayOnly: true) } ?? .null,
+            "tags": .list(t.tags.map { .string($0) }),
+        ]
+    }
+
+    static func taskResult(_ rows: [Env], snap: VaultSnapshot, grouped: Bool) -> DVResult {
+        var groups: [DVTaskGroup] = []
+        if grouped {
+            for env in rows {
+                let heading = display(env.bindings["key"] ?? .null, snap)
+                let tasks = (env.bindings["rows"]?.asList ?? []).compactMap { v -> DVTask? in
+                    if case .task(let t) = v { return t }
+                    return nil
+                }
+                groups.append(DVTaskGroup(heading: heading, tasks: tasks))
+            }
+        } else {
+            var order: [String] = []
+            var bucket: [String: [DVTask]] = [:]
+            for env in rows {
+                guard let t = env.task else { continue }
+                if bucket[t.path] == nil { order.append(t.path) }
+                bucket[t.path, default: []].append(t)
+            }
+            groups = order.map { p in
+                let name = snap.notes[p]?.name ?? ((p as NSString).lastPathComponent as NSString).deletingPathExtension
+                return DVTaskGroup(heading: .link(path: p, name: name), tasks: bucket[p] ?? [])
+            }
+        }
+        let flat = groups.flatMap(\.tasks)
+        return DVResult(headers: [], rows: flat.map { [.task($0)] }, isList: true, isTask: true, taskGroups: groups)
+    }
+
+    /// Flip the `index`-th task checkbox (document order, outside code fences) in `text`.
+    public static func toggleTask(in text: String, index: Int) -> String? {
+        let lines = text.components(separatedBy: "\n")
+        var out = lines
+        var n = 0
+        var inFence = false
+        let fm = Frontmatter.parse(text)
+        let check = try! NSRegularExpression(pattern: #"^(\s*(?:[-*+]|\d+[.)])\s+)\[( |x|X)\]"#)
+        for (i, line) in lines.enumerated() where i >= fm.lineCount {
+            let t = line.trimmingCharacters(in: .whitespaces)
+            if t.hasPrefix("```") || t.hasPrefix("~~~") { inFence.toggle(); continue }
+            if inFence { continue }
+            let ns = line as NSString
+            guard let m = check.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { continue }
+            if n == index {
+                let mark = ns.substring(with: m.range(at: 2))
+                let flipped = mark == " " ? "x" : " "
+                let prefix = ns.substring(with: m.range(at: 1))
+                out[i] = prefix + "[" + flipped + "]" + ns.substring(from: m.range.upperBound)
+                return out.joined(separator: "\n")
+            }
+            n += 1
+        }
+        return nil
     }
 
     static func groupExpr(_ q: DVQuery) -> DVExpr? {
@@ -845,14 +945,12 @@ public enum Dataview {
             let ns = line as NSString
             guard let m = check.firstMatch(in: line, range: NSRange(location: 0, length: ns.length)) else { continue }
             let mark = ns.substring(with: m.range(at: 2))
-            var body = ns.substring(with: m.range(at: 3))
+            let body = ns.substring(with: m.range(at: 3))
             var due: Date?, scheduled: Date?, created: Date?, completion: Date?
             func eat(_ pattern: String, _ into: inout Date?) {
                 let re = try! NSRegularExpression(pattern: pattern)
                 if let mm = re.firstMatch(in: body, range: NSRange(location: 0, length: (body as NSString).length)) {
-                    let raw = (body as NSString).substring(with: mm.range(at: 1))
-                    into = DVDate.parse(raw)
-                    body = re.stringByReplacingMatches(in: body, range: NSRange(location: 0, length: (body as NSString).length), withTemplate: "")
+                    into = DVDate.parse((body as NSString).substring(with: mm.range(at: 1)))
                 }
             }
             eat(#"📅\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#, &due)
@@ -868,8 +966,7 @@ public enum Dataview {
             tagRe.enumerateMatches(in: body, range: NSRange(location: 0, length: (body as NSString).length)) { m, _, _ in
                 if let m { tags.append((body as NSString).substring(with: m.range(at: 1))) }
             }
-            let clean = body.trimmingCharacters(in: .whitespaces)
-            out.append(DVTask(text: clean, completed: mark.lowercased() == "x", path: path, line: i, indexInFile: index,
+            out.append(DVTask(text: body.trimmingCharacters(in: .whitespaces), completed: mark.lowercased() == "x", path: path, line: i, indexInFile: index,
                               due: due, scheduled: scheduled, created: created, completion: completion, tags: tags))
             index += 1
         }

@@ -1207,6 +1207,24 @@ final class Workspace {
         flushSave()
     }
 
+    /// Toggle a task in any vault note, including files that aren't open. Uses the same
+    /// write path as other edits so git and Obsidian Sync see the change.
+    func toggleDataviewTask(path: String, index: Int) {
+        if path == currentPath {
+            toggleTask(index: index)
+            return
+        }
+        guard let root else { return }
+        let url = root.appendingPathComponent(path)
+        let text = (try? String(contentsOf: url, encoding: .utf8)) ?? snapshot?.notes[path]?.content
+        guard let text, let next = Dataview.toggleTask(in: text, index: index) else { return }
+        if write(next, to: path, create: false) {
+            snapshot?.refresh(paths: [path])
+            renderToken += 1
+        }
+    }
+
+
     // MARK: External changes
 
     private func filesChanged(_ paths: [String]) {

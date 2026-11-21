@@ -51,12 +51,58 @@ final class DataviewTests: XCTestCase {
     }
 
     func testUnsupportedQueriesStillError() {
-        XCTAssertThrowsError(try run("TASK FROM \"Daily\"")) { err in
-            XCTAssertTrue(String(describing: err).contains("TASK"))
-        }
         XCTAssertThrowsError(try run("CALENDAR file.day FROM \"Daily\"")) { err in
             XCTAssertTrue(String(describing: err).contains("CALENDAR"))
         }
+    }
+
+    func testTaskQueries() throws {
+        let all = try run("TASK FROM \"Knowledge/Astrology/Planets\"")
+        XCTAssertTrue(all.isTask)
+        XCTAssertEqual(all.taskGroups.map { if case .link(_, let n) = $0.heading { return n } else { return $0.heading.text } }.sorted(), ["Sun"])
+        XCTAssertEqual(all.taskGroups[0].tasks.map(\.text), ["Watch sunrise 📅 2026-11-22", "Note the metal"])
+        XCTAssertEqual(all.taskGroups[0].tasks.map(\.completed), [false, true])
+
+        let open = try run("TASK FROM \"Knowledge\" WHERE !completed")
+        XCTAssertEqual(open.taskGroups.flatMap(\.tasks).map(\.text), ["Watch sunrise 📅 2026-11-22"])
+
+        let due = try run("TASK FROM \"Knowledge\" WHERE due = date(\"2026-11-22\")")
+        XCTAssertEqual(due.taskGroups.flatMap(\.tasks).map(\.text).first?.contains("Watch sunrise"), true)
+
+        let journal = try run("TASK FROM \"Daily\" WHERE contains(text, \"Write\")")
+        XCTAssertEqual(journal.taskGroups.flatMap(\.tasks).map(\.path), ["Daily/2026-11-20.md"])
+        XCTAssertEqual(journal.taskGroups.flatMap(\.tasks).first?.tags, ["journal"])
+
+        let grouped = try run("TASK FROM \"Daily\" OR \"Knowledge/Astrology/Planets\" GROUP BY file.folder")
+        XCTAssertTrue(grouped.isTask)
+        XCTAssertGreaterThanOrEqual(grouped.taskGroups.count, 2)
+        let labels = Set(grouped.taskGroups.map(\.heading.text))
+        XCTAssertTrue(labels.contains("Daily") || labels.contains("Knowledge/Astrology/Planets"))
+    }
+
+    func testToggleTask() {
+        let src = """
+        # Note
+        - [ ] one
+        - [x] two
+        ```
+        - [ ] not a task
+        ```
+        1. [ ] three
+        """
+        let a = Dataview.toggleTask(in: src, index: 0)!
+        XCTAssertTrue(a.contains("- [x] one"))
+        XCTAssertTrue(a.contains("- [x] two"))
+        XCTAssertTrue(a.contains("- [ ] not a task"))
+        let b = Dataview.toggleTask(in: a, index: 1)!
+        XCTAssertTrue(b.contains("- [ ] two"))
+        let c = Dataview.toggleTask(in: b, index: 2)!
+        XCTAssertTrue(c.contains("1. [x] three"))
+        XCTAssertNil(Dataview.toggleTask(in: src, index: 9))
+        // Frontmatter is skipped
+        let fm = "---\ntags: [a]\n---\n- [ ] only\n"
+        let f = Dataview.toggleTask(in: fm, index: 0)!
+        XCTAssertTrue(f.contains("- [x] only"))
     }
 
     // MARK: file.* fields
