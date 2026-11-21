@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Highlights (`==like this==`) stay on the words in the typeset reader. A wrapped mark no longer paints a full-width yellow band into the margins.
 
+### Documented
+- Preliminary Dataview support: `dataview` blocks in the reader run TABLE (including WITHOUT ID) with AS columns, and LIST; FROM a folder or `#tag` with OR and `-` exclusion; WHERE with comparisons, AND/OR, `contains()`, `choice()`, `default()`; SORT; and LIMIT. Inline queries, DataviewJS, TASK, CALENDAR, and GROUP BY are not supported yet; those queries show an error box.
+
 ## [0.1.3] - 2026-11-21
 
 ### Added

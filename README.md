@@ -19,6 +19,15 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
 - **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N
 - **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync
+- **Preliminary Dataview support** — `dataview` blocks in the reader for TABLE and LIST queries; unsupported queries show an error box
+
+## Preliminary Dataview support
+
+`dataview` code blocks run in the typeset reader.
+
+Supported: TABLE (including WITHOUT ID) with AS columns, and LIST; FROM a folder or `#tag` with OR and `-` exclusion; WHERE with comparisons, AND/OR, `contains()`, `choice()`, `default()`; SORT; LIMIT.
+
+Not yet supported: inline queries, DataviewJS, TASK, CALENDAR, and GROUP BY. Unsupported queries show an error box.
 
 ## Download
 
