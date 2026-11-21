@@ -1,8 +1,9 @@
 import Foundation
 
-/// Obsidian Bases (`.base` YAML, or a ` ```base ` block in a note). Read-only in Onyx:
-/// we parse the file, filter and sort the vault, and draw the views. Unknown
-/// expressions are skipped with a warning rather than crashing the view.
+/// Obsidian Bases (`.base` YAML, or a ` ```base ` block in a note). Onyx parses the
+/// file, filters and sorts the vault, and draws the views. Light structural edits
+/// (columns, sort, views, a simple filter) write back through `BaseDoc`, which
+/// keeps comments and unknown keys. Unknown expressions warn rather than crashing.
 
 public extension String {
     var isBasePath: Bool { lowercased().hasSuffix(".base") }
@@ -46,10 +47,12 @@ public struct BaseView: Sendable, Equatable, Identifiable {
     public var cardSize: Double?
     public var coverProperty: String?
     public var indentProperties: Bool
-    public init(type: String, name: String, filters: BaseFilter, order: [String], sort: [BaseSort], limit: Int?, groupBy: BaseSort?, cardSize: Double?, coverProperty: String?, indentProperties: Bool) {
+    /// Property key → built-in summary name (`Sum`, `Average`, `Count`, …) or a custom formula name from the file-level `summaries` map.
+    public var summaries: [String: String]
+    public init(type: String, name: String, filters: BaseFilter, order: [String], sort: [BaseSort], limit: Int?, groupBy: BaseSort?, cardSize: Double?, coverProperty: String?, indentProperties: Bool, summaries: [String: String] = [:]) {
         self.type = type; self.name = name; self.filters = filters; self.order = order; self.sort = sort
         self.limit = limit; self.groupBy = groupBy; self.cardSize = cardSize; self.coverProperty = coverProperty
-        self.indentProperties = indentProperties
+        self.indentProperties = indentProperties; self.summaries = summaries
     }
 }
 
@@ -60,9 +63,11 @@ public struct BaseFile: Sendable, Equatable {
     public var filters: BaseFilter
     public var views: [BaseView]
     public var warnings: [String]
-    public init(name: String?, formulas: [String: String], properties: [String: BasePropertyConfig], filters: BaseFilter, views: [BaseView], warnings: [String]) {
+    /// File-level custom summary formulas (`summaries: { customAverage: "values.mean().round(3)" }`).
+    public var summaries: [String: String]
+    public init(name: String?, formulas: [String: String], properties: [String: BasePropertyConfig], filters: BaseFilter, views: [BaseView], warnings: [String], summaries: [String: String] = [:]) {
         self.name = name; self.formulas = formulas; self.properties = properties
-        self.filters = filters; self.views = views; self.warnings = warnings
+        self.filters = filters; self.views = views; self.warnings = warnings; self.summaries = summaries
     }
 }
 
@@ -73,6 +78,7 @@ public enum BaseValue: Equatable, Sendable {
     case string(String)
     case list([BaseValue])
     case date(Date)
+    case duration(BaseDuration)
     case link(path: String, name: String)
 
     public var isTruthy: Bool {
@@ -83,6 +89,7 @@ public enum BaseValue: Equatable, Sendable {
         case .string(let s): return !s.isEmpty
         case .list(let l): return !l.isEmpty
         case .date: return true
+        case .duration(let d): return !d.isZero
         case .link(let p, let n): return !p.isEmpty || !n.isEmpty
         }
     }
@@ -95,6 +102,7 @@ public enum BaseValue: Equatable, Sendable {
         case .string(let s): return s
         case .list(let l): return l.map(\.text).filter { !$0.isEmpty }.joined(separator: ", ")
         case .date(let d): return BaseValue.day.string(from: d)
+        case .duration(let d): return d.text
         case .link(_, let n): return n
         }
     }
@@ -102,6 +110,7 @@ public enum BaseValue: Equatable, Sendable {
     public var sortKey: String {
         switch self {
         case .date(let d): return BaseValue.iso.string(from: d)
+        case .duration(let d): return String(format: "%020.6f", d.interval)
         case .number(let n): return String(format: "%020.6f", n)
         case .bool(let b): return b ? "1" : "0"
         default: return text.lowercased()
@@ -115,6 +124,9 @@ public enum BaseValue: Equatable, Sendable {
         switch (self, o) {
         case (.number(let a), .number(let b)): return a == b ? 0 : (a < b ? -1 : 1)
         case (.date(let a), .date(let b)): return a == b ? 0 : (a < b ? -1 : 1)
+        case (.duration(let a), .duration(let b)):
+            let x = a.interval, y = b.interval
+            return x == y ? 0 : (x < y ? -1 : 1)
         case (.bool(let a), .bool(let b)): return a == b ? 0 : (!a ? -1 : 1)
         case (.link(let p1, let n1), .link(let p2, let n2)):
             if !p1.isEmpty && p1 == p2 { return 0 }
@@ -148,7 +160,10 @@ public struct BaseGroup: Sendable, Equatable, Identifiable {
     public var id: String { title }
     public var title: String
     public var rows: [BaseRowView]
-    public init(title: String, rows: [BaseRowView]) { self.title = title; self.rows = rows }
+    public var summaries: [String: BaseValue]
+    public init(title: String, rows: [BaseRowView], summaries: [String: BaseValue] = [:]) {
+        self.title = title; self.rows = rows; self.summaries = summaries
+    }
 }
 
 public struct BaseResult: Sendable {
@@ -158,9 +173,11 @@ public struct BaseResult: Sendable {
     public var groups: [BaseGroup]?
     public var warnings: [String]
     public var total: Int
-    public init(view: BaseView, columns: [BaseColumn], rows: [BaseRowView], groups: [BaseGroup]?, warnings: [String], total: Int) {
+    /// Per-column summary values for the visible rows (empty when the view has no `summaries`).
+    public var summaries: [String: BaseValue]
+    public init(view: BaseView, columns: [BaseColumn], rows: [BaseRowView], groups: [BaseGroup]?, warnings: [String], total: Int, summaries: [String: BaseValue] = [:]) {
         self.view = view; self.columns = columns; self.rows = rows; self.groups = groups
-        self.warnings = warnings; self.total = total
+        self.warnings = warnings; self.total = total; self.summaries = summaries
     }
 }
 
@@ -201,7 +218,8 @@ public enum Bases {
             properties: props,
             filters: filter(map["filters"], warnings: &warnings),
             views: [],
-            warnings: warnings
+            warnings: warnings,
+            summaries: parseSummaries(map["summaries"])
         )
         let rawViews = map["views"]?.list ?? []
         if rawViews.isEmpty { warnings.append("This base has no views.") }
@@ -255,8 +273,8 @@ public enum Bases {
             var ctx = ctxBase
             ctx.item = item
             let ok = evalFilter(combined, ctx: &ctx)
-            warnings.append(contentsOf: ctx.warnings)
             if ok { rows.append(rowView(item, view: view, file: file, ctx: &ctx, snap: snap)) }
+            warnings.append(contentsOf: ctx.warnings)
         }
         warnings = uniq(warnings)
 
@@ -291,7 +309,9 @@ public enum Bases {
             }
             groups = buckets.map { BaseGroup(title: $0.0, rows: $0.1) }
         }
-        return BaseResult(view: view, columns: columns, rows: rows, groups: groups, warnings: warnings, total: total)
+        var result = BaseResult(view: view, columns: columns, rows: rows, groups: groups, warnings: warnings, total: total)
+        attachSummaries(&result, file: file, snap: snap)
+        return result
     }
 
     public static func sort(_ rows: [BaseRowView], by key: String, ascending: Bool) -> [BaseRowView] {
@@ -339,7 +359,8 @@ public enum Bases {
         return BaseView(
             type: type, name: name, filters: filters, order: order, sort: sort,
             limit: m["limit"]?.int, groupBy: group, cardSize: m["cardSize"]?.number,
-            coverProperty: cover, indentProperties: m["indentProperties"]?.bool ?? false
+            coverProperty: cover, indentProperties: m["indentProperties"]?.bool ?? false,
+            summaries: parseSummaries(m["summaries"])
         )
     }
 
@@ -487,6 +508,7 @@ extension Bases {
         var memo: [String: BaseValue]
         var warnings: [String]
         var stack: Set<String> = []
+        var bindings: [String: BaseValue] = [:]
     }
 
     static func evalFilter(_ f: BaseFilter, ctx: inout EvalCtx) -> Bool {
@@ -566,7 +588,7 @@ extension Bases {
             if c == "." { out.append(.dot); adv(); continue }
             let two: String
             if let n = s.index(i, offsetBy: 2, limitedBy: s.endIndex) { two = String(s[i..<n]) } else { two = String(c) }
-            if ["==", "!=", ">=", "<=", "&&", "||"].contains(two) { out.append(.op(two)); i = s.index(i, offsetBy: 2); continue }
+            if ["==", "!=", ">=", "<=", "&&", "||", "=>"].contains(two) { out.append(.op(two)); i = s.index(i, offsetBy: 2); continue }
             if ["+", "-", "*", "/", ">", "<", "!", "=", "&", "|"].contains(String(c)) { out.append(.op(String(c))); adv(); continue }
             throw EvalError("Unexpected “\(c)” in “\(s)”.")
         }
@@ -581,6 +603,7 @@ extension Bases {
         case member(Expr, String)
         case call(Expr, [Expr])
         case index(Expr, Expr)
+        case lambda(String, Expr)
     }
 
     struct Parser {
@@ -596,6 +619,15 @@ extension Bases {
         }
         mutating func expression(_ min: Int = 0) throws -> Expr {
             var left = try prefix()
+            if case .op("=>") = peek() {
+                _ = take()
+                let param: String
+                switch left {
+                case .ident(let n): param = n
+                default: throw EvalError("Expected a parameter before “=>” in “\(src)”.")
+                }
+                return .lambda(param, try expression())
+            }
             while let t = peek() {
                 let (prec, rightAssoc, op) = infix(t)
                 if prec < min { break }
@@ -697,6 +729,7 @@ extension Bases {
             if o == "&&" { let l = evalExpr(a, ctx: &ctx); return l.isTruthy ? evalExpr(b, ctx: &ctx) : l }
             if o == "||" { let l = evalExpr(a, ctx: &ctx); return l.isTruthy ? l : evalExpr(b, ctx: &ctx) }
             let l = evalExpr(a, ctx: &ctx), r = evalExpr(b, ctx: &ctx)
+            if let d = binaryDate(o, l, r) { return d }
             switch o {
             case "==": return .bool(equal(l, r))
             case "!=": return .bool(!equal(l, r))
@@ -718,14 +751,26 @@ extension Bases {
                 return .null
             default: return .null
             }
+        case .lambda:
+            ctx.warnings.append("A function was used on its own; call it on a list with filter or map.")
+            return .null
         case .member(let base, let name):
             return member(evalExpr(base, ctx: &ctx), name, ctx: &ctx)
         case .call(let cal, let args):
-            let argv = args.map { evalExpr($0, ctx: &ctx) }
+            var lambda: (param: String, body: Expr)? = nil
+            if let first = args.first, case .lambda(let p, let b) = first { lambda = (p, b) }
+            let argv = args.map { expr -> BaseValue in
+                if case .lambda = expr { return .null }
+                return evalExpr(expr, ctx: &ctx)
+            }
             if case .ident(let n) = cal { return call(n, argv, recv: nil, ctx: &ctx) }
             if case .member(let base, let name) = cal {
                 let recv = evalExpr(base, ctx: &ctx)
-                return call(name, argv, recv: recv, ctx: &ctx)
+                if let v = extraMethod(name, argv, recv: recv, lambda: lambda, ctx: &ctx), name.lowercased() == "filter" || name.lowercased() == "map" {
+                    return v
+                }
+                let result = call(name, argv, recv: recv, ctx: &ctx)
+                return result
             }
             ctx.warnings.append("Unknown function call.")
             return .null
@@ -756,6 +801,7 @@ extension Bases {
     }
 
     static func lookup(_ name: String, ctx: inout EvalCtx) -> BaseValue {
+        if let v = ctx.bindings[name] { return v }
         switch name {
         case "true": return .bool(true)
         case "false": return .bool(false)
@@ -783,6 +829,18 @@ extension Bases {
             if name == "year" { return .number(Double(Calendar.current.component(.year, from: d))) }
             if name == "month" { return .number(Double(Calendar.current.component(.month, from: d))) }
             if name == "day" { return .number(Double(Calendar.current.component(.day, from: d))) }
+            if name == "hour" { return .number(Double(Calendar.current.component(.hour, from: d))) }
+            if name == "minute" { return .number(Double(Calendar.current.component(.minute, from: d))) }
+            if name == "second" { return .number(Double(Calendar.current.component(.second, from: d))) }
+        }
+        if case .duration(let d) = base {
+            if name == "years" { return .number(Double(d.years)) }
+            if name == "months" { return .number(Double(d.months)) }
+            if name == "weeks" { return .number(Double(d.weeks)) }
+            if name == "days" { return .number(Double(d.days)) }
+            if name == "hours" { return .number(Double(d.hours)) }
+            if name == "minutes" { return .number(Double(d.minutes)) }
+            if name == "seconds" { return .number(d.seconds) }
         }
         return .null
     }
@@ -880,6 +938,10 @@ extension Bases {
                 return .null
             case "string", "str":
                 return .string(args.first?.text ?? "")
+            case "duration":
+                if case .duration(let d) = args.first { return .duration(d) }
+                if let s = args.first?.text, let d = BaseDuration.parse(s) { return .duration(d) }
+                return .null
             default:
                 break
             }
@@ -983,7 +1045,7 @@ extension Bases {
         case "isEmpty", "isempty":
             return .bool(!recv.isTruthy)
         default:
-            return nil
+            return extraMethod(name, args, recv: recv, lambda: nil, ctx: &ctx)
         }
     }
 }
@@ -1038,6 +1100,8 @@ enum YAML {
     }
 
     static func unquotedHash(_ s: String) -> String.Index? {
+        // A `#` that starts the line (after indent) is a full-line comment, not a scalar.
+        if let start = s.firstIndex(where: { $0 != " " && $0 != "\t" }), s[start] == "#" { return start }
         var quote: Character? = nil
         var i = s.startIndex
         while i < s.endIndex {
