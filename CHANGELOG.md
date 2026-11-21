@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Show Sync Log in the command palette: a panel of recent Git and Obsidian Sync activity (timestamp, source, event, detail), kept in a ring of the last 500 events and written to a plain-text log per vault. Esc closes it; Copy and Reveal in Finder sit in the header; clicking the footer sync badges opens it too.
 - In-app Bases editing: add, remove, and reorder columns; rename or add a table or cards view; edit a filter from a popover. Writes are atomic and undoable with ⌘Z, and comments and unknown keys are kept.
 - Summaries row on table views: Count, Sum, Average, Min, Max, Earliest, Latest, Unique, Empty, Filled.
 - Richer Bases formulas: date durations, `.format()`, `.relative()`, plus list, number, and string methods.

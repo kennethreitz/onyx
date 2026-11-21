@@ -63,6 +63,7 @@ public actor SyncEngine {
     private let stateURL: URL?
     private let options: Options
     private let onStatus: @Sendable (SyncStatus) -> Void
+    private let onLog: @Sendable (String, String?) -> Void
 
     private var conn: SyncConnection?
     private var eventsTask: Task<Void, Never>?
@@ -80,10 +81,11 @@ public actor SyncEngine {
     public var currentPhase: SyncPhase { phase }
 
     public init(root: URL, state: SyncState, crypto: any SyncEncryptionProvider, token: String, stateURL: URL?,
-                options: Options = Options(), onStatus: @escaping @Sendable (SyncStatus) -> Void = { _ in }) {
+                options: Options = Options(), onStatus: @escaping @Sendable (SyncStatus) -> Void = { _ in },
+                onLog: @escaping @Sendable (String, String?) -> Void = { _, _ in }) {
         self.root = root.standardizedFileURL.resolvingSymlinksInPath()
         self.state = state; self.crypto = crypto; self.token = token; self.stateURL = stateURL
-        self.options = options; self.onStatus = onStatus
+        self.options = options; self.onStatus = onStatus; self.onLog = onLog
         scanner = LocalScanner(root: root, configDir: state.filter.configDir)
     }
 
@@ -165,6 +167,7 @@ public actor SyncEngine {
     }
     private func note(_ s: String, _ path: String? = nil) {
         log.append(path.map { "\(s): \($0)" } ?? s); if log.count > 500 { log.removeFirst(log.count - 500) }
+        onLog(s, path)
     }
     private func saveIfDirty(force: Bool = false) {
         guard dirty || force, let stateURL else { return }

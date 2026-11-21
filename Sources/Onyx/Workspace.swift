@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -142,6 +142,8 @@ final class Workspace {
     var git: GitSync?
     /// Obsidian Sync, only for folders the user connected in Settings ▸ Sync (see VaultSync); nil otherwise.
     var obsidianSync: VaultSync?
+    /// Recent git and Obsidian Sync activity for this vault, persisted in Application Support.
+    var syncLog: SyncLogStore?
 
     func open(vault url: URL, initialNote: String? = nil, restoreSplits: Bool = true) {
         let next = url.standardizedFileURL
@@ -155,10 +157,15 @@ final class Workspace {
         root = next
         git?.stop()
         git = GitSync.detect(root!)
+        syncLog = SyncLogStore(vaultRoot: root!)
+        if ProcessInfo.processInfo.environment["ONYX_SYNC_LOG_DEMO"] == "1" { syncLog?.seedPreviewIfEmpty() }
         git?.beforeCommit = { [weak self] in self?.flushSave() }
+        git?.onLog = { [weak self] event, detail in self?.syncLog?.append(source: .git, event: event, detail: detail) }
         git?.start()
         obsidianSync?.stop()
-        obsidianSync = VaultSync.resume(for: root!)
+        obsidianSync = VaultSync.resume(for: root!, onLog: { [weak self] event, detail in
+            self?.syncLog?.append(source: .obsidian, event: event, detail: detail)
+        })
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
         loadTreeOrder()

@@ -175,6 +175,9 @@ struct OnyxApp: App {
                 case "atlas": ws.graphAtlas = true; ws.show(.graph)
                 case "workspace": ws.toggleWorkspaceLayout()
                 case "daily": ws.openDaily()
+                case "synclog", "sync-log":
+                    ws.syncLog?.seedPreviewIfEmpty()
+                    ws.show(.syncLog)
                 default: break
                 }
             }

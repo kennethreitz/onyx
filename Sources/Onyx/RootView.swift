@@ -147,8 +147,8 @@ struct RootView: View {
                     Spacer()
                 }
                 syncDot.padding(.trailing, 6)
-                if let s = ws.obsidianSync { SyncBadge(sync: s).padding(.trailing, 6) }
-                if let g = ws.git { GitBadge(git: g) { ws.toggleSidebar(.git) }.padding(.trailing, 6) }
+                if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.padding(.trailing, 6) }
+                if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.padding(.trailing, 6) }
                 if ws.currentPath != nil {
                     Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)
                 }
@@ -455,6 +455,13 @@ struct RootView: View {
                 }
                 Spacer()
             }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .syncLog:
+            dimmer
+            VStack {
+                SyncLogView(store: ws.syncLog, dismiss: { ws.show(.none) })
+                    .padding(.top, 72)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
         case .graph:
             // Drawn on the focused pane (or the solo page), not over the window.
             EmptyView()
@@ -691,6 +698,7 @@ struct WelcomeView: View {
 /// The footer's tiny git state: synced ✓, syncing ↻, offline, conflict (tinted), local only.
 struct GitBadge: View {
     var git: GitSync
+    var openSourceControl: () -> Void = {}
     var action: () -> Void
     var body: some View {
         let (symbol, color): (String, Color) = switch git.state {
@@ -706,8 +714,12 @@ struct GitBadge: View {
             Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
         }
         .buttonStyle(.plain)
-        .help(git.help)
+        .help(git.help + "\nClick for the sync log")
         .accessibilityLabel(git.help)
+        .contextMenu {
+            Button("Show Sync Log") { action() }
+            Button("Source Control") { openSourceControl() }
+        }
     }
 }
 

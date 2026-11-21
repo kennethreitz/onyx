@@ -1,6 +1,7 @@
 import AppKit
 import CryptoKit
 import Observation
+import OnyxCore
 import OnyxSync
 import SwiftUI
 
@@ -72,6 +73,7 @@ final class VaultSync {
     private(set) var binding: SyncBinding
     private(set) var status = SyncStatus(phase: .connecting, lastSynced: nil, initialMerge: true)
     @ObservationIgnored private var engine: SyncEngine?
+    @ObservationIgnored var onLog: (SyncLogEvent, String) -> Void = { _, _ in }
 
     static var supportDir: URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Onyx/Sync")
@@ -83,20 +85,23 @@ final class VaultSync {
     static func isConnected(_ root: URL) -> Bool { FileManager.default.fileExists(atPath: stateURL(for: root).path) }
 
     /// Resume sync for a folder that was connected before; nil if it never was (or secrets are missing).
-    static func resume(for root: URL) -> VaultSync? {
+    static func resume(for root: URL, onLog: @escaping (SyncLogEvent, String) -> Void = { _, _ in }) -> VaultSync? {
         guard ProcessInfo.processInfo.environment["ONYX_NO_SYNC"] == nil,
               let state = try? SyncState.load(stateURL(for: root)) else { return nil }
         let v = VaultSync(root: root, binding: state.binding)
+        v.onLog = onLog
         v.start(state: state)
         return v
     }
 
     /// First connect, after the user confirmed the plan.
-    static func connect(root: URL, binding: SyncBinding, key: [UInt8]) throws -> VaultSync {
+    static func connect(root: URL, binding: SyncBinding, key: [UInt8],
+                        onLog: @escaping (SyncLogEvent, String) -> Void = { _, _ in }) throws -> VaultSync {
         try SyncAccount.shared.store.set("key." + binding.vaultID, Data(key))
         let state = SyncState(binding: binding)
         try state.save(stateURL(for: root))
         let v = VaultSync(root: root, binding: binding)
+        v.onLog = onLog
         v.start(state: state)
         return v
     }
@@ -105,16 +110,24 @@ final class VaultSync {
 
     private func start(state: SyncState) {
         let account = SyncAccount.shared
-        guard let token = account.token else { status.phase = .error("Signed out of Obsidian — sign in under Settings ▸ Sync"); return }
+        guard let token = account.token else {
+            let msg = "Signed out of Obsidian — sign in under Settings ▸ Sync"
+            status.phase = .error(msg); record(.error, msg); return
+        }
         guard let key = account.store.vaultKey(binding.vaultID),
               let crypto = try? ObsidianCrypto.provider(version: binding.encryptionVersion, key: key, salt: binding.salt) else {
-            status.phase = .error("Missing the vault key — reconnect under Settings ▸ Sync"); return
+            let msg = "Missing the vault key — reconnect under Settings ▸ Sync"
+            status.phase = .error(msg); record(.error, msg); return
         }
         var o = SyncEngine.Options()
         o.backupDir = Self.supportDir.appendingPathComponent("Backups").appendingPathComponent(Self.stateURL(for: root).deletingPathExtension().lastPathComponent)
-        let e = SyncEngine(root: root, state: state, crypto: crypto, token: token, stateURL: Self.stateURL(for: root), options: o) { [weak self] s in
-            Task { @MainActor in self?.status = s }
-        }
+        let e = SyncEngine(root: root, state: state, crypto: crypto, token: token, stateURL: Self.stateURL(for: root), options: o,
+                           onStatus: { [weak self] s in Task { @MainActor in self?.status = s } },
+                           onLog: { [weak self] msg, path in
+                               if let ev = SyncLogStore.fromObsidian(message: msg, path: path) {
+                                   Task { @MainActor in self?.record(ev.event, ev.detail) }
+                               }
+                           })
         engine = e
         Task { await e.start() }
     }
@@ -131,6 +144,8 @@ final class VaultSync {
         try? FileManager.default.removeItem(at: Self.stateURL(for: root))
         SyncAccount.shared.store.remove("key." + binding.vaultID)
     }
+
+    func record(_ event: SyncLogEvent, _ detail: String) { onLog(event, detail) }
 
     var isPaused: Bool { if case .paused = status.phase { return true }; return false }
 
@@ -163,6 +178,7 @@ struct SettingsOpener: View {
 
 struct SyncBadge: View {
     var sync: VaultSync
+    var action: () -> Void
     @Environment(\.openSettings) private var openSettings
     var body: some View {
         let (symbol, color): (String, Color) = switch sync.status.phase {
@@ -172,12 +188,16 @@ struct SyncBadge: View {
             case .offline: ("icloud.slash", Color.faint)
             case .error, .needsAttention: ("exclamationmark.icloud", Color.orange.opacity(0.85))
         }
-        Button { openSettings() } label: {
+        Button(action: action) {
             Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
         }
         .buttonStyle(.plain)
-        .help(sync.help)
+        .help(sync.help + "\nClick for the sync log")
         .accessibilityLabel(sync.help)
+        .contextMenu {
+            Button("Show Sync Log") { action() }
+            Button("Sync Settings…") { openSettings() }
+        }
     }
 }
 
@@ -332,7 +352,11 @@ struct ObsidianSyncSettings: View {
     func connect(_ p: Proposal) {
         guard let root = ws.root else { return }
         proposal = nil
-        do { ws.obsidianSync = try VaultSync.connect(root: root, binding: p.binding, key: p.key) }
+        do {
+            ws.obsidianSync = try VaultSync.connect(root: root, binding: p.binding, key: p.key, onLog: { [weak ws] event, detail in
+                ws?.syncLog?.append(source: .obsidian, event: event, detail: detail)
+            })
+        }
         catch { self.error = "\(error)" }
     }
 

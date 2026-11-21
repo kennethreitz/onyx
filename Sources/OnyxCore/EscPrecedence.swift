@@ -11,7 +11,7 @@ public enum EscAction: String, Equatable, Sendable {
     case dismissSuggestions
     /// The in-note find bar is open.
     case closeFind
-    /// Quick switcher, command palette, graph/atlas overlay, or move-to picker.
+    /// Quick switcher, command palette, graph/atlas overlay, sync log, or move-to picker.
     case dismissOverlay
     /// A multi-selection in the file tree.
     case clearTreeSelection
@@ -78,7 +78,7 @@ public struct EscSituation: Equatable, Sendable {
 }
 
 /// Precedence for Esc, highest first:
-/// sheet/alert → IME → autocomplete → find bar → overlay (switcher, palette, graph, move-to)
+/// sheet/alert → IME → autocomplete → find bar → overlay (switcher, palette, graph, sync log, move-to)
 /// → tree multi-selection → unpinned inspector → unpinned sidebar → docked inspector
 /// → focus mode → collapse selection/multi-cursor → return to reading (editor only, setting on).
 /// Esc in reading view never switches to editing.

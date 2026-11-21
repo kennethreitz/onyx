@@ -29,6 +29,8 @@ import OnyxCore
     @ObservationIgnored private var pending: (sync: Bool, reason: String?)?
     /// Called on the main thread before each commit (Workspace flushes its pending save).
     @ObservationIgnored var beforeCommit: () -> Void = {}
+    /// Called on the main thread after a commit, pull, push, conflict, or error.
+    @ObservationIgnored var onLog: (SyncLogEvent, String) -> Void = { _, _ in }
     @ObservationIgnored var settle: TimeInterval = 1.0
     @ObservationIgnored var interval: TimeInterval = 30
 
@@ -86,7 +88,7 @@ import OnyxCore
         let ops = Ops(root: root, git: git)
         queue.async { [weak self] in
             let commit = ops.commit(reason: reason)
-            let result = sync ? ops.sync(timeout: 60) : .ok(nil)
+            let result = sync ? ops.sync(timeout: 60) : .ok(Ops.Report())
             DispatchQueue.main.async { MainActor.assumeIsolated { self?.finished(commit: commit, result: result) } }
         }
         if state != .conflict { state = sync ? .pulling : .committing }
@@ -96,31 +98,43 @@ import OnyxCore
         inFlight = false
         if let commit { lastCommit = commit }
         switch result {
-        case .ok(let copies):
+        case .ok(let report):
             failures = 0; retry?.cancel()
             lastSync = Date()
-            if let copies, !copies.isEmpty {
-                conflictCopies += copies
+            if !report.copies.isEmpty {
+                conflictCopies += report.copies
                 state = .conflict
-                detail = "Kept both versions: " + copies.map { ($0 as NSString).lastPathComponent }.joined(separator: ", ")
+                detail = "Kept both versions: " + report.copies.map { ($0 as NSString).lastPathComponent }.joined(separator: ", ")
             } else if state != .conflict || conflictCopies.allSatisfy({ !FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path) }) {
                 conflictCopies = []
                 state = .synced; detail = "Synced"
             }
+            if let commit { onLog(.commit, commit) }
+            if report.pulled > 0 { onLog(.pull, report.pulled == 1 ? "Received 1 commit" : "Received \(report.pulled) commits") }
+            if report.pushed > 0 { onLog(.push, report.pushed == 1 ? "Pushed 1 commit" : "Pushed \(report.pushed) commits") }
+            if !report.copies.isEmpty {
+                onLog(.conflict, "Kept both versions: " + report.copies.map { ($0 as NSString).lastPathComponent }.joined(separator: ", "))
+            }
         case .localOnly:
             failures = 0; state = .localOnly; detail = "Committed locally (no remote)"
+            if let commit { onLog(.commit, commit) }
         case .offline(let msg):
             failures += 1
             let wait = GitText.backoff(failures)
             state = .offline; detail = "Offline, retrying in \(Int(wait))s. \(msg)"
+            if let commit { onLog(.commit, commit) }
+            onLog(.error, "Offline: \(msg)")
             retry?.cancel()
             let w = DispatchWorkItem { [weak self] in MainActor.assumeIsolated { self?.syncNow() } }
             retry = w
             DispatchQueue.main.asyncAfter(deadline: .now() + wait, execute: w)
         case .failed(let msg):
             state = .failed; detail = msg
+            if let commit { onLog(.commit, commit) }
+            onLog(.error, msg)
         case .busy(let msg):
             state = .conflict; detail = msg
+            onLog(.conflict, msg)
         }
         if let p = pending { pending = nil; request(sync: p.sync, reason: p.reason) }
     }
@@ -149,7 +163,8 @@ struct Ops: Sendable {
     let root: URL
     let git: String
 
-    enum Result: Sendable { case ok([String]?), localOnly, offline(String), failed(String), busy(String) }
+    struct Report: Sendable { var copies: [String] = []; var pulled = 0; var pushed = 0 }
+    enum Result: Sendable { case ok(Report), localOnly, offline(String), failed(String), busy(String) }
 
     struct Out { var code: Int32; var out: String; var err: String; var data: Data }
     @discardableResult
@@ -215,7 +230,7 @@ struct Ops: Sendable {
         guard let branch = line(["symbolic-ref", "--short", "-q", "HEAD"]) else { return .failed("Detached HEAD; not syncing") }
         var upstream = line(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
         let remote = upstream.map { String($0.split(separator: "/").first ?? "origin") } ?? (remotes.contains("origin") ? "origin" : remotes[0])
-        var copies: [String] = []
+        var report = Report()
         for _ in 0..<4 {
             let f = run(["fetch", "--quiet", "--prune", remote], timeout: timeout)
             if f.code != 0 { return GitText.isNetworkError(f.err) ? .offline(firstLine(f.err)) : .failed(firstLine(f.err)) }
@@ -227,18 +242,23 @@ struct Ops: Sendable {
                 if r.code != 0 {
                     guard rebasing else { return .failed("Rebase failed: " + firstLine(r.err)) }
                     switch resolveRebase() {
-                    case .some(let c): copies += c
+                    case .some(let c): report.copies += c
                     case .none:
                         run(["rebase", "--abort"])
                         return .failed("Couldn’t replay local commits onto \(u); left them as they were (nothing lost)")
                     }
                 }
+                report.pulled += behind
             }
             let ahead = upstream.flatMap { Int(line(["rev-list", "--count", "\($0)..HEAD"]) ?? "0") } ?? 1
-            guard ahead > 0 else { return .ok(copies) }
+            guard ahead > 0 else { return .ok(report) }
             let p = upstream == nil ? run(["push", "--quiet", "-u", remote, "HEAD"], timeout: timeout)
                                     : run(["push", "--quiet", remote, "HEAD:\(branch)"], timeout: timeout)
-            if p.code == 0 { if upstream == nil { upstream = "\(remote)/\(branch)" }; return .ok(copies) }
+            if p.code == 0 {
+                if upstream == nil { upstream = "\(remote)/\(branch)" }
+                report.pushed += ahead
+                return .ok(report)
+            }
             if GitText.isNetworkError(p.err) { return .offline(firstLine(p.err)) }
             if !GitText.isNonFastForward(p.err) { return .failed("Push refused: " + firstLine(p.err)) }
             // the remote moved on between fetch and push: go round again

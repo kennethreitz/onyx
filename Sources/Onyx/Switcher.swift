@@ -241,6 +241,7 @@ enum PaletteCommands {
             PaletteItem(id: "bookmark", title: "Bookmark / unbookmark this note", symbol: "bookmark.fill") { ws.toggleBookmark() },
             PaletteItem(id: "tags", title: "Tags", symbol: "number") { ws.toggleSidebar(.tags) },
             PaletteItem(id: "git", title: "Source control", symbol: "arrow.triangle.branch") { ws.toggleSidebar(.git) },
+            PaletteItem(id: "synclog", title: "Show Sync Log", symbol: "list.bullet.rectangle") { DispatchQueue.main.async { ws.show(.syncLog) } },
             PaletteItem(id: "inspector", title: "Show inspector (outline, backlinks, properties)", symbol: "sidebar.right", shortcut: "⌘I") { ws.toggleInspector() },
             PaletteItem(id: "outline", title: "Outline", symbol: "list.bullet.indent") { ws.toggleInspector(.outline) },
             PaletteItem(id: "backlinks", title: "Backlinks", symbol: "arrow.uturn.backward") { ws.toggleInspector(.backlinks) },
