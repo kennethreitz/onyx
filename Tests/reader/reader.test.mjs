@@ -157,6 +157,18 @@ test('canvas cards: fragment renders against the card context, without line mark
   assert.doesNotMatch(ctx.window.Onyx._html('[[Hecate]]'), /AI\/Hecate/);
 });
 
+test('==highlight== becomes a mark, including across a line break', () => {
+  assert.match(html('a ==one== b'), /<p>a <mark>one<\/mark> b<\/p>/);
+  const multi = html('start ==this highlight\ncontinues across a line== end');
+  assert.match(multi, /<mark>this highlight<br>\s*continues across a line<\/mark>/);
+});
+
+test('mark CSS clones decoration on each line so a wrap does not paint a full-width band', () => {
+  const css = fs.readFileSync(path.join(web, 'reader.css'), 'utf8');
+  assert.match(css, /mark,\s*\.highlight\s*\{[^}]*-webkit-box-decoration-break:\s*clone/);
+  assert.match(css, /mark,\s*\.highlight\s*\{[^}]*box-decoration-break:\s*clone/);
+});
+
 // --- Typeset reading (typeset.js) ---------------------------------------------
 const T = () => ctx.window.OnyxTypeset;
 

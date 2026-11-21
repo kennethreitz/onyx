@@ -96,7 +96,13 @@ a.is-unresolved { text-decoration-style: dotted; color: var(--text-muted); }
 a.external-link::after { content: "\2009\2197"; font-size: 0.7em; color: var(--text-faint); vertical-align: super; }
 
 strong { font-weight: 700; } em { font-style: italic; }
-mark, .highlight { background: var(--highlight); color: inherit; padding: 0 0.08em; border-radius: 2px; }
+/* clone: each line fragment keeps its own background. Without it, WKWebView
+   treats border-radius as one box around the whole mark — a yellow band the
+   width of the pane that starts and ends mid-line, and runs into the margins. */
+mark, .highlight {
+  background: var(--highlight); color: inherit; padding: 0 0.08em; border-radius: 2px;
+  -webkit-box-decoration-break: clone; box-decoration-break: clone;
+}
 mark.hltr-pink { background: #FFB8EBA6; } mark.hltr-red { background: #FF5582A6; } mark.hltr-orange { background: #FFB86CA6; }
 mark.hltr-yellow { background: #FFF3A3A6; } mark.hltr-green { background: #BBFABBA6; } mark.hltr-cyan { background: #ABF7F7A6; }
 mark.hltr-blue { background: #ADCCFFA6; } mark.hltr-purple { background: #D2B3FFA6; } mark.hltr-grey { background: #CACFD9A6; }
