@@ -1,0 +1,209 @@
+import XCTest
+@testable import OnyxCore
+
+final class DataviewTests: XCTestCase {
+    let now: Date = {
+        var c = DateComponents(); c.year = 2026; c.month = 11; c.day = 21; c.hour = 15; c.minute = 30
+        return Calendar.current.date(from: c)!
+    }()
+
+    func snap(_ files: [String: String], dates: [String: (mtime: Date, ctime: Date)] = [:]) -> VaultSnapshot {
+        var s = VaultSnapshot(root: URL(fileURLWithPath: "/tmp/none"))
+        for (p, c) in files {
+            let d = dates[p]
+            s.notes[p] = VaultSnapshot.makeRecord(rel: p, content: c, mtime: d?.mtime ?? now, ctime: d?.ctime ?? now, size: c.utf8.count)
+        }
+        s.rebuildDerived()
+        return s
+    }
+
+    func planets() -> VaultSnapshot {
+        snap([
+            "Knowledge/Astrology/Planets/Sun.md": "---\ntype: planet\norder: 1\nmetal: Gold\naliases:\n  - Sol\n---\n# Sun\n[[Moon]]\n- [ ] Watch sunrise 📅 2026-11-22\n- [x] Note the metal\n",
+            "Knowledge/Astrology/Planets/Moon.md": "---\ntype: planet\norder: 2\nmetal: Silver\n---\n# Moon\n[[Sun]] [[Missing]]\nauthors:: [[Sun]], [[Moon]]\n",
+            "Knowledge/Astrology/Planets/Planets.md": "# Planets\n#atlas",
+            "Projects/Moon.md": "# other moon",
+            "Daily/2026-11-20.md": "---\ntype: daily\n---\n# Friday\n- [ ] Write #journal\n",
+            "Daily/2026-11-21.md": "---\ntype: daily\n---\n# Saturday\ncost:: 3\ncost:: 5\n",
+        ])
+    }
+
+    func run(_ q: String, in s: VaultSnapshot? = nil, from: String? = nil) throws -> DVResult {
+        try Dataview.run(q, in: s ?? planets(), from: from, now: now)
+    }
+
+    func ev(_ expr: String, path: String = "Knowledge/Astrology/Planets/Sun.md", in s: VaultSnapshot? = nil) throws -> DVValue {
+        try Dataview.evalExpr(expr, in: s ?? planets(), from: path, now: now)
+    }
+
+    // MARK: Parser
+
+    func testParseGroupByAndFlatten() throws {
+        let q = try Dataview.parse("TABLE length(rows) FROM \"Knowledge\" WHERE type = \"planet\" GROUP BY type")
+        XCTAssertEqual(q.kind, .table)
+        XCTAssertTrue(q.pipeline.contains { if case .groupBy = $0 { return true }; return false })
+        let f = try Dataview.parse("LIST FROM \"Knowledge\" FLATTEN authors AS Author")
+        XCTAssertTrue(f.pipeline.contains { if case .flatten(_, let n) = $0 { return n == "Author" }; return false })
+        let e = try Dataview.parseExpr("date(today) - dur(1 day)")
+        if case .binary("-", _, _) = e { } else { XCTFail("expected subtraction") }
+        let lam = try Dataview.parseExpr("filter(file.tasks, (x) => !x.completed)")
+        if case .call("filter", let args) = lam, args.count == 2, case .lambda("x", _) = args[1] { } else { XCTFail("expected lambda") }
+    }
+
+    func testUnsupportedQueriesStillError() {
+        XCTAssertThrowsError(try run("TASK FROM \"Daily\"")) { err in
+            XCTAssertTrue(String(describing: err).contains("TASK"))
+        }
+        XCTAssertThrowsError(try run("CALENDAR file.day FROM \"Daily\"")) { err in
+            XCTAssertTrue(String(describing: err).contains("CALENDAR"))
+        }
+    }
+
+    // MARK: file.* fields
+
+    func testFileImplicitFields() throws {
+        let s = planets()
+        XCTAssertEqual(try ev("file.name").text, "Sun")
+        XCTAssertEqual(try ev("file.path").text, "Knowledge/Astrology/Planets/Sun.md")
+        XCTAssertEqual(try ev("file.folder").text, "Knowledge/Astrology/Planets")
+        XCTAssertEqual(try ev("file.size").text, "\(s.notes["Knowledge/Astrology/Planets/Sun.md"]!.size)")
+        if case .link(let p, let n) = try ev("file.link") {
+            XCTAssertEqual(p, "Knowledge/Astrology/Planets/Sun.md"); XCTAssertEqual(n, "Sun")
+        } else { XCTFail("file.link") }
+        if case .list(let a) = try ev("file.aliases") {
+            XCTAssertEqual(a.map(\.text), ["Sol"])
+        } else { XCTFail("aliases") }
+        if case .list(let t) = try ev("file.tasks") {
+            XCTAssertEqual(t.count, 2)
+            if case .task(let first) = t[0] {
+                XCTAssertFalse(first.completed)
+                XCTAssertEqual(first.text.hasPrefix("Watch sunrise"), true)
+                XCTAssertEqual(first.due.map { DVDate.format($0, dayOnly: true) }, "2026-11-22")
+            } else { XCTFail("task object") }
+        } else { XCTFail("tasks") }
+        if case .date(_, let day) = try ev("file.day", path: "Daily/2026-11-20.md") {
+            XCTAssertTrue(day)
+        } else { XCTFail("file.day") }
+        XCTAssertEqual(try ev("file.day", path: "Daily/2026-11-20.md").text, "2026-11-20")
+        if case .date(_, let dayOnly) = try ev("file.ctime") { XCTAssertFalse(dayOnly) } else { XCTFail("ctime") }
+        if case .date(_, let dayOnly) = try ev("file.cday") { XCTAssertTrue(dayOnly) } else { XCTFail("cday") }
+        if case .list(let tags) = try ev("file.tags", path: "Knowledge/Astrology/Planets/Planets.md") {
+            XCTAssertTrue(tags.map(\.text).contains("#atlas"))
+        } else { XCTFail("tags") }
+        if case .list(let outs) = try ev("file.outlinks") {
+            XCTAssertTrue(outs.contains { if case .link(let p, _) = $0 { return p.hasSuffix("Moon.md") }; return false })
+        } else { XCTFail("outlinks") }
+        if case .list(let ins) = try ev("file.inlinks") {
+            XCTAssertTrue(ins.contains { if case .link(let p, _) = $0 { return p.hasSuffix("Moon.md") }; return false })
+        } else { XCTFail("inlinks") }
+    }
+
+    func testInlineFieldsFeedDataview() throws {
+        let r = try run("TABLE authors FROM \"Knowledge/Astrology/Planets\" WHERE file.name = \"Moon\"")
+        XCTAssertEqual(r.rows.count, 1)
+        if case .list(let l) = r.rows[0][1] {
+            XCTAssertEqual(Set(l.map(\.text)), ["Sun", "Moon"])
+        } else { XCTFail("authors should be links: \(r.rows[0][1])") }
+    }
+
+    // MARK: GROUP BY / FLATTEN
+
+    func testGroupByRows() throws {
+        let r = try run("TABLE WITHOUT ID length(rows) AS Count FROM \"Knowledge\" WHERE type = \"planet\" GROUP BY type")
+        XCTAssertEqual(r.headers, ["Count"])
+        XCTAssertEqual(r.rows.count, 1)
+        XCTAssertEqual(r.rows[0][0].text, "2")
+        let withKey = try run("TABLE length(rows) FROM \"Knowledge\" WHERE type = \"planet\" GROUP BY type")
+        XCTAssertEqual(withKey.rows.count, 1)
+        XCTAssertEqual(withKey.rows[0][0].text, "planet")
+        XCTAssertEqual(withKey.rows[0][1].text, "2")
+        let names = try run("TABLE WITHOUT ID rows.file.name FROM \"Knowledge\" WHERE type = \"planet\" GROUP BY type")
+        XCTAssertEqual(Set(names.rows[0][0].asList.map(\.text)), ["Moon", "Sun"])
+        let sums = try run("TABLE WITHOUT ID sum(rows.order) FROM \"Knowledge\" WHERE type = \"planet\" GROUP BY type")
+        XCTAssertEqual(sums.rows[0][0].text, "3")
+    }
+
+    func testFlatten() throws {
+        let r = try run("TABLE WITHOUT ID Author FROM \"Knowledge/Astrology/Planets\" WHERE file.name = \"Moon\" FLATTEN authors AS Author")
+        XCTAssertEqual(r.rows.count, 2)
+        XCTAssertEqual(Set(r.rows.map { $0[0].text }), ["Sun", "Moon"])
+        // empty / missing flatten still emits a single (null) row
+        let empty = try run("LIST FROM \"Projects\" FLATTEN authors")
+        XCTAssertEqual(empty.rows.count, 1)
+    }
+
+    // MARK: Dates and durations
+
+    func testDatesAndDurations() throws {
+        let today = try ev("date(today)")
+        XCTAssertEqual(today.text, "2026-11-21")
+        XCTAssertEqual(try ev("date(yesterday)").text, "2026-11-20")
+        XCTAssertEqual(try ev("date(tomorrow)").text, "2026-11-22")
+        XCTAssertEqual(try ev("dateformat(date(today), \"yyyy-MM-dd\")").text, "2026-11-21")
+        let later = try ev("date(today) + dur(1 day)")
+        XCTAssertEqual(later.text, "2026-11-22")
+        let earlier = try ev("date(today) - 2 days")
+        XCTAssertEqual(earlier.text, "2026-11-19")
+        XCTAssertEqual(try ev("date(today) > date(yesterday)").text, "true")
+        XCTAssertEqual(try ev("date(today) = date(\"2026-11-21\")").text, "true")
+        if case .duration(let d) = try ev("date(today) - date(yesterday)") {
+            XCTAssertEqual(d.days, 1)
+        } else { XCTFail("date - date") }
+        XCTAssertEqual(try ev("striptime(date(now))").text, "2026-11-21")
+        XCTAssertEqual(try ev("file.day = date(yesterday)", path: "Daily/2026-11-20.md").text, "true")
+        XCTAssertEqual(try ev("date(today) - dur(\"1 week\")").text, "2026-11-14")
+    }
+
+    // MARK: Functions
+
+    func testFunctionLibrary() throws {
+        XCTAssertEqual(try ev("length(\"Gold\")").text, "4")
+        XCTAssertEqual(try ev("length(file.tasks)").text, "2")
+        XCTAssertEqual(try ev("lower(metal)").text, "gold")
+        XCTAssertEqual(try ev("upper(metal)").text, "GOLD")
+        XCTAssertEqual(try ev("round(3.14159, 2)").text, "3.14")
+        XCTAssertEqual(try ev("round(3.7)").text, "4")
+        XCTAssertEqual(try ev("min(3, 1, 4)").text, "1")
+        XCTAssertEqual(try ev("max(3, 1, 4)").text, "4")
+        XCTAssertEqual(try ev("sum(1, 2, 3)").text, "6")
+        XCTAssertEqual(try ev("join(file.aliases, \" / \")").text, "Sol")
+        XCTAssertEqual(try ev("number(\"21\")").text, "21")
+        XCTAssertEqual(try ev("string(order)").text, "1")
+        XCTAssertEqual(try ev("startswith(metal, \"Go\")").text, "true")
+        XCTAssertEqual(try ev("endswith(metal, \"ld\")").text, "true")
+        XCTAssertEqual(try ev("regexmatch(metal, \"^G\")").text, "true")
+        XCTAssertEqual(try ev("replace(metal, \"o\", \"oo\")").text, "Goold")
+        XCTAssertEqual(try ev("contains(metal, \"ol\")").text, "true")
+        XCTAssertEqual(try ev("icontains(metal, \"GOLD\")").text, "true")
+        XCTAssertEqual(try ev("econtains(file.aliases, \"Sol\")").text, "true")
+        XCTAssertEqual(try ev("econtains(file.aliases, \"So\")").text, "false")
+        XCTAssertEqual(try ev("choice(metal, metal, \"—\")").text, "Gold")
+        XCTAssertEqual(try ev("default(missing, \"n/a\")").text, "n/a")
+        let filtered = try ev("filter(file.tasks, (x) => !x.completed)")
+        XCTAssertEqual(filtered.asList.count, 1)
+        XCTAssertEqual(filtered.asList[0].text.hasPrefix("Watch sunrise"), true)
+        let mapped = try ev("map(file.tasks, (x) => x.completed)")
+        XCTAssertEqual(mapped.asList.map { $0.text }, ["false", "true"])
+        XCTAssertEqual(try ev("any(file.tasks, (x) => x.completed)").text, "true")
+        XCTAssertEqual(try ev("all(file.tasks, (x) => x.completed)").text, "false")
+        XCTAssertEqual(try ev("sum(cost)", path: "Daily/2026-11-21.md").text, "8")
+        if case .list(let costs) = try ev("nonnull(cost)", path: "Daily/2026-11-21.md") {
+            XCTAssertFalse(costs.contains(.null))
+        } else if case .number = try ev("nonnull(cost)", path: "Daily/2026-11-21.md") {
+            // a single non-null still comes back wrapped as a list
+        }
+        if case .link(let p, let n) = try ev("link(\"Moon\")") {
+            XCTAssertTrue(p.hasSuffix("Moon.md")); XCTAssertEqual(n, "Moon")
+        } else { XCTFail("link()") }
+    }
+
+    func testExistingTableAndListStillWork() throws {
+        let r = try run("TABLE WITHOUT ID file.link AS \"Planet\", metal AS \"Metal\"\nFROM \"Knowledge/Astrology/Planets\"\nWHERE type = \"planet\"\nSORT order DESC")
+        XCTAssertEqual(r.headers, ["Planet", "Metal"])
+        XCTAssertEqual(r.rows.map { $0[1].text }, ["Silver", "Gold"])
+        let l = try run("LIST FROM \"Projects\"")
+        XCTAssertEqual(l.rows.count, 1)
+        let c = try run("TABLE choice(metal, metal, \"—\") AS M FROM \"Knowledge\" SORT file.name ASC")
+        XCTAssertEqual(c.rows.map { $0[1].text }, ["Silver", "—", "Gold"])
+    }
+}
