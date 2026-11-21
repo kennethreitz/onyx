@@ -242,6 +242,7 @@ enum PaletteCommands {
             item("daily-prev", title: "Previous daily note") { ws.openDaily(offset: -1) },
             item("daily-next", title: "Next daily note") { ws.openDaily(offset: 1) },
             item("home", title: "Open homepage") { ws.openHome() },
+            item("random") { ws.openRandomNote() },
             item("mode", title: ws.mode == .read ? "Edit this note" : "Read this note", symbol: ws.mode == .read ? "pencil" : "book") { ws.toggleMode() },
             item("new", title: "New note") { ws.newNote() },
             item("newfolder") { ws.newFolder() },

@@ -67,6 +67,7 @@ final class ShortcutStoreTests: XCTestCase {
         XCTAssertEqual(store.display(for: "finder"), "⌥⇧⌘R")
         XCTAssertEqual(store.chords(for: "rename"), [])
         XCTAssertEqual(store.chords(for: "synclog"), [])
+        XCTAssertEqual(store.chords(for: "random"), [])
     }
 
     func testDefaultChordsAreUnique() {

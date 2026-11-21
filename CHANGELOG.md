@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Open Random Note in the command palette and the Go menu. It opens a random Markdown note from the vault in the current pane, skipping the one you’re on when it can. Hidden files and ignored folders stay out, the same as the rest of the index. No default shortcut; assign one in Settings ▸ Shortcuts.
+
 ## [0.1.5] - 2026-11-21
 
 ### Added

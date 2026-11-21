@@ -242,6 +242,12 @@ final class Workspace {
         else if let first = snapshot?.sortedNotePaths.first { openNote(first) }
     }
 
+    func openRandomNote() {
+        guard let snap = snapshot else { return }
+        guard let path = RandomNote.pick(from: snap.sortedNotePaths, excluding: currentPath) else { return }
+        openNote(path)
+    }
+
     func openLink(_ target: String, from source: String? = nil) {
         guard let snap = snapshot else { return }
         let link = NoteParser.makeLink(inner: target, embed: false, range: NSRange())

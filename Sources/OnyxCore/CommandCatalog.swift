@@ -83,6 +83,7 @@ public enum CommandCatalog {
         cmd("back", "Back", .navigate, [.command("[")], "chevron.left"),
         cmd("forward", "Forward", .navigate, [.command("]")], "chevron.right"),
         cmd("home", "Homepage", .navigate, [.command("h", shift: true)], "house"),
+        cmd("random", "Open Random Note", .navigate, [], "shuffle"),
         cmd("graph", "Focus Graph", .navigate, [.command("g")], "point.3.connected.trianglepath.dotted"),
         cmd("atlas", "Atlas", .navigate, [.command("g", shift: true)], "circle.hexagongrid"),
         cmd("graphpane", "Graph in a Pane", .navigate, [.command("g", option: true)]),

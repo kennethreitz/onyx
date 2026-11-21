@@ -243,6 +243,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("back", disabled: !ws.canGoBack) { ws.goBack() }
             ShortcutMenus.button("forward", disabled: !ws.canGoForward) { ws.goForward() }
             ShortcutMenus.button("home") { ws.openHome() }
+            ShortcutMenus.button("random") { ws.openRandomNote() }
             Divider()
             ShortcutMenus.button("graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }
             ShortcutMenus.button("atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }
