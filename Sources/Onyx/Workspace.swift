@@ -468,7 +468,11 @@ final class Workspace {
     }
 
     func newNote() {
-        let folder = currentPath.map { ($0 as NSString).deletingLastPathComponent } ?? ""
+        let folder = NoteNaming.folderForNewNote(
+            selected: treeSelection.selected,
+            folders: snapshot?.folders ?? [],
+            selectedFolder: selectedFolder,
+            currentPath: currentPath)
         createNote(named: "Untitled", folder: folder)
     }
 
@@ -913,7 +917,33 @@ final class Workspace {
         }
     }
 
-    func flushSave() { saveTask?.cancel(); if isDirty { save() } }
+    /// True while an Untitled note is being renamed from its title, so `relocate`'s
+    /// own `flushSave()` doesn't recurse back into promotion.
+    private var promotingUntitled = false
+
+    func flushSave() {
+        saveTask?.cancel()
+        if isDirty { save() }
+        if !promotingUntitled { promoteUntitledIfNeeded() }
+    }
+
+    /// After an explicit save (⌘S, leaving the note, Save and Read), rename a still-Untitled
+    /// note from its first heading so it lands in the sidebar under a real name. Autosave
+    /// writes the bytes but leaves the placeholder name alone while the title is still being typed.
+    func promoteUntitledIfNeeded() {
+        guard let path = currentPath, NoteNaming.isUntitled(path) else { return }
+        guard let title = NoteNaming.title(fromContent: text) else { return }
+        let folder = (path as NSString).deletingLastPathComponent
+        let dest = NoteNaming.dest(folder: folder, title: title) { candidate in
+            if candidate == path { return false }
+            if snapshot?.notes[candidate] != nil { return true }
+            return FileManager.default.fileExists(atPath: root?.appendingPathComponent(candidate).path ?? "")
+        }
+        guard dest != path else { return }
+        promotingUntitled = true
+        defer { promotingUntitled = false }
+        relocate(path, to: dest, reason: "Rename Untitled → \(((dest as NSString).lastPathComponent as NSString).deletingPathExtension)")
+    }
 
     /// Conflict-safe save. If the file changed on disk since we loaded it
     /// (Obsidian Sync, git, another bot) we never overwrite it blindly.

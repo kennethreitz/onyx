@@ -72,7 +72,7 @@ struct SidebarView: View {
                 HStack {
                     Text("\(snap.notes.count) notes").font(.system(size: 10.5)).foregroundStyle(Color.faint)
                     Spacer()
-                    Button { ws.newNote() } label: { Image(systemName: "square.and.pencil") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("New note (⌘N)")
+                    Button { ws.newNote() } label: { Image(systemName: "square.and.pencil") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("New note (⌘N)").accessibilityIdentifier("new-note-button")
                     Button { ws.newFolder() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("New folder (⇧⌘N)")
                 }.padding(.horizontal, 12).padding(.vertical, 7)
             }

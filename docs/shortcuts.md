@@ -22,8 +22,9 @@
 | <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm). After clicking in the sidebar, deletes the selection |
 | <kbd>⇧</kbd>/<kbd>⌘</kbd>-click | Sidebar multi-select (range / toggle); right-click to Move, Reveal, or Delete them all; Esc clears |
 | <kbd>⇧⌘M</kbd> | Move note to… a folder (fuzzy; type a new name to create one). Rename from File or right-click |
-| <kbd>⌘N</kbd> | New note |
+| <kbd>⌘N</kbd> | New note (in the selected folder, or next to the open note). The compose button at the bottom of the sidebar, Command Palette ▸ New note, and a folder’s New Note Here do the same |
 | <kbd>⇧⌘N</kbd> | New folder (in the selected folder, or the vault root) |
+| <kbd>⌘S</kbd> | Save. A still-Untitled note is named from its first heading (or first line) and appears under that name in the sidebar. Autosave writes the file while you type, but leaves the placeholder name until you save or leave the note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
 | <kbd>⌘,</kbd> | Settings |

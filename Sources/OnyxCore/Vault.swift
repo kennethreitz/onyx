@@ -15,7 +15,7 @@ public struct NoteRecord: Sendable {
         (summary.frontmatter["aliases"] ?? summary.frontmatter["alias"])?.strings ?? []
     }
     /// The first H1 if present, else the file name.
-    public var title: String { name }
+    public var title: String { summary.headings.first(where: { $0.level == 1 })?.text ?? name }
 }
 
 public struct FileNode: Identifiable, Hashable, Sendable {

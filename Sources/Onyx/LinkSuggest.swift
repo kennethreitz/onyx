@@ -142,6 +142,23 @@ enum TypeSelfTest {
         row.mouseDown(with: down)
         return true
     }
+    /// A real mouseDown on the sidebar compose (new-note) button.
+    @MainActor static func clickNewNoteButton() -> Bool {
+        guard let w = MainWindow.current, let root = w.contentView else { return false }
+        let id = "new-note-button"
+        func find(_ v: NSView) -> NSView? {
+            if v.identifier?.rawValue == id || v.accessibilityIdentifier() == id { return v }
+            for s in v.subviews { if let x = find(s) { return x } }
+            return nil
+        }
+        guard let btn = find(root) else { return false }
+        let loc = btn.convert(NSPoint(x: btn.bounds.midX, y: btn.bounds.midY), to: nil)
+        let t = ProcessInfo.processInfo.systemUptime
+        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: loc, modifierFlags: [], timestamp: t, windowNumber: w.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1) else { return false }
+        if let b = btn as? NSButton { b.performClick(nil); return true }
+        btn.mouseDown(with: down)
+        return true
+    }
     /// `open <path>`, `split`, `back`, `trash <path>` (no confirm), `state`.
     @MainActor static func workspaceCommand(_ line: String, _ ws: Workspace) -> Bool {
         let arg = line.split(separator: " ", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
@@ -284,6 +301,63 @@ enum TypeSelfTest {
         case "state":
             let h = ws.debugHistory
             print("[state] current=\(ws.currentPath ?? "-") history=\(h) panes=\(ws.panes.map { $0.path ?? "-" }) focused=\(ws.focusedPane) recent0=\(ws.recent.first ?? "-")")
+        case "newnote":
+            ws.newNote()
+            print("[newnote] current=\(ws.currentPath ?? "-") dirty=\(ws.isDirty) notes=\(ws.snapshot?.notes.count ?? -1) tree=\(ws.visibleTreePaths())")
+        case "save":
+            ws.flushSave()
+            print("[save] current=\(ws.currentPath ?? "-") dirty=\(ws.isDirty) lastSavedChars=\(ws.lastSaved.count)")
+        case "daily":
+            ws.openDaily()
+            print("[daily] current=\(ws.currentPath ?? "-")")
+        case "createnote":   // createnote <folder>|<name>  (folder may be empty)
+            let parts = arg.split(separator: "|", maxSplits: 1).map(String.init)
+            let folder = parts.count == 2 ? parts[0] : ""
+            let name = parts.count == 2 ? parts[1] : (parts.first ?? "Untitled")
+            let path = ws.createNote(named: name, folder: folder)
+            print("[createnote] path=\(path ?? "nil") current=\(ws.currentPath ?? "-")")
+        case "disk":
+            if let r = ws.root, let p = ws.currentPath {
+                let url = r.appendingPathComponent(p)
+                let exists = FileManager.default.fileExists(atPath: url.path)
+                let body = exists ? ((try? String(contentsOf: url, encoding: .utf8)) ?? "") : ""
+                let inSnap = ws.snapshot?.notes[p] != nil
+                let inTree = ws.visibleTreePaths().contains(p)
+                print("[disk] path=\(p) exists=\(exists) inSnap=\(inSnap) inTree=\(inTree) bytes=\(body.utf8.count) body=\(body.replacingOccurrences(of: "\n", with: " ⏎ "))")
+            } else { print("[disk] no current path") }
+        case "clicknew":
+            print("[clicknew] \(clickNewNoteButton() ? "ok" : "missing")")
+        case "settext":
+            ws.text = arg.replacingOccurrences(of: "\\n", with: "\n")
+            ws.renderToken += 1
+            print("[settext] dirty=\(ws.isDirty) chars=\(ws.text.count)")
+        case "menu":   // menu File>New Note | File>Save — the real File menu item (same path as ⌘N / ⌘S)
+            let titles = arg.split(separator: ">").map { $0.trimmingCharacters(in: .whitespaces) }
+            var menu: NSMenu? = NSApp.mainMenu
+            var item: NSMenuItem?
+            for title in titles {
+                item = menu?.items.first(where: { $0.title == title })
+                menu = item?.submenu
+            }
+            if let item, let m = item.menu, let i = m.items.firstIndex(of: item) {
+                m.performActionForItem(at: i)
+                print("[menu] \(arg) ok current=\(ws.currentPath ?? "-") dirty=\(ws.isDirty)")
+            } else { print("[menu] \(arg) missing") }
+        case "menukey":   // menukey cmd-n | cmd-s: the File menu key-equivalent path
+            var f: NSEvent.ModifierFlags = []
+            if arg.contains("cmd") { f.insert(.command) }; if arg.contains("shift") { f.insert(.shift) }; if arg.contains("opt") { f.insert(.option) }
+            let (ch, code): (String, UInt16) = {
+                if arg.hasSuffix("-n") { return ("n", 45) }
+                if arg.hasSuffix("-s") { return ("s", 1) }
+                if arg.hasSuffix("esc") { return ("\u{1b}", 53) }
+                if arg.hasSuffix("return") { return ("\r", 36) }
+                return ("", 0)
+            }()
+            if let w = MainWindow.current, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: f, timestamp: ProcessInfo.processInfo.systemUptime,
+                                                                     windowNumber: w.windowNumber, context: nil, characters: ch, charactersIgnoringModifiers: ch, isARepeat: false, keyCode: code) {
+                let handled = w.performKeyEquivalent(with: e)
+                print("[menukey] \(arg) handled=\(handled) current=\(ws.currentPath ?? "-") dirty=\(ws.isDirty)")
+            } else { print("[menukey] \(arg) no window") }
         default: return false
         }
         return true
