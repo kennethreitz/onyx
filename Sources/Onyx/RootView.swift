@@ -130,19 +130,22 @@ struct RootView: View {
         }
     }
 
-    // MARK: Footer — quiet affordances that come up when you reach for them
+    // MARK: Footer — a quiet bar under the page; icons settle until you hover
 
     var footer: some View {
         VStack {
             Spacer()
-            HStack(spacing: 2) {
-                FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
-                FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
-                FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
-                FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
-                FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
-                FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
-                FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
+            HStack(spacing: 1) {
+                HStack(spacing: 1) {
+                    FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
+                    FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
+                    FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
+                    FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
+                    FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
+                    FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
+                    FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
+                }
+                .opacity(footerHover ? 1 : 0.55)
                 Spacer()
                 if let t = ws.toast {
                     Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).lineLimit(1)
@@ -157,11 +160,12 @@ struct RootView: View {
                     Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)
                 }
                 FooterButton(symbol: "sidebar.right", help: "Inspector (⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
+                    .opacity(footerHover ? 1 : 0.55)
             }
-            .padding(.horizontal, 10)
-            .frame(height: 30)
-            .background(Color.paper.opacity(footerHover ? 0.96 : 0))
-            .opacity(footerHover ? 1 : 0.42)
+            .padding(.horizontal, 8)
+            .frame(height: 28)
+            .background(Color.secondaryPaper)
+            .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 0.8) }
             .animation(.easeOut(duration: 0.2), value: footerHover)
             .onHover { footerHover = $0 }
         }
@@ -603,10 +607,10 @@ struct FooterButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12.5, weight: on ? .semibold : .regular))
-                .foregroundStyle(on || hover ? Color.ink : Color.muted)
-                .frame(width: 28, height: 24)
-                .background(hover ? Color.ink.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .font(.system(size: 11, weight: on ? .medium : .regular))
+                .foregroundStyle(on || hover ? Color.ink : Color.faint)
+                .frame(width: 22, height: 22)
+                .background(hover ? Color.ink.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 5))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain).help(help).onHover { hover = $0 }
