@@ -50,6 +50,8 @@ public struct VaultSnapshot: Sendable {
     public var attachments: [String: Date] = [:]
     /// Obsidian canvases (also listed in `attachments`): what each one links to.
     public var canvases: [String: CanvasSummary] = [:]
+    /// Obsidian Bases (also listed in `attachments`): the raw YAML, re-parsed when opened.
+    public var bases: [String: String] = [:]
     /// Resolved outgoing links of each canvas (file nodes and [[links]] in its cards).
     public private(set) var canvasLinks: [String: [String]] = [:]
     public var folders: Set<String> = []
@@ -194,6 +196,7 @@ public struct VaultSnapshot: Sendable {
             } else {
                 snap.attachments[rel] = mtime
                 if rel.isCanvasPath, let d = try? Data(contentsOf: url) { snap.canvases[rel] = CanvasFile.summarize(String(decoding: d, as: UTF8.self)) }
+                if rel.isBasePath, let d = try? Data(contentsOf: url) { snap.bases[rel] = String(decoding: d, as: UTF8.self) }
             }
         }
         // Read + parse concurrently.
@@ -231,12 +234,13 @@ public struct VaultSnapshot: Sendable {
             var isDir: ObjCBool = false
             let exists = fm.fileExists(atPath: url.path, isDirectory: &isDir)
             if !exists {
-                notes[rel] = nil; attachments[rel] = nil; canvases[rel] = nil
+                notes[rel] = nil; attachments[rel] = nil; canvases[rel] = nil; bases[rel] = nil
                 if folders.contains(rel) {
                     folders = folders.filter { $0 != rel && !$0.hasPrefix(rel + "/") }
                     notes = notes.filter { !$0.key.hasPrefix(rel + "/") }
                     attachments = attachments.filter { !$0.key.hasPrefix(rel + "/") }
                     canvases = canvases.filter { !$0.key.hasPrefix(rel + "/") }
+                    bases = bases.filter { !$0.key.hasPrefix(rel + "/") }
                 }
                 continue
             }
@@ -252,6 +256,7 @@ public struct VaultSnapshot: Sendable {
                     }
                     for (p, d) in sub.attachments { attachments[rel + "/" + p] = d }
                     for (p, c) in sub.canvases { canvases[rel + "/" + p] = c }
+                    for (p, b) in sub.bases { bases[rel + "/" + p] = b }
                 }
                 continue
             }
@@ -264,6 +269,7 @@ public struct VaultSnapshot: Sendable {
             } else {
                 attachments[rel] = mtime
                 if rel.isCanvasPath, let d = try? Data(contentsOf: url) { canvases[rel] = CanvasFile.summarize(String(decoding: d, as: UTF8.self)) }
+                if rel.isBasePath, let d = try? Data(contentsOf: url) { bases[rel] = String(decoding: d, as: UTF8.self) }
             }
             var parent = (rel as NSString).deletingLastPathComponent
             while !parent.isEmpty && !folders.contains(parent) { folders.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
@@ -276,6 +282,12 @@ public struct VaultSnapshot: Sendable {
         if path.isCanvasPath {
             attachments[path] = Date()
             canvases[path] = CanvasFile.summarize(content)
+            rebuildDerived()
+            return
+        }
+        if path.isBasePath {
+            attachments[path] = Date()
+            bases[path] = content
             rebuildDerived()
             return
         }

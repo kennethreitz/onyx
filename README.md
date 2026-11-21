@@ -19,7 +19,7 @@ Onyx opens a folder of `.md` files and gets out of the way. It edits like a calm
 - **Typeset reading** — small caps, collision-free sidenotes, hyphenation, the page as a book
 - **PDF and print** — the note as a book page, margin notes, a running head, working links
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
-- **Canvas and Kanban** — Obsidian boards, in place, and editable
+- **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place
 - **Wikilinks, daily notes, and search** — the usual, without the chrome
 - **Obsidian Sync and git** — optional, and only if you ask
 
@@ -70,6 +70,8 @@ Obsidian's `.canvas` boards (JSON Canvas) open from the sidebar, <kbd>⌘O</kbd>
 Two-finger scroll pans, pinch zooms, and <kbd>⇧1</kbd> zooms to fit. Everything is editable: drag to move (a group carries its cards), drag an edge to resize, double-click empty space for a card, double-click a card to type in it or open its note, drag from the dots on a card's sides to connect, <kbd>⌫</kbd> to delete, <kbd>⌘Z</kbd> to undo. Right-click adds cards, notes, and groups and sets colors and arrows. Canvases are saved in Obsidian's exact format, ids and unknown fields included, so both apps can share them, and they count as linking to their cards in backlinks and the graph.
 
 Kanban boards written by the Obsidian Kanban plugin open as columns of cards. You can move cards and collapse columns in the focused pane; split and preview copies stay read-only. They’re saved in the same format Obsidian uses.
+
+Obsidian Bases (`.base` files) open from the sidebar and <kbd>⌘O</kbd> as a table, a list, or a card grid. Views switch at the top, columns sort with a click, and note names open the note. Filters, formulas, and the subset of `file.*` functions those files use are evaluated against the live vault index. Bases are read-only in this release: you can look, not edit the YAML. A fenced `base` code block in a note renders the same way.
 
 <p align="center">
   <img src="docs/focus-graph.png" alt="Focus graph centered on a note" width="49%">
@@ -146,7 +148,7 @@ Every command is also in the menu bar with its shortcut. The first-run hint shee
 
 ## Obsidian compatibility
 
-Onyx is built to open an Obsidian vault without converting anything. It understands wikilinks (aliases, headings, embeds), frontmatter, nested tags, folder notes, `%%comments%%`, callouts, footnotes, and Mermaid. It reads a few things out of `.obsidian`: the daily-notes folder, default view mode, user ignore filters, bookmarks, and the Homepage plugin’s start note. Rename and move rewrite wikilinks and standard Markdown links and embeds. Kanban boards and `.canvas` files open in place.
+Onyx is built to open an Obsidian vault without converting anything. It understands wikilinks (aliases, headings, embeds), frontmatter, nested tags, folder notes, `%%comments%%`, callouts, footnotes, and Mermaid. It reads a few things out of `.obsidian`: the daily-notes folder, default view mode, user ignore filters, bookmarks, and the Homepage plugin’s start note. Rename and move rewrite wikilinks and standard Markdown links and embeds. Kanban boards, `.canvas` files, and `.base` files open in place.
 
 It is not a plugin host, and it does not implement Templates, Excalidraw, or Bases. You can keep using Obsidian for those, and “Open in Obsidian” is one click away.
 

@@ -126,10 +126,12 @@ final class Workspace {
     var currentNote: NoteRecord? { currentPath.flatMap { snapshot?.notes[$0] } }
     /// The open file is an Obsidian canvas (shown by CanvasView, saved as JSON Canvas).
     var isCanvas: Bool { currentPath?.isCanvasPath == true }
-    /// Folder and name for the title path (notes and canvases).
+    /// The open file is an Obsidian Base (shown by BasesView, read-only YAML).
+    var isBase: Bool { currentPath?.isBasePath == true }
+    /// Folder and name for the title path (notes, canvases and bases).
     var titleParts: (folder: String, name: String)? {
         if let n = currentNote { return (n.folder, n.name) }
-        guard let p = currentPath, isCanvas else { return nil }
+        guard let p = currentPath, isCanvas || isBase else { return nil }
         return ((p as NSString).deletingLastPathComponent, ((p as NSString).lastPathComponent as NSString).deletingPathExtension)
     }
     var isDirty: Bool { text != lastSaved }
@@ -225,7 +227,7 @@ final class Workspace {
         guard let snap = snapshot else { return }
         let link = NoteParser.makeLink(inner: target, embed: false, range: NSRange())
         if let p = snap.resolve(link.target, from: source ?? currentPath) {
-            if snap.isAttachment(p), !p.isCanvasPath, let root { NSWorkspace.shared.open(root.appendingPathComponent(p)); return }
+            if snap.isAttachment(p), !p.isCanvasPath, !p.isBasePath, let root { NSWorkspace.shared.open(root.appendingPathComponent(p)); return }
             openNote(p, heading: link.heading)
         } else if !link.target.isEmpty {
             createNote(named: link.target, folder: "")   // like Obsidian: clicking an unresolved link creates it
@@ -239,6 +241,8 @@ final class Workspace {
         if let note = snap.notes[path] { content = note.content }
         else if path.isCanvasPath, snap.canvases[path] != nil, let root {   // an Obsidian canvas
             content = (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? ""
+        } else if path.isBasePath, snap.bases[path] != nil, let root {
+            content = snap.bases[path] ?? (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? ""
         } else { return }
         flushSave()
         if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
@@ -335,7 +339,7 @@ final class Workspace {
         let j = historyIndex + step
         guard history.indices.contains(j) else { return }
         // a note that's gone (trashed, renamed elsewhere) is skipped
-        if case .note(let p) = history[j].place, snapshot?.notes[p] == nil, snapshot?.canvases[p] == nil {
+        if case .note(let p) = history[j].place, snapshot?.notes[p] == nil, snapshot?.canvases[p] == nil, snapshot?.bases[p] == nil {
             history.remove(at: j)
             if step < 0 { historyIndex = j } // current entry slid down into j
             return go(step)
@@ -715,9 +719,10 @@ final class Workspace {
         flushSave()
         // old → new for every note that moves
         var map: [String: String] = [:]
-        if snap.notes[from] != nil || snap.canvases[from] != nil { map[from] = dest }
+        if snap.notes[from] != nil || snap.canvases[from] != nil || snap.bases[from] != nil { map[from] = dest }
         for p in snap.notes.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
         for p in snap.canvases.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
+        for p in snap.bases.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
         // rewrite links (in the files as they are now, before the move)
         func noExt(_ p: String) -> String { p.lowercased().hasSuffix(".md") ? String(p.dropLast(3)) : p }
         func title(_ p: String) -> String { (noExt(p) as NSString).lastPathComponent }
@@ -959,7 +964,7 @@ final class Workspace {
     private func applyExternal(_ paths: [String]) {
         guard var snap = snapshot, let root else { return }
         var external = false
-        for p in paths where p.lowercased().hasSuffix(".md") || p.isCanvasPath {
+        for p in paths where p.lowercased().hasSuffix(".md") || p.isCanvasPath || p.isBasePath {
             let disk = try? String(contentsOf: root.appendingPathComponent(p), encoding: .utf8)
             if p == currentPath {
                 if let disk, disk != lastSaved {
@@ -971,11 +976,11 @@ final class Workspace {
                         renderToken += 1
                     } else if disk != text { conflict = disk }
                 }
-            } else if !p.isCanvasPath, snap.notes[p]?.content != disk { external = true }
+            } else if !p.isCanvasPath, !p.isBasePath, snap.notes[p]?.content != disk { external = true }
         }
         snap.refresh(paths: paths)
         snapshot = snap
-        if let cur = currentPath, snap.notes[cur] == nil, snap.canvases[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
+        if let cur = currentPath, snap.notes[cur] == nil, snap.canvases[cur] == nil, snap.bases[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
             toast = "“\((cur as NSString).lastPathComponent)” was moved or deleted elsewhere"
         }
         if external { externalPulse = Date(); lastExternalChange = Date(); git?.edited() }

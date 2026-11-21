@@ -256,7 +256,7 @@ public struct QuickIndex: Sendable {
     public init(_ snap: VaultSnapshot) {
         let all = snap.notes.values.map { n in
             QuickEntry(path: n.path, name: MatchKey(n.name), folder: MatchKey(n.folder), aliases: n.aliases.map(MatchKey.init), mtime: n.mtime, dated: QuickIndex.date(in: n.name))
-        } + snap.canvases.keys.map { p in   // canvases open from ⌘O too
+        } + (Array(snap.canvases.keys) + Array(snap.bases.keys)).map { p in   // canvases and bases open from ⌘O too
             QuickEntry(path: p, name: MatchKey(((p as NSString).lastPathComponent as NSString).deletingPathExtension), folder: MatchKey((p as NSString).deletingLastPathComponent),
                        aliases: [], mtime: snap.attachments[p] ?? .distantPast, dated: nil)
         }

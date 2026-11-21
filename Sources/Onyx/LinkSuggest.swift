@@ -144,7 +144,7 @@ enum TypeSelfTest {
             if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
         case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view
             let m: NSEvent.ModifierFlags = line.hasPrefix("shift") ? .shift : line.hasPrefix("cmd") ? .command : []
-            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") || arg.isCanvasPath { ws.openNote(arg) } }
+            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") || arg.isCanvasPath || arg.isBasePath { ws.openNote(arg) } }
         case "expand": ws.expanded.insert(arg)
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
