@@ -23,19 +23,20 @@ enum Typeset {
     static let smallCaps = "onyx.smallCaps"        // runs of capitals (PSF, HTTP) in true small caps
     static let face = "onyx.typeface"              // "lm" (Latin Modern, Reitz LaTeX) | "et" (ET Book, Tufte)
     static let opening = "onyx.opening"            // "smallcaps" | "dropcap" | "none"
+    static let justify = "onyx.justify"            // justified paragraphs; off = ragged right (default)
 
-    static func bool(_ k: String) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? true }
+    static func bool(_ k: String, dflt: Bool = true) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? dflt }
     static var faceName: String { UserDefaults.standard.string(forKey: face) ?? "lm" }
     static var openingName: String { UserDefaults.standard.string(forKey: opening) ?? "smallcaps" }
 
     /// The `typeset` object the reader's typeset.js and typeset.css key off.
     static func options(preview: Bool = false, print: [String: Any]? = nil) -> [String: Any] {
         var o: [String: Any] = ["on": bool(on), "onum": bool(oldstyle), "hyphens": bool(hyphens), "smallCaps": bool(smallCaps),
-                                "face": faceName, "opening": preview ? "none" : openingName]
+                                "justify": bool(justify, dflt: false), "face": faceName, "opening": preview ? "none" : openingName]
         if let print { o["print"] = print }
         return o
     }
-    static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(faceName)\(openingName)" }
+    static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(bool(justify, dflt: false))\(faceName)\(openingName)" }
 }
 
 struct SettingsView: View {
@@ -52,6 +53,7 @@ struct SettingsView: View {
     @AppStorage(Typeset.smallCaps) private var smallCaps = true
     @AppStorage(Typeset.face) private var face = "lm"
     @AppStorage(Typeset.opening) private var opening = "smallcaps"
+    @AppStorage(Typeset.justify) private var justify = false
 
     var body: some View {
         Form {
@@ -93,7 +95,7 @@ struct SettingsView: View {
                 Toggle("Footnotes as sidenotes in the margin", isOn: $sidenotes)
                 Button("Restore Reitz LaTeX defaults") {
                     readerSize = 19; editorSize = 14; measure = 41; sidenotes = true
-                    typeset = true; oldstyle = true; hyphens = true; smallCaps = true; face = "lm"; opening = "smallcaps"
+                    typeset = true; oldstyle = true; hyphens = true; smallCaps = true; justify = false; face = "lm"; opening = "smallcaps"
                 }
                     .buttonStyle(.link).font(.system(size: 11.5))
             } header: { header("Typography") }
@@ -112,6 +114,7 @@ struct SettingsView: View {
                     }
                     Toggle("Old-style figures in text", isOn: $oldstyle)
                     Toggle("Hyphenation", isOn: $hyphens)
+                    Toggle("Justified paragraphs", isOn: $justify)
                     Toggle("Small caps for abbreviations (PSF, HTTP)", isOn: $smallCaps)
                 }
                 .disabled(!typeset)

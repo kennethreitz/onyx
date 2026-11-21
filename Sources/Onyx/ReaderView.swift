@@ -50,6 +50,7 @@ struct ReaderView: NSViewRepresentable {
     @AppStorage(Typeset.smallCaps) private var tsSmallCaps = true
     @AppStorage(Typeset.face) private var tsFace = "lm"
     @AppStorage(Typeset.opening) private var tsOpening = "smallcaps"
+    @AppStorage(Typeset.justify) private var tsJustify = false
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
     var text: String { source?.text ?? ws.text }

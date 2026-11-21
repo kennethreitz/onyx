@@ -249,7 +249,12 @@
 
   function apply(page, opts) {
     opts = opts || {};
-    page.lang = language(opts.props);
+    // Hyphenation dictionaries key off lang on the reader root; default English.
+    const lang = language(opts.props);
+    page.lang = lang;
+    const doc = page.ownerDocument;
+    if (doc && doc.documentElement) doc.documentElement.lang = lang;
+    if (doc && doc.body) doc.body.lang = lang;
     if (!opts.on) return;
     smartenDOM(page);
     quotes(page);

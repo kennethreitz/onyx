@@ -41,6 +41,10 @@ body.typeset .markdown-preview-view :is(p, li, blockquote, figcaption, .sidenote
   text-wrap: pretty;                                           /* no runts, even rag */
   hanging-punctuation: first allow-end last;                   /* quotes and stops hang */
 }
+/* Ragged-right by default. Justification is opt-in (body.just) because WKWebView
+   often fails to hyphenate custom fonts, and justify-without-hyphens makes rivers. */
+body.typeset .markdown-preview-view :is(p, li) { text-align: left; text-align-last: start; }
+body.typeset.just.hyph .markdown-preview-view :is(p, li) { text-align: justify; text-align-last: start; }
 body.typeset.hyph .markdown-preview-view :is(p, li, blockquote) {
   -webkit-hyphens: auto; hyphens: auto;
   -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3;
@@ -49,7 +53,8 @@ body.typeset.hyph .markdown-preview-view :is(p, li, blockquote) {
   hyphenate-limit-last: always;                                /* never hyphenate the last word of a paragraph */
 }
 body.typeset:not(.hyph) .markdown-preview-view :is(p, li, blockquote, .sidenote) { -webkit-hyphens: manual; hyphens: manual; }
-body.typeset:not(.hyph) .markdown-preview-view :is(p, li) { text-align: left; }   /* no hyphens: ragged right beats rivers */
+body.typeset:not(.hyph) .markdown-preview-view :is(p, li) { text-align: left; text-align-last: start; }
+body.typeset :is(strong, b) { letter-spacing: 0; word-spacing: normal; }
 body.typeset .sidenote { -webkit-hyphens: auto; hyphens: auto; -webkit-hyphenate-limit-before: 3; -webkit-hyphenate-limit-after: 3; }
 
 /* Optical margin kerns for quotes that open a line mid-paragraph (typeset.js pairs them) */
@@ -91,14 +96,14 @@ body.typeset p.has-dropcap::first-letter {
   -webkit-initial-letter: 3; initial-letter: 3;                /* three lines, sunk three */
   font-family: var(--font-text); font-weight: 400; margin-right: 0.08em; color: var(--text-normal);
 }
-body.typeset .callout-title { font-family: var(--font-caps); font-variant-caps: normal; text-transform: lowercase; letter-spacing: 0.05em; }
-body.typeset.face-et .callout-title { font-family: inherit; text-transform: none; font-variant-caps: all-small-caps; }
+body.typeset .callout-title { font-family: inherit; font-variant-caps: normal; text-transform: none; letter-spacing: 0; word-spacing: normal; }
+body.typeset.face-et .callout-title { font-family: inherit; text-transform: none; font-variant-caps: normal; letter-spacing: 0; }
 
 /* ---- Quotations ----------------------------------------------------------------------- */
 body.typeset blockquote { margin: calc(var(--lh) * 0.75) 2.5em; }
 body.typeset blockquote .attribution { display: block; text-align: right; margin-top: calc(var(--lh) * 0.2); font-style: normal; }
 body.typeset blockquote .attribution .attribution-dash { color: var(--text-muted); }
-body.typeset blockquote.epigraph { margin: calc(var(--lh) * 0.25) 0 calc(var(--lh) * 1.25) auto; width: 62%; font-style: italic; text-align: left; font-size: 0.95em; -webkit-hyphens: manual; hyphens: manual; }
+body.typeset blockquote.epigraph { margin: calc(var(--lh) * 0.25) 0 calc(var(--lh) * 1.25) 1.25em; width: auto; max-width: none; font-style: italic; text-align: left; font-size: 0.95em; -webkit-hyphens: manual; hyphens: manual; }
 body.typeset blockquote.epigraph p { text-align: left; -webkit-hyphens: manual; hyphens: manual; margin: 0; }
 body.typeset blockquote.epigraph .attribution { font-family: var(--font-caps); font-style: normal; letter-spacing: 0.03em; }
 body.typeset blockquote.epigraph em { font-style: normal; }

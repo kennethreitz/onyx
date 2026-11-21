@@ -201,6 +201,19 @@ test('hyphenation language comes from frontmatter lang, else English', () => {
   assert.equal(T().language([]), 'en');
 });
 
+test('apply sets lang on the reader root (and the document), defaulting to en', () => {
+  const html = { lang: 'fr' }, body = { lang: '' };
+  const page = { lang: '', querySelector() { return null; }, querySelectorAll() { return []; },
+                 ownerDocument: { documentElement: html, body } };
+  T().apply(page, { props: [] });           // typeset off: still set lang for hyphenation
+  assert.equal(page.lang, 'en');
+  assert.equal(html.lang, 'en');
+  assert.equal(body.lang, 'en');
+  T().apply(page, { props: [{ key: 'lang', value: 'de' }] });
+  assert.equal(page.lang, 'de');
+  assert.equal(html.lang, 'de');
+});
+
 test('numeric table cells are recognised for right alignment', () => {
   for (const v of ['4.2', '1,234', '45%', '$12.50', '(3.1)', '−7', '302.5']) assert.ok(T().NUM.test(v), v);
   for (const v of ['2.0 beta', 'n/a', 'Python 3', 'v1.0']) assert.ok(!T().NUM.test(v), v);

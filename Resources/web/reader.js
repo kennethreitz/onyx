@@ -515,7 +515,7 @@
     if (!t) return '';
     const print = t.print ? ' print' : '';
     if (!t.on) return print;
-    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.face === 'et' ? ' face-et' : '') + print;
+    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.justify ? ' just' : '') + (t.face === 'et' ? ' face-et' : '') + print;
   }
 
   window.Onyx = {
