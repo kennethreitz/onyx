@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-21
+
 ### Added
 - Dataview `GROUP BY` (with `rows`) and `FLATTEN`, implicit `file.*` fields (name, path, folder, link, ctime, mtime, cday, mday, tags, etags, inlinks, outlinks, aliases, tasks, size, day), dates and durations (`date(today)`, `dur()`, date comparisons and math), and a broader function library: length, lower, upper, round, min/max/sum, join, link, dateformat, regexmatch, replace, startswith/endswith, filter/map, any/all, nonnull, number, string, striptime, choice, default, contains/icontains, econtains. Inline `key:: value` fields are queried like frontmatter.
 - Dataview TASK queries: tasks from matching notes, grouped by file, with WHERE on completed, text, due, and similar fields. Clicking a checkbox toggles `[ ]` / `[x]` in the source note through the normal write path, so git and Obsidian Sync see the change.
@@ -126,7 +128,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/kennethreitz/onyx/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/kennethreitz/onyx/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/kennethreitz/onyx/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/kennethreitz/onyx/compare/v0.1.2...v0.1.3
