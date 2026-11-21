@@ -73,6 +73,7 @@ struct SidebarView: View {
                     Text("\(snap.notes.count) notes").font(.system(size: 10.5)).foregroundStyle(Color.faint)
                     Spacer()
                     Button { ws.newNote() } label: { Image(systemName: "square.and.pencil") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("New note (⌘N)")
+                    Button { ws.newFolder() } label: { Image(systemName: "folder.badge.plus") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("New folder (⇧⌘N)")
                 }.padding(.horizontal, 12).padding(.vertical, 7)
             }
         }
@@ -130,6 +131,14 @@ struct FileTreeView: View {
                     } else {
                         ProgressView().controlSize(.small).padding()
                     }
+                    // Empty area at the bottom of the list, for a vault-root New Note / New Folder menu.
+                    Color.clear
+                        .frame(maxWidth: .infinity, minHeight: 80)
+                        .contentShape(Rectangle())
+                        .contextMenu {
+                            Button("New Note") { ws.createNote(named: "Untitled", folder: "") }
+                            Button("New Folder") { ws.newFolder(in: "") }
+                        }
                 }.thinScrollers()
                 .padding(.vertical, 6)
             }
@@ -273,6 +282,7 @@ struct FileMenu: View {
         }
         if isFolder {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
+            Button("New Folder") { ws.newFolder(in: path) }
             Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
             Button("Export Folder as PDF…") { NoteBookPrinter.run([path], ws: ws) }
         }

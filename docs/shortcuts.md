@@ -23,6 +23,7 @@
 | <kbd>⇧</kbd>/<kbd>⌘</kbd>-click | Sidebar multi-select (range / toggle); right-click to Move, Reveal, or Delete them all; Esc clears |
 | <kbd>⇧⌘M</kbd> | Move note to… a folder (fuzzy; type a new name to create one). Rename from File or right-click |
 | <kbd>⌘N</kbd> | New note |
+| <kbd>⇧⌘N</kbd> | New folder (in the selected folder, or the vault root) |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
 | <kbd>⌘,</kbd> | Settings |

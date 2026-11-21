@@ -147,6 +147,9 @@ enum TypeSelfTest {
         let arg = line.split(separator: " ", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
         switch line.split(separator: " ").first ?? "" {
         case "open": ws.openNote(arg)
+        case "newfolder":
+            let p = ws.createFolder(in: arg.isEmpty ? nil : arg, prompt: false)
+            print("[newfolder] \(p ?? "failed") folders=\(ws.snapshot?.folders.sorted().joined(separator: ",") ?? "-") selected=\(ws.selectedFolder ?? "-")")
         case "split": ws.split(.vertical)
         case "openat":   // openat <line> <path>: open a note scrolled to a source line
             let parts = arg.split(separator: " ", maxSplits: 1).map(String.init); if parts.count == 2, let l = Int(parts[0]) { ws.openNote(parts[1], line: l) }

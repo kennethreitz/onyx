@@ -62,6 +62,7 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | ⌥⌘[ ⌥⌘] | Previous / next daily note |
 | ⌘⌫ | Delete note: confirm, then the Trash; panes and history move on (replaces the editor's delete-to-line-start) |
 | ⌘N | New note |
+| ⇧⌘N | New folder |
 | ⌃⌘F | Focus mode |
 | Esc | Put away the topmost layer (overlay → floating panel → inspector → focus mode) |
 

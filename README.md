@@ -17,7 +17,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **PDF and print** — the note as a book page, with margin notes and a running head
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place
-- **Wikilinks, daily notes, and search** — the usual, without the chrome
+- **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N
 - **Obsidian Sync and git** — optional, and only if you ask
 
 ## Download

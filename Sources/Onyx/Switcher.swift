@@ -234,6 +234,7 @@ enum PaletteCommands {
             PaletteItem(id: "home", title: "Open homepage", symbol: "house", shortcut: "⌘⇧H") { ws.openHome() },
             PaletteItem(id: "mode", title: ws.mode == .read ? "Edit this note" : "Read this note", symbol: ws.mode == .read ? "pencil" : "book", shortcut: "⌘↩") { ws.toggleMode() },
             PaletteItem(id: "new", title: "New note", symbol: "square.and.pencil", shortcut: "⌘N") { ws.newNote() },
+            PaletteItem(id: "newfolder", title: "New Folder", symbol: "folder.badge.plus", shortcut: "⇧⌘N") { ws.newFolder() },
             PaletteItem(id: "files", title: "Show files", symbol: "folder", shortcut: "⌘K") { ws.toggleSidebar(.files) },
             PaletteItem(id: "search", title: "Search vault", symbol: "magnifyingglass", shortcut: "⌘⇧F") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 },
             PaletteItem(id: "recent", title: "Recent files", symbol: "clock") { ws.toggleSidebar(.recent) },

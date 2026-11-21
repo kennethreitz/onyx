@@ -472,6 +472,48 @@ final class Workspace {
         createNote(named: "Untitled", folder: folder)
     }
 
+    /// Folder a New Folder / New Note Here command should use: an explicit path, else the
+    /// single selected folder (or the parent of a selected file), else the title-path folder,
+    /// else the folder of the open note, else the vault root.
+    func folderForNewItem(explicit: String? = nil) -> String {
+        if let e = explicit { return e }
+        if treeSelection.selected.count == 1, let p = treeSelection.selected.first {
+            if snapshot?.folders.contains(p) == true { return p }
+            return (p as NSString).deletingLastPathComponent
+        }
+        if let f = selectedFolder { return f }
+        return currentPath.map { ($0 as NSString).deletingLastPathComponent } ?? ""
+    }
+
+    /// Create an empty folder, refresh the tree, reveal it, and offer a name (the sidebar
+    /// has no inline rename; `confirmRename` is the same prompt used for existing folders).
+    @discardableResult
+    func createFolder(named rawName: String? = nil, in explicit: String? = nil, prompt: Bool = true) -> String? {
+        guard let root else { return nil }
+        let folder = folderForNewItem(explicit: explicit)
+        let fm = FileManager.default
+        var taken = Set((snapshot?.folders ?? []).filter { ($0 as NSString).deletingLastPathComponent == folder }.map { ($0 as NSString).lastPathComponent })
+        let parentURL = folder.isEmpty ? root : root.appendingPathComponent(folder)
+        if let kids = try? fm.contentsOfDirectory(atPath: parentURL.path) { taken.formUnion(kids) }
+        let name = FolderCreate.uniqueName(base: rawName ?? FolderCreate.defaultName, existing: taken)
+        let rel = FolderCreate.path(name: name, in: folder)
+        let url = root.appendingPathComponent(rel).standardizedFileURL
+        guard url.path.hasPrefix(root.path + "/"), !rel.contains("..") else { return nil }
+        do { try fm.createDirectory(at: url, withIntermediateDirectories: true) }
+        catch { toast = "Couldn’t create folder: \(error.localizedDescription)"; return nil }
+        snapshot?.refresh(paths: [rel])
+        git?.edited()
+        obsidianSync?.edited()
+        vaultMutated("Add \(name)", paths: [rel])
+        revealFolder(rel)
+        treeSelection.click(rel)
+        let quiet = ProcessInfo.processInfo.environment["ONYX_SHOT_QUIET"] == "1"
+        if prompt, !quiet { DispatchQueue.main.async { self.confirmRename(rel) } }
+        return rel
+    }
+
+    func newFolder(in explicit: String? = nil) { _ = createFolder(in: explicit) }
+
     // MARK: Sidebar selection (Finder-style)
 
     /// Rows selected in the file tree. Click selects one (and opens it); ⇧-click spans from the

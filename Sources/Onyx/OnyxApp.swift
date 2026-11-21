@@ -178,6 +178,9 @@ struct OnyxApp: App {
                 case "synclog", "sync-log":
                     ws.syncLog?.seedPreviewIfEmpty()
                     ws.show(.syncLog)
+                case "newfolder", "new-folder":
+                    if !ws.sidebarVisible { ws.toggleDockedSidebar(.files) } else { ws.sidebarTab = .files }
+                    _ = ws.createFolder(prompt: false)
                 default: break
                 }
             }
@@ -205,6 +208,7 @@ struct OnyxApp: App {
         }
         CommandGroup(replacing: .newItem) {
             Button("New Note") { ws.newNote() }.keyboardShortcut("n")
+            Button("New Folder") { ws.newFolder() }.keyboardShortcut("n", modifiers: [.command, .shift])
             Button("Open Vault…") { openVault() }.keyboardShortcut("o", modifiers: [.command, .shift])
             Divider()
             Button("Quick Switcher…") { ws.show(.switcher) }.keyboardShortcut("o")
@@ -305,6 +309,7 @@ struct OnyxApp: App {
 enum KeySelfTest {
     static let keys: [(String, UInt16, String, NSEvent.ModifierFlags)] = [
         ("⌘O", 31, "o", .command), ("⌘P", 35, "p", .command), ("⇧⌘P", 35, "p", [.command, .shift]),
+        ("⇧⌘N", 45, "n", [.command, .shift]), ("⌘N", 45, "n", .command),
         ("⌘K", 40, "k", .command), ("⇧⌘F", 3, "f", [.command, .shift]), ("⌘↩", 36, "\r", .command),
         ("⌘E", 14, "e", .command), ("⌘T", 17, "t", .command), ("⌘\\", 42, "\\", .command),
         ("⌘I", 34, "i", .command), ("⌘G", 5, "g", .command), ("⇧⌘G", 5, "g", [.command, .shift]),

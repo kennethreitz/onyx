@@ -92,7 +92,7 @@ Useful with `open -n build/Onyx.app --args …` or `make run ARGS='…'`:
 | `--open <note>` | Open this note once the vault is up. |
 | `--mode read` / `--mode edit` | Start in that mode. |
 | `--appearance light` / `dark` / `system` | Override the appearance for this launch. |
-| `--show sidebar` / `search` / `inspector` / `outline` / `switcher` / `palette` / `graph` / `atlas` / `workspace` / `daily` / `synclog` | Open that UI after launch (for screenshots). `synclog` seeds a short demo log if the vault’s log is empty. |
+| `--show sidebar` / `search` / `inspector` / `outline` / `switcher` / `palette` / `graph` / `atlas` / `workspace` / `daily` / `synclog` / `newfolder` | Open that UI after launch (for screenshots). `synclog` seeds a short demo log if the vault’s log is empty. `newfolder` creates an Untitled Folder and selects it, without the rename prompt. |
 | `--sidebar open` | Start with the sidebar docked. |
 | `--size <W>x<H>` | Window content size (default 1180×820). |
 | `--window-id-file <path>` | Write the window number here, for `screencapture -l`. |
