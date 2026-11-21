@@ -6,7 +6,7 @@ If the vault is a git repository and `git` is installed, Onyx uses it without be
 
 A tiny footer glyph shows synced, syncing, offline, local-only, or conflict.
 
-To leave git alone for a session while developing, see [DEVELOP.md](../DEVELOP.md) (`ONYX_NO_GIT`).
+To leave git alone for a session while developing, see [DEVELOP.md](DEVELOP.md) (`ONYX_NO_GIT`).
 
 ## Obsidian Sync, optional
 
@@ -14,6 +14,6 @@ Off by default, and opt-in per vault. In Settings ▸ Sync, sign in to your Obsi
 
 Safety rails: the first sync never deletes on either side, and differing files are kept twice. A mass deletion or an empty-looking vault folder pauses for confirmation instead of propagating. Local deletions go to the Trash; overwritten Markdown is backed up first.
 
-This is unofficial and still new. Try it on a throwaway vault before pointing it at the real one. If you’d rather not use it, Obsidian’s official [`obsidian-headless`](https://www.npmjs.com/package/obsidian-headless) CLI (`npx obsidian-headless`) can keep a folder in sync while Onyx simply edits the files. Protocol notes are in [obsidian-sync-protocol.md](obsidian-sync-protocol.md). To leave Sync alone for a session, see [DEVELOP.md](../DEVELOP.md) (`ONYX_NO_SYNC`).
+This is unofficial and still new. Try it on a throwaway vault before pointing it at the real one. If you’d rather not use it, Obsidian’s official [`obsidian-headless`](https://www.npmjs.com/package/obsidian-headless) CLI (`npx obsidian-headless`) can keep a folder in sync while Onyx simply edits the files. Protocol notes are in [obsidian-sync-protocol.md](obsidian-sync-protocol.md). To leave Sync alone for a session, see [DEVELOP.md](DEVELOP.md) (`ONYX_NO_SYNC`).
 
 See also [compatibility and privacy](compatibility.md).

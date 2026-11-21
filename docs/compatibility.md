@@ -33,4 +33,4 @@ Your notes live in a folder you choose. Onyx does not require an account and doe
 
 Starting with v0.1.1, the auto-updater also talks to GitHub, and only to check for (and download) a newer release.
 
-Building from source? See [DEVELOP.md](../DEVELOP.md).
+Building from source? See [DEVELOP.md](DEVELOP.md).
