@@ -262,7 +262,9 @@ are rewritten by rename/move like any wikilink, bare names included. `VaultSnaps
 kind: `parents(of:)`, `parts(of:)`, `siblings(of:)` and the symmetric `related(to:)`.
 
 The reader renders a field as a small monospace key plus link chips; the editor tints `key::`.
-The inspector's Links tab lists Part of, Parts and Related above the backlinks. In the focus graph, `partOf`
+The inspector's Links tab (`RelationshipsSection`) lists Part of, Parts and Related above the backlinks. Parts is a tree from
+`Ancestry.partsTree` (cycle-safe: a note that is its own ancestor in a branch shows once more as ↻; depth 6), Siblings fold
+under a count, and `VaultSnapshot.fieldRelations(of:)` groups every other link-valued key both ways (`treats`, `treats · from`). In the focus graph, `partOf`
 spokes are firmer muted stems and related ones blue dotted lines. Hovering any resolved reader link or an inspector
 relation for 400 ms opens a card: the note's parents above, parts below (two staggered lanes, "+N more"),
 siblings faint at the side, related to the right, or its plain links when it has no fields. Click a node

@@ -702,24 +702,7 @@ struct InspectorView: View {
     }
 
     @ViewBuilder func relations(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
-        let parents = snap.parents(of: note.path), parts = snap.parts(of: note.path), related = snap.related(to: note.path)
-        let unresolved = note.summary.links.filter { $0.fieldKey.map(InlineField.kind) == "partof" && snap.resolve($0.target, from: note.path) == nil }
-        if !parents.isEmpty || !unresolved.isEmpty {
-            sectionTitle("Part of")
-            ForEach(parents, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
-            ForEach(unresolved, id: \.target) { l in
-                Button { ws.openLink(l.target) } label: { Text("\(l.alias ?? l.target)  · create").font(.system(size: 12)).foregroundStyle(Color.muted) }
-                    .buttonStyle(.plain).padding(.horizontal, 17).padding(.vertical, 4)
-            }
-        }
-        if !parts.isEmpty {
-            sectionTitle("Parts · \(parts.count)")
-            ForEach(parts, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
-        }
-        if !related.isEmpty {
-            sectionTitle("Related · \(related.count)")
-            ForEach(related, id: \.self) { NoteRow(ws: ws, path: $0, preview: true) }
-        }
+        RelationshipsSection(ws: ws, note: note, snap: snap).id(note.path)
     }
 
     @ViewBuilder func backlinks(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
