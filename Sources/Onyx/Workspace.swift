@@ -532,6 +532,12 @@ final class Workspace {
     var renamingPath: String? = nil
     var renameDraft = ""
     var renameError: String? = nil
+    /// Paths being ⌘-dragged in the file tree. Empty when no tree-move drag is in flight.
+    var draggingPaths: [String] = []
+    /// Folder a tree-move drop would land in (`""` = vault root). Nil when not hovering a valid row.
+    var dropTarget: String? = nil
+    var dropForbidden = false
+    @ObservationIgnored private var dropExpandTask: Task<Void, Never>?
 
 
     /// True if this path is selected, or it's the folder note of a selected folder
@@ -797,6 +803,84 @@ final class Workspace {
         renamingPath = nil
         renameDraft = ""
         renameError = nil
+    }
+
+    /// If `path` is part of a multi-selection, drag the selection’s roots; otherwise just `path`.
+    func pathsForTreeDrag(from path: String) -> [String] {
+        if treeSelection.contains(path), treeSelection.isMulti {
+            return TreeSelection.roots(treeSelection.selected)
+        }
+        return [path]
+    }
+
+    func beginTreeDrag(_ paths: [String]) {
+        draggingPaths = TreeSelection.roots(paths)
+        dropTarget = nil
+        dropForbidden = false
+        TreeClickCatcher.Catcher.moving = true
+    }
+
+    @discardableResult
+    func treeDragHover(on path: String, isFolder: Bool) -> Bool {
+        guard !draggingPaths.isEmpty else { return false }
+        let dest = TreeMove.destination(droppingOn: path, targetIsFolder: isFolder)
+        switch treeMoveVerdict(toFolder: dest) {
+        case .refuse, .collision:
+            dropForbidden = true
+            setDropTarget(dest, expand: false)
+            return false
+        case .none, .move:
+            dropForbidden = false
+            setDropTarget(dest, expand: true)
+            return true
+        }
+    }
+
+    func performTreeDrop(on path: String, isFolder: Bool) {
+        let dest = TreeMove.destination(droppingOn: path, targetIsFolder: isFolder)
+        switch treeMoveVerdict(toFolder: dest) {
+        case .none:
+            break
+        case .refuse(let message), .collision(let message):
+            toast = message
+        case .move(let sources):
+            move(sources, toFolder: dest)
+        }
+        endTreeDrag()
+    }
+
+    func endTreeDrag() {
+        dropExpandTask?.cancel()
+        dropExpandTask = nil
+        draggingPaths = []
+        dropTarget = nil
+        dropForbidden = false
+        TreeClickCatcher.Catcher.moving = false
+    }
+
+    private func treeMoveVerdict(toFolder dest: String) -> TreeMove.Verdict {
+        TreeMove.verdict(sources: draggingPaths, toFolder: dest, occupied: { pathOccupied($0) })
+    }
+
+    private func pathOccupied(_ dest: String) -> Bool {
+        if let root {
+            return FileManager.default.fileExists(atPath: root.appendingPathComponent(dest).path)
+        }
+        return snapshot?.notes[dest] != nil
+            || snapshot?.folders.contains(dest) == true
+            || snapshot?.attachments[dest] != nil
+    }
+
+    private func setDropTarget(_ folder: String?, expand: Bool) {
+        let changed = dropTarget != folder
+        dropTarget = folder
+        guard expand, changed, let f = folder, !f.isEmpty, !expanded.contains(f) else { return }
+        dropExpandTask?.cancel()
+        dropExpandTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 700_000_000)
+            guard !Task.isCancelled, dropTarget == f else { return }
+            _ = withAnimation(.easeOut(duration: 0.12)) { expanded.insert(f) }
+        }
     }
 
     /// Used when the sidebar is hidden, so there's no row to edit in place.

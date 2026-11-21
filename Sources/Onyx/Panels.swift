@@ -90,53 +90,174 @@ struct SidebarView: View {
 /// because the callback runs after the event has ended.
 struct TreeClickCatcher: NSViewRepresentable {
     var path: String
+    var isFolder: Bool = false
+    /// When true, the view only participates in an in-flight ⌘-drag (the empty area at the
+    /// bottom of the tree, used as a vault-root drop zone). Clicks pass through.
+    var dropOnly: Bool = false
     /// Leading strip reserved for the disclosure chevron (0 for files). Clicks here
     /// toggle expansion and are not treated as a row activation, so a folder with
     /// an index note can still be collapsed.
     var chevronWidth: CGFloat = 0
     var onChevron: (() -> Void)? = nil
     var onClick: (NSEvent.ModifierFlags) -> Void
+    var onCommandDrag: ((String) -> [String])? = nil
+    var onDragHover: ((String, Bool) -> Bool)? = nil
+    var onDrop: ((String, Bool) -> Void)? = nil
+    var onDragEnded: (() -> Void)? = nil
 
     func makeNSView(context: Context) -> Catcher {
         let v = Catcher()
-        v.apply(path: path, chevronWidth: chevronWidth, onChevron: onChevron, onClick: onClick)
+        v.registerForDraggedTypes([.onyxTreePaths])
+        v.apply(self)
         return v
     }
-    func updateNSView(_ v: Catcher, context: Context) {
-        v.apply(path: path, chevronWidth: chevronWidth, onChevron: onChevron, onClick: onClick)
-    }
+    func updateNSView(_ v: Catcher, context: Context) { v.apply(self) }
 
-    final class Catcher: NSView {
+    final class Catcher: NSView, NSDraggingSource {
+        static var moving = false
+        static let pasteboardType = NSPasteboard.PasteboardType.onyxTreePaths
+
+        var path = ""
+        var isFolder = false
+        var dropOnly = false
         var onClick: ((NSEvent.ModifierFlags) -> Void)?
         var onChevron: (() -> Void)?
         var chevronWidth: CGFloat = 0
-        func apply(path: String, chevronWidth: CGFloat, onChevron: (() -> Void)?, onClick: @escaping (NSEvent.ModifierFlags) -> Void) {
-            self.onClick = onClick
-            self.onChevron = onChevron
-            self.chevronWidth = chevronWidth
-            let id = "tree-row:\(path)"
+        var onCommandDrag: ((String) -> [String])?
+        var onDragHover: ((String, Bool) -> Bool)?
+        var onDrop: ((String, Bool) -> Void)?
+        var onDragEnded: (() -> Void)?
+        private var pendingClick: NSEvent?
+        private var pendingPoint: NSPoint = .zero
+        private var startedDrag = false
+
+        func apply(_ s: TreeClickCatcher) {
+            path = s.path
+            isFolder = s.isFolder
+            dropOnly = s.dropOnly
+            onClick = s.onClick
+            onChevron = s.onChevron
+            chevronWidth = s.chevronWidth
+            onCommandDrag = s.onCommandDrag
+            onDragHover = s.onDragHover
+            onDrop = s.onDrop
+            onDragEnded = s.onDragEnded
+            let id = s.dropOnly ? "tree-root-drop" : "tree-row:\(s.path)"
             identifier = NSUserInterfaceItemIdentifier(id)
             setAccessibilityIdentifier(id)
         }
         override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
         /// Steal only a plain left mouse-down (including ⌘/⇧). Right-click, control-click,
         /// and hover pass through so the SwiftUI context menu and `onHover` keep working.
+        /// During a tree-move drag, stay in the hit path so we can highlight and accept the drop.
         override func hitTest(_ point: NSPoint) -> NSView? {
-            guard bounds.contains(point), let e = NSApp.currentEvent else { return nil }
+            guard bounds.contains(point) else { return nil }
+            if Self.moving { return self }
+            if dropOnly { return nil }
+            guard let e = NSApp.currentEvent else { return nil }
             if e.type == .leftMouseDown && !e.modifierFlags.contains(.control) { return self }
             return nil
         }
         override func mouseDown(with event: NSEvent) {
+            if dropOnly { return }
             if event.modifierFlags.contains(.control) { nextResponder?.mouseDown(with: event); return }
-            let x = convert(event.locationInWindow, from: nil).x
-            if chevronWidth > 0 && x < chevronWidth {
+            let loc = convert(event.locationInWindow, from: nil)
+            if chevronWidth > 0 && loc.x < chevronWidth {
                 onChevron?()
-            } else {
-                onClick?(event.modifierFlags)
+                return
             }
+            // ⌘-click vs ⌘-drag: wait to see whether this is a drag before toggling selection,
+            // so we don't deselect a row the user is about to move.
+            if event.modifierFlags.contains(.command), onCommandDrag != nil {
+                pendingClick = event
+                pendingPoint = loc
+                startedDrag = false
+                return
+            }
+            onClick?(event.modifierFlags)
+        }
+        override func mouseDragged(with event: NSEvent) {
+            guard let start = pendingClick, !startedDrag, let onCommandDrag else { return }
+            let loc = convert(event.locationInWindow, from: nil)
+            let dx = loc.x - pendingPoint.x, dy = loc.y - pendingPoint.y
+            guard (dx * dx + dy * dy) >= 16 else { return }
+            guard start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command) else { return }
+            let paths = onCommandDrag(path)
+            guard !paths.isEmpty else { return }
+            startedDrag = true
+            pendingClick = nil
+            beginMoveDrag(paths: paths, event: event)
+        }
+        override func mouseUp(with event: NSEvent) {
+            if let start = pendingClick, !startedDrag {
+                pendingClick = nil
+                onClick?(start.modifierFlags)
+            }
+            pendingClick = nil
+            startedDrag = false
         }
         override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
+
+        private func beginMoveDrag(paths: [String], event: NSEvent) {
+            let pb = NSPasteboardItem()
+            pb.setString(paths.joined(separator: "\n"), forType: .onyxTreePaths)
+            let item = NSDraggingItem(pasteboardWriter: pb)
+            let label = TreeSelection.describe(paths)
+            let img = dragImage(label)
+            var frame = bounds
+            frame.size.width = min(max(frame.width, 80), 240)
+            frame.size.height = 22
+            item.setDraggingFrame(frame, contents: img)
+            Self.moving = true
+            beginDraggingSession(with: [item], event: event, source: self)
+        }
+
+        private func dragImage(_ label: String) -> NSImage {
+            let font = NSFont.systemFont(ofSize: 12.5)
+            let attrs: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: Theme.ink,
+            ]
+            let text = NSAttributedString(string: label, attributes: attrs)
+            let size = NSSize(width: min(ceil(text.size().width) + 16, 240), height: 22)
+            let image = NSImage(size: size)
+            image.lockFocus()
+            Theme.paper.setFill()
+            NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 5, yRadius: 5).fill()
+            text.draw(at: NSPoint(x: 8, y: (size.height - text.size().height) / 2))
+            image.unlockFocus()
+            return image
+        }
+
+        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
+        func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+            Self.moving = false
+            onDragEnded?()
+        }
+
+        override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { hover(sender) }
+        override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { hover(sender) }
+        override func draggingExited(_ sender: NSDraggingInfo?) {}
+        override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { hasTreePaths(sender) }
+        override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+            guard hasTreePaths(sender) else { return false }
+            onDrop?(path, isFolder)
+            return true
+        }
+
+        private func hover(_ sender: NSDraggingInfo) -> NSDragOperation {
+            guard hasTreePaths(sender) else { return [] }
+            return (onDragHover?(path, isFolder) ?? false) ? .move : []
+        }
+
+        private func hasTreePaths(_ sender: NSDraggingInfo) -> Bool {
+            sender.draggingPasteboard.availableType(from: [.onyxTreePaths]) != nil
+        }
     }
+}
+
+extension NSPasteboard.PasteboardType {
+    static let onyxTreePaths = NSPasteboard.PasteboardType("app.onyx.tree-paths")
 }
 
 
@@ -151,10 +272,29 @@ struct FileTreeView: View {
                     } else {
                         ProgressView().controlSize(.small).padding()
                     }
-                    // Empty area at the bottom of the list, for a vault-root New Note / New Folder menu.
+                    // Empty area at the bottom of the list, for a vault-root New Note / New Folder menu,
+                    // and as a drop zone for ⌘-drag to the vault root.
                     Color.clear
                         .frame(maxWidth: .infinity, minHeight: 80)
                         .contentShape(Rectangle())
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(ws.dropTarget == ""
+                                      ? (ws.dropForbidden ? Color.orange.opacity(0.10) : Color.cursorBlue.opacity(0.10))
+                                      : Color.clear)
+                                .padding(.horizontal, 5)
+                        )
+                        .overlay(
+                            TreeClickCatcher(
+                                path: "",
+                                isFolder: true,
+                                dropOnly: true,
+                                onClick: { _ in },
+                                onDragHover: { path, isFolder in ws.treeDragHover(on: path, isFolder: isFolder) },
+                                onDrop: { path, isFolder in ws.performTreeDrop(on: path, isFolder: isFolder) },
+                                onDragEnded: { ws.endTreeDrag() }
+                            )
+                        )
                         .contextMenu {
                             Button("New Note") { ws.createNote(named: "Untitled", folder: "") }
                             Button("New Folder") { ws.newFolder(in: "") }
@@ -187,9 +327,16 @@ struct TreeNodeView: View {
     /// Selected rows get the full highlight; with a multi-selection the open note (if not part
     /// of it) keeps only a faint one so it's clear what a menu or ⌘⌫ will act on.
     var fill: Double {
+        if node.isFolder, ws.dropTarget == node.path { return ws.dropForbidden ? 0.10 : 0.14 }
         if isSelected { return 0.16 }
         if isCurrent { return ws.treeSelection.isMulti ? 0.04 : 0.08 }
         return hover ? 0.04 : 0
+    }
+    var dropFill: Color {
+        if node.isFolder, ws.dropTarget == node.path {
+            return (ws.dropForbidden ? Color.orange : Color.cursorBlue).opacity(fill)
+        }
+        return Color.ink.opacity(fill)
     }
 
     var body: some View {
@@ -230,7 +377,18 @@ struct TreeNodeView: View {
             }
             .padding(.leading, CGFloat(depth) * 13 + 8).padding(.trailing, 8)
             .frame(minHeight: 24, maxHeight: ws.renamingPath == node.path ? 26 : 24)
-            .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(fill)).padding(.horizontal, 5))
+            .background(
+                RoundedRectangle(cornerRadius: 5)
+                    .fill(dropFill)
+                    .padding(.horizontal, 5)
+            )
+            .overlay {
+                if node.isFolder, ws.dropTarget == node.path {
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke((ws.dropForbidden ? Color.orange : Color.cursorBlue).opacity(0.55), lineWidth: 1.2)
+                        .padding(.horizontal, 5)
+                }
+            }
             .overlay(alignment: .leading) {
                 if isSelected && ws.renamingPath != node.path {
                     RoundedRectangle(cornerRadius: 1).fill(Color.ink.opacity(0.5)).frame(width: 2, height: 14).padding(.leading, 8)
@@ -242,11 +400,22 @@ struct TreeNodeView: View {
                 if ws.renamingPath != node.path {
                     TreeClickCatcher(
                         path: node.path,
+                        isFolder: node.isFolder,
                         chevronWidth: node.isFolder ? CGFloat(depth) * 13 + 8 + 12 : 0,
-                        onChevron: node.isFolder ? { handleChevron() } : nil
-                    ) { flags in
-                        ws.treeClick(node.path, modifiers: flags) { activate() }
-                    }
+                        onChevron: node.isFolder ? { handleChevron() } : nil,
+                        onClick: { flags in
+                            ws.treeClick(node.path, modifiers: flags) { activate() }
+                        },
+                        onCommandDrag: { path in
+                            guard ws.renamingPath == nil else { return [] }
+                            let paths = ws.pathsForTreeDrag(from: path)
+                            ws.beginTreeDrag(paths)
+                            return paths
+                        },
+                        onDragHover: { path, isFolder in ws.treeDragHover(on: path, isFolder: isFolder) },
+                        onDrop: { path, isFolder in ws.performTreeDrop(on: path, isFolder: isFolder) },
+                        onDragEnded: { ws.endTreeDrag() }
+                    )
                 }
             }
             .id(node.path)

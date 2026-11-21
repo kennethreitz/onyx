@@ -238,7 +238,7 @@ Rename… (File menu, palette, right-click, or Return on a focused file-tree row
 row name in place, Finder-style: the stem is selected (without `.md`), ↩ commits, Esc or an
 empty or unchanged name cancels, clicking away commits, and a collision or illegal character
 keeps the edit and shows an error. If the sidebar is hidden, the old name prompt is used.
-Move to… (⇧⌘M, palette, right-click; never drag and drop) opens a folder picker on the ⌘O matcher: type to filter,
+⌘-drag a row (or a multi-selection) onto a folder, a file in that folder, or the empty area at the bottom of the tree (the vault root) to move it; the drop target highlights and a collapsed folder expands after a short hover. A folder cannot land inside itself or a descendant, and a name collision is refused with an error. Plain drag does not move files. Move to… (⇧⌘M, palette, right-click) opens a folder picker on the ⌘O matcher: type to filter,
 ↩ moves, ⇧↩ or the Create row makes the typed folder (nested paths fine) and moves there.
 Folders get both. Links across the vault follow: path links (`[[Folder/Note]]`, with or without
 `.md`) are rewritten to the new path, name links (`[[Note]]`) only when the name changed (or
