@@ -79,6 +79,46 @@ struct SidebarView: View {
     }
 }
 
+/// A transparent AppKit view that receives left clicks and reports the event's own
+/// modifier flags. SwiftUI's `onTapGesture` often doesn't fire for ⌘-click on macOS,
+/// and reading `NSEvent.modifierFlags` in the gesture callback can miss the key
+/// because the callback runs after the event has ended.
+struct TreeClickCatcher: NSViewRepresentable {
+    var path: String
+    var onClick: (NSEvent.ModifierFlags) -> Void
+
+    func makeNSView(context: Context) -> Catcher {
+        let v = Catcher()
+        v.apply(path: path, onClick: onClick)
+        return v
+    }
+    func updateNSView(_ v: Catcher, context: Context) { v.apply(path: path, onClick: onClick) }
+
+    final class Catcher: NSView {
+        var onClick: ((NSEvent.ModifierFlags) -> Void)?
+        func apply(path: String, onClick: @escaping (NSEvent.ModifierFlags) -> Void) {
+            self.onClick = onClick
+            let id = "tree-row:\(path)"
+            identifier = NSUserInterfaceItemIdentifier(id)
+            setAccessibilityIdentifier(id)
+        }
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+        /// Steal only a plain left mouse-down (including ⌘/⇧). Right-click, control-click,
+        /// and hover pass through so the SwiftUI context menu and `onHover` keep working.
+        override func hitTest(_ point: NSPoint) -> NSView? {
+            guard bounds.contains(point), let e = NSApp.currentEvent else { return nil }
+            if e.type == .leftMouseDown && !e.modifierFlags.contains(.control) { return self }
+            return nil
+        }
+        override func mouseDown(with event: NSEvent) {
+            if event.modifierFlags.contains(.control) { nextResponder?.mouseDown(with: event); return }
+            onClick?(event.modifierFlags)
+        }
+        override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
+    }
+}
+
+
 struct FileTreeView: View {
     @Bindable var ws: Workspace
     var body: some View {
@@ -117,8 +157,8 @@ struct TreeNodeView: View {
     /// Selected rows get the full highlight; with a multi-selection the open note (if not part
     /// of it) keeps only a faint one so it's clear what a menu or ⌘⌫ will act on.
     var fill: Double {
-        if isSelected { return 0.085 }
-        if isCurrent { return ws.treeSelection.isMulti ? 0.035 : 0.08 }
+        if isSelected { return 0.16 }
+        if isCurrent { return ws.treeSelection.isMulti ? 0.04 : 0.08 }
         return hover ? 0.04 : 0
     }
 
@@ -149,9 +189,16 @@ struct TreeNodeView: View {
             .padding(.leading, CGFloat(depth) * 13 + 8).padding(.trailing, 8)
             .frame(height: 24)
             .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(fill)).padding(.horizontal, 5))
+            .overlay(alignment: .leading) {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 1).fill(Color.ink.opacity(0.5)).frame(width: 2, height: 14).padding(.leading, 8)
+                }
+            }
             .contentShape(Rectangle())
             .onHover { hover = $0 }
-            .onTapGesture { ws.treeClick(node.path, modifiers: NSEvent.modifierFlags) { activate() } }
+            .overlay(TreeClickCatcher(path: node.path) { flags in
+                ws.treeClick(node.path, modifiers: flags) { activate() }
+            })
             .id(node.path)
             .contextMenu {
                 if ws.treeSelection.isMulti && isSelected {

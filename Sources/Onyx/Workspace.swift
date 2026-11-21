@@ -262,7 +262,7 @@ final class Workspace {
         } else { return }
         flushSave()
         if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
-        if !treeSelection.contains(path) { treeSelection.clear() }   // opened from elsewhere
+        if !selectionIncludes(path) { treeSelection.clear() }   // opened from elsewhere
         if recordHistory { pushHistory(.note(path)) }
         if currentPath != path { liveTop = 0 }
         currentPath = path
@@ -479,6 +479,18 @@ final class Workspace {
     var treeSelection = TreeSelection()
     /// The tree was the last thing clicked, so ⌘⌫ and Esc act on its selection.
     @ObservationIgnored var treeFocused = false
+
+
+    /// True if this path is selected, or it's the folder note of a selected folder
+    /// (`Projects/Projects.md` when `Projects` is selected).
+    func selectionIncludes(_ path: String) -> Bool {
+        if treeSelection.contains(path) { return true }
+        guard path.lowercased().hasSuffix(".md") else { return false }
+        let parent = (path as NSString).deletingLastPathComponent
+        guard !parent.isEmpty else { return false }
+        let stem = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        return (parent as NSString).lastPathComponent == stem && treeSelection.contains(parent)
+    }
 
     func visibleTreePaths() -> [String] { snapshot?.tree.visiblePaths(expanded: expanded, children: treeChildren) ?? [] }
 

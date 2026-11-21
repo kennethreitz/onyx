@@ -22,6 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Rhymepad support.
 
+### Fixed
+- ⌘-click and ⇧-click in the file tree actually change the selection. The earlier multi-select code never saw the modifier keys: SwiftUI's tap gesture often skips a ⌘-click, and the handler read `NSEvent.modifierFlags` after the event had ended.
+
+
 ## [0.1.2] - 2026-11-20
 
 ### Added

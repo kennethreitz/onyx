@@ -125,6 +125,23 @@ enum TypeSelfTest {
             t += line.hasPrefix("type ") ? 0.05 * Double(line.count) + 0.3 : 0.3
         }
     }
+    /// Send a real left mouse-down/up, with modifiers, to the sidebar row's click catcher.
+    /// Works even when the window ignores mouse events (`ONYX_SHOT_QUIET`).
+    @MainActor static func clickTreeRow(_ path: String, modifiers: NSEvent.ModifierFlags) -> Bool {
+        guard let w = MainWindow.current, let root = w.contentView else { return false }
+        let id = "tree-row:\(path)"
+        func find(_ v: NSView) -> NSView? {
+            if v.identifier?.rawValue == id || v.accessibilityIdentifier() == id { return v }
+            for s in v.subviews { if let x = find(s) { return x } }
+            return nil
+        }
+        guard let row = find(root) else { return false }
+        let loc = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let t = ProcessInfo.processInfo.systemUptime
+        guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: loc, modifierFlags: modifiers, timestamp: t, windowNumber: w.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1) else { return false }
+        row.mouseDown(with: down)
+        return true
+    }
     /// `open <path>`, `split`, `back`, `trash <path>` (no confirm), `state`.
     @MainActor static func workspaceCommand(_ line: String, _ ws: Workspace) -> Bool {
         let arg = line.split(separator: " ", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
@@ -145,6 +162,11 @@ enum TypeSelfTest {
         case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view
             let m: NSEvent.ModifierFlags = line.hasPrefix("shift") ? .shift : line.hasPrefix("cmd") ? .command : []
             ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") || arg.isCanvasPath || arg.isBasePath { ws.openNote(arg) } }
+        case "rowhit", "rowhitcmd", "rowhitshift":
+            // A real mouseDown on the sidebar row (not a shortcut into treeClick), so this
+            // exercises the same path as a pointer click, including modifier flags.
+            let m: NSEvent.ModifierFlags = line.hasPrefix("rowhitcmd") ? .command : line.hasPrefix("rowhitshift") ? .shift : []
+            print("[rowhit] \(clickTreeRow(arg, modifiers: m) ? "ok" : "missing") \(arg)")
         case "expand": ws.expanded.insert(arg)
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
