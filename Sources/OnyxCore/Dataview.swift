@@ -862,7 +862,8 @@ public enum Dataview {
     static func inlineHTML(_ raw: String, snap: VaultSnapshot, path: String, now: Date) -> String {
         let s = raw.trimmingCharacters(in: .whitespaces)
         if s.hasPrefix("$=") {
-            return "<span class=\"dataview-inline-error\">DataviewJS isn’t supported yet</span>"
+            let js = String(s.dropFirst(2)).trimmingCharacters(in: .whitespaces)
+            return DataviewJS.evalInline(js, in: snap, from: path, now: now)
         }
         let expr = String(s.drop(while: { $0 == "=" || $0.isWhitespace }))
         do {

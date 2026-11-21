@@ -305,7 +305,7 @@ final class DataviewTests: XCTestCase {
         XCTAssertEqual(r.html[0], "Sun")
         XCTAssertEqual(r.html[1], "Gold")
         XCTAssertEqual(r.html[2], "4")
-        XCTAssertTrue(r.html[3].contains("DataviewJS"))
+        XCTAssertEqual(r.html[3], "Sun")
         XCTAssertTrue(r.html[4].contains("dataview-inline-error"), r.html[4])
     }
 

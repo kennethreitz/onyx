@@ -241,7 +241,7 @@ struct ReaderView: NSViewRepresentable {
 
 /// Everything the page needs, resolved Swift-side so JS never touches the disk.
 enum ReaderPayload {
-    static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
+    static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataviewjs|dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
     static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true) -> String {
         let fm = Frontmatter.parse(text)
@@ -258,7 +258,14 @@ enum ReaderPayload {
             out += "<div class=\"onyx-dataview\" data-i=\"\(dv.count)\"></div>" + String(repeating: "\n", count: fenceLines)
             let lang = ns.substring(with: m.range(at: 1))
             let query = ns.substring(with: m.range(at: 2))
-            dv.append(lang == "base" ? baseHTML(query, snap: snap, path: path) : dataviewHTML(query, snap: snap, path: path))
+            if lang == "dataviewjs" {
+                switch DataviewJS.run(query, in: snap, from: path) {
+                case .html(let h): dv.append(h)
+                case .error(let e): dv.append("<div class=\"dataview-error\"><span>dataviewjs</span> \(esc(e))<pre>\(esc(query))</pre></div>")
+                }
+            } else {
+                dv.append(lang == "base" ? baseHTML(query, snap: snap, path: path) : dataviewHTML(query, snap: snap, path: path))
+            }
             last = NSMaxRange(m.range)
         }
         out += ns.substring(from: last)
