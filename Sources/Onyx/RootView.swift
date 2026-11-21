@@ -152,6 +152,9 @@ struct RootView: View {
                 if ws.speech.isActive {
                     SpeechBadge(speech: ws.speech).padding(.trailing, 6)
                 }
+                if ws.recorder.isActive {
+                    RecordingBadge(recorder: ws.recorder) { ws.stopRecording() }.padding(.trailing, 6)
+                }
                 syncDot.padding(.trailing, 6)
                 if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.padding(.trailing, 6) }
                 if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.padding(.trailing, 6) }

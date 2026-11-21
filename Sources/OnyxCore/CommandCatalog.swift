@@ -103,6 +103,7 @@ public enum CommandCatalog {
         cmd("readaloud", "Read Aloud", .note, [], "speaker.wave.2"),
         cmd("readpause", "Pause Reading", .note, [], "pause.fill"),
         cmd("readstop", "Stop Reading", .note, [], "stop.fill"),
+        cmd("record", "Record Audio", .note, [], "mic"),
         cmd("reindex", "Rebuild Index", .note, [], "arrow.clockwise"),
         cmd("hints", "Show Shortcut Hints", .note, []),
     ]

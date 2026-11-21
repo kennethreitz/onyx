@@ -114,6 +114,7 @@ final class Workspace {
     var lastExternalChange: Date? = nil
     var toast: String? = nil
     let speech = SpeechReader()
+    let recorder = AudioRecorder()
     var editorJump: Int? = nil           // line to reveal in the editor
     var readerJump: Int? = nil           // heading index to reveal in the reader
     var expanded: Set<String> = []
@@ -222,6 +223,17 @@ final class Workspace {
             homePath = v.hasSuffix(".md") ? v : v + ".md"
             obsidianHomeIsGraph = (hp["kind"] as? String) == "Graph view" && (hp["openOnStartup"] as? Bool ?? false)
         }
+    }
+    /// For files written outside `write` (recordings): let the index, git and sync know.
+    func fileAdded(_ rel: String) {
+        snapshot?.refresh(paths: [rel])
+        git?.edited()
+        obsidianSync?.edited()
+    }
+    func noteUpdatedOnDisk(_ path: String, content: String) { snapshot?.update(path: path, content: content) }
+    /// Obsidian's "Default location for new attachments" (`attachmentFolderPath` in app.json).
+    func obsidianAttachmentFolderSetting() -> String? {
+        (obsidianJSON("app.json") as? [String: Any])?["attachmentFolderPath"] as? String
     }
     private func obsidianIgnore() -> [String] {
         ((obsidianJSON("app.json") as? [String: Any])?["userIgnoreFilters"] as? [String]) ?? []

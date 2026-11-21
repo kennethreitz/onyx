@@ -22,6 +22,19 @@ final class OnyxSchemeHandler: NSObject, WKURLSchemeHandler {
             return task.didFailWithError(URLError(.fileDoesNotExist))
         }
         let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
+        // Audio and video need byte ranges (WebKit's media loader asks for them before it will play or seek).
+        if mime.hasPrefix("audio/") || mime.hasPrefix("video/") {
+            let range = AudioNote.byteRange(task.request.value(forHTTPHeaderField: "Range"), length: data.count)
+            let body = range.map { data.subdata(in: $0) } ?? data
+            var headers = ["Content-Type": mime, "Content-Length": "\(body.count)", "Accept-Ranges": "bytes"]
+            if let r = range { headers["Content-Range"] = "bytes \(r.lowerBound)-\(r.upperBound - 1)/\(data.count)" }
+            if let resp = HTTPURLResponse(url: url, statusCode: range == nil ? 200 : 206, httpVersion: "HTTP/1.1", headerFields: headers) {
+                task.didReceive(resp)
+                task.didReceive(body)
+                task.didFinish()
+                return
+            }
+        }
         task.didReceive(URLResponse(url: url, mimeType: mime, expectedContentLength: data.count, textEncodingName: mime.hasPrefix("text") || mime.contains("javascript") ? "utf-8" : nil))
         task.didReceive(data)
         task.didFinish()

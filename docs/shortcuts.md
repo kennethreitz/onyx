@@ -34,7 +34,7 @@
 
 Open Random Note is in the command palette and the Go menu; it has no default shortcut.
 
-Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading.
+Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading. Record Audio (Stop Recording while recording) is there too, also without a default shortcut.
 
 Every command is also in the menu bar with its shortcut. The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
 

@@ -273,6 +273,7 @@ enum PaletteCommands {
             item("readaloud") { ws.readAloud() },
             item("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", symbol: ws.speech.state == .paused ? "play.fill" : "pause.fill") { ws.toggleSpeechPause() },
             item("readstop") { ws.stopSpeech() },
+            item("record", title: ws.recorder.isRecording ? "Stop Recording" : "Record Audio", symbol: ws.recorder.isRecording ? "stop.circle" : "mic") { ws.toggleRecording() },
             item("sidenotes", title: ws.sidenotes ? "Footnotes at the end" : "Footnotes as sidenotes") { ws.sidenotes.toggle() },
             item("light", title: "Appearance: light") { appearance("light") },
             item("dark", title: "Appearance: dark") { appearance("dark") },

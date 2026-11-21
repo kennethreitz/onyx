@@ -302,6 +302,8 @@ struct OnyxApp: App {
             ShortcutMenus.button("readaloud", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.readAloud() }
             ShortcutMenus.button("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", disabled: !ws.speech.isActive) { ws.toggleSpeechPause() }
             ShortcutMenus.button("readstop", disabled: !ws.speech.isActive) { ws.stopSpeech() }
+            ShortcutMenus.button("record", title: ws.recorder.isRecording ? "Stop Recording" : "Record Audio",
+                                 disabled: !ws.recorder.isRecording && (ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.recorder.isActive)) { ws.toggleRecording() }
             Divider()
             ShortcutMenus.button("reindex") { ws.reindex() }
             ShortcutMenus.button("hints") { withAnimation { ws.showHints = true } }

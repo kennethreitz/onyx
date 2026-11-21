@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Dataview `GROUP BY` (with `rows`) and `FLATTEN`, implicit `file.*` fields (name, path, folder, link, ctime, mtime, cday, mday, tags, etags, inlinks, outlinks, aliases, tasks, size, day), dates and durations (`date(today)`, `dur()`, date comparisons and math), and a broader function library: length, lower, upper, round, min/max/sum, join, link, dateformat, regexmatch, replace, startswith/endswith, filter/map, any/all, nonnull, number, string, striptime, choice, default, contains/icontains, econtains. Inline `key:: value` fields are queried like frontmatter.
 - Open Random Note in the command palette and the Go menu. It opens a random Markdown note from the vault in the current pane, skipping the one you’re on when it can. Hidden files and ignored folders stay out, the same as the rest of the index. No default shortcut; assign one in Settings ▸ Shortcuts.
+- Record Audio in the command palette and the Note menu (bindable in Settings ▸ Shortcuts). It toggles recording from the microphone to `Recording YYYY-MM-DD HH-mm-ss.m4a` (AAC) in Obsidian’s attachment folder, shows a quiet footer chip with elapsed time and stop, then inserts `![[Recording ….m4a]]` at the cursor. A transcript is generated on-device (SpeechAnalyzer/SpeechTranscriber on macOS 26+, else SFSpeechRecognizer with on-device recognition in ~50 s chunks) and added below the embed as a `> [!transcript]` callout while the chip reads “Transcribing…”. Settings ▸ Reading has a toggle for automatic transcripts (on by default). The app bundle now declares microphone and speech-recognition usage descriptions.
+
+### Fixed
+- Embedded audio and video in the reader answer byte-range requests, so WebKit can play and seek them.
 
 ## [0.1.5] - 2026-11-21
 

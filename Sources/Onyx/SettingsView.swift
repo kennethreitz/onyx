@@ -276,6 +276,7 @@ struct ReadingSettingsPage: View {
 private struct SpeechSettingsSection: View {
     @AppStorage(SpeechPrefs.voice) private var voice = ""
     @AppStorage(SpeechPrefs.rate) private var rate = Double(AVSpeechUtteranceDefaultSpeechRate)
+    @AppStorage(RecordingPrefs.autoTranscribe) private var autoTranscribe = true
     private let voices = SpeechReader.voices()
 
     var body: some View {
@@ -295,6 +296,9 @@ private struct SpeechSettingsSection: View {
                 }
             }
             Text("Read Aloud in the command palette or the Note menu speaks the selection, or the whole note. It uses the Mac’s voices and works offline.")
+                .font(.system(size: 11)).foregroundStyle(Color.faint)
+            Toggle("Transcribe recordings automatically", isOn: $autoTranscribe)
+            Text("Record Audio saves an .m4a to the attachments folder, embeds it at the cursor, and adds an on-device transcript below it.")
                 .font(.system(size: 11)).foregroundStyle(Color.faint)
         } header: { settingsHeader("Speech") }
     }

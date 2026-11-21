@@ -48,6 +48,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSApplicationCategoryType</key><string>public.app-category.productivity</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSSupportsAutomaticTermination</key><false/>
+  <key>NSMicrophoneUsageDescription</key><string>Onyx records audio into your notes when you choose Record Audio.</string>
+  <key>NSSpeechRecognitionUsageDescription</key><string>Onyx transcribes your recordings on this Mac.</string>
   <key>CFBundleDocumentTypes</key>
   <array><dict>
     <key>CFBundleTypeName</key><string>Folder</string>
