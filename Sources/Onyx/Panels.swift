@@ -86,19 +86,30 @@ struct SidebarView: View {
 /// because the callback runs after the event has ended.
 struct TreeClickCatcher: NSViewRepresentable {
     var path: String
+    /// Leading strip reserved for the disclosure chevron (0 for files). Clicks here
+    /// toggle expansion and are not treated as a row activation, so a folder with
+    /// an index note can still be collapsed.
+    var chevronWidth: CGFloat = 0
+    var onChevron: (() -> Void)? = nil
     var onClick: (NSEvent.ModifierFlags) -> Void
 
     func makeNSView(context: Context) -> Catcher {
         let v = Catcher()
-        v.apply(path: path, onClick: onClick)
+        v.apply(path: path, chevronWidth: chevronWidth, onChevron: onChevron, onClick: onClick)
         return v
     }
-    func updateNSView(_ v: Catcher, context: Context) { v.apply(path: path, onClick: onClick) }
+    func updateNSView(_ v: Catcher, context: Context) {
+        v.apply(path: path, chevronWidth: chevronWidth, onChevron: onChevron, onClick: onClick)
+    }
 
     final class Catcher: NSView {
         var onClick: ((NSEvent.ModifierFlags) -> Void)?
-        func apply(path: String, onClick: @escaping (NSEvent.ModifierFlags) -> Void) {
+        var onChevron: (() -> Void)?
+        var chevronWidth: CGFloat = 0
+        func apply(path: String, chevronWidth: CGFloat, onChevron: (() -> Void)?, onClick: @escaping (NSEvent.ModifierFlags) -> Void) {
             self.onClick = onClick
+            self.onChevron = onChevron
+            self.chevronWidth = chevronWidth
             let id = "tree-row:\(path)"
             identifier = NSUserInterfaceItemIdentifier(id)
             setAccessibilityIdentifier(id)
@@ -113,7 +124,12 @@ struct TreeClickCatcher: NSViewRepresentable {
         }
         override func mouseDown(with event: NSEvent) {
             if event.modifierFlags.contains(.control) { nextResponder?.mouseDown(with: event); return }
-            onClick?(event.modifierFlags)
+            let x = convert(event.locationInWindow, from: nil).x
+            if chevronWidth > 0 && x < chevronWidth {
+                onChevron?()
+            } else {
+                onClick?(event.modifierFlags)
+            }
         }
         override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
     }
@@ -181,7 +197,6 @@ struct TreeNodeView: View {
                         .foregroundStyle(Color.faint)
                         .frame(width: 12)
                         .contentShape(Rectangle())
-                        .onTapGesture { toggle() }
                 } else {
                     Spacer().frame(width: 12)
                 }
@@ -205,7 +220,11 @@ struct TreeNodeView: View {
             }
             .contentShape(Rectangle())
             .onHover { hover = $0 }
-            .overlay(TreeClickCatcher(path: node.path) { flags in
+            .overlay(TreeClickCatcher(
+                path: node.path,
+                chevronWidth: node.isFolder ? CGFloat(depth) * 13 + 8 + 12 : 0,
+                onChevron: node.isFolder ? { handleChevron() } : nil
+            ) { flags in
                 ws.treeClick(node.path, modifiers: flags) { activate() }
             })
             .id(node.path)
@@ -227,9 +246,15 @@ struct TreeNodeView: View {
             if isOpen { ws.expanded.remove(node.path) } else { ws.expanded.insert(node.path) }
         }
     }
+    func handleChevron() {
+        let a = FolderTreeClick.action(.chevron, hasFolderNote: node.folderNote != nil)
+        if a.toggleExpansion { toggle() }
+    }
     func activate() {
         if node.isFolder {
-            if let fn = node.folderNote { ws.expanded.insert(node.path); ws.openNote(fn) } else { toggle() }
+            let a = FolderTreeClick.action(.row, hasFolderNote: node.folderNote != nil)
+            if a.toggleExpansion { toggle() }
+            if a.openFolderNote, let fn = node.folderNote { ws.openNote(fn, revealInTree: false) }
         } else if node.isNote || node.path.isCanvasPath || node.path.isBasePath { ws.openNote(node.path) }
         else if let r = ws.root { NSWorkspace.shared.open(r.appendingPathComponent(node.path)) }
     }

@@ -127,7 +127,9 @@ enum TypeSelfTest {
     }
     /// Send a real left mouse-down/up, with modifiers, to the sidebar row's click catcher.
     /// Works even when the window ignores mouse events (`ONYX_SHOT_QUIET`).
-    @MainActor static func clickTreeRow(_ path: String, modifiers: NSEvent.ModifierFlags) -> Bool {
+    /// When `chevron` is true, the click lands in the disclosure-chevron strip so the
+    /// catcher toggles expansion without activating the row (opening a folder note).
+    @MainActor static func clickTreeRow(_ path: String, modifiers: NSEvent.ModifierFlags, chevron: Bool = false) -> Bool {
         guard let w = MainWindow.current, let root = w.contentView else { return false }
         let id = "tree-row:\(path)"
         func find(_ v: NSView) -> NSView? {
@@ -136,7 +138,10 @@ enum TypeSelfTest {
             return nil
         }
         guard let row = find(root) else { return false }
-        let loc = row.convert(NSPoint(x: row.bounds.midX, y: row.bounds.midY), to: nil)
+        let chevronW = (row as? TreeClickCatcher.Catcher)?.chevronWidth ?? 0
+        if chevron && chevronW <= 0 { return false }
+        let x = chevron ? row.bounds.minX + max(chevronW - 6, 1) : row.bounds.midX
+        let loc = row.convert(NSPoint(x: x, y: row.bounds.midY), to: nil)
         let t = ProcessInfo.processInfo.systemUptime
         guard let down = NSEvent.mouseEvent(with: .leftMouseDown, location: loc, modifierFlags: modifiers, timestamp: t, windowNumber: w.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1) else { return false }
         row.mouseDown(with: down)
@@ -199,7 +204,11 @@ enum TypeSelfTest {
             // exercises the same path as a pointer click, including modifier flags.
             let m: NSEvent.ModifierFlags = line.hasPrefix("rowhitcmd") ? .command : line.hasPrefix("rowhitshift") ? .shift : []
             print("[rowhit] \(clickTreeRow(arg, modifiers: m) ? "ok" : "missing") \(arg)")
+        case "rowhitchevron":
+            print("[rowhit] \(clickTreeRow(arg, modifiers: [], chevron: true) ? "ok" : "missing") chevron \(arg)")
         case "expand": ws.expanded.insert(arg)
+        case "expanded":
+            print("[expanded] \(ws.expanded.sorted().joined(separator: ",")) current=\(ws.currentPath ?? "-")")
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
         case "escape":   // the same path as the Esc key (prints the action, then performs it)

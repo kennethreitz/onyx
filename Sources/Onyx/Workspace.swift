@@ -250,7 +250,7 @@ final class Workspace {
         }
     }
 
-    func openNote(_ path: String, heading: String? = nil, recordHistory: Bool = true) {
+    func openNote(_ path: String, heading: String? = nil, recordHistory: Bool = true, revealInTree: Bool = true) {
         selectedFolder = nil
         guard let snap = snapshot else { return }
         let content: String
@@ -264,7 +264,8 @@ final class Workspace {
         if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
         if !selectionIncludes(path) { treeSelection.clear() }   // opened from elsewhere
         if recordHistory { pushHistory(.note(path)) }
-        if currentPath != path { liveTop = 0 }
+        let alreadyOpen = currentPath == path
+        if !alreadyOpen { liveTop = 0 }
         currentPath = path
         conflict = nil
         suppressTextChange = true
@@ -276,9 +277,11 @@ final class Workspace {
         recent.insert(path, at: 0)
         if recent.count > 50 { recent.removeLast(recent.count - 50) }
         UserDefaults.standard.set(recent, forKey: key("recent"))
-        // reveal in tree
-        var parent = (path as NSString).deletingLastPathComponent
-        while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
+        // reveal in tree — but not when the note is already open, and not when a
+        // folder-row click just toggled expansion: both would undo a user collapse.
+        if TreeReveal.shouldExpandAncestors(alreadyOpen: alreadyOpen, reveal: revealInTree) {
+            for parent in TreeReveal.ancestors(of: path) { expanded.insert(parent) }
+        }
         if let heading, let note = snap.notes[path], let idx = note.summary.headings.firstIndex(where: { $0.text.lowercased() == heading.lowercased() }) {
             readerJump = idx; editorJump = note.summary.headings[idx].line
         }
