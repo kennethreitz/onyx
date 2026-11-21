@@ -31,9 +31,19 @@ final class GraphStore {
 
 struct Camera: Equatable { var zoom: Double; var pan: SIMD2<Double> }
 
+/// The focus graph and atlas.
+///
+/// Presented as an overlay on the current pane (or the solo page), sitting on top of the
+/// note underneath — never over the sidebar, inspector, or other split panes. `docked` is
+/// the standing "graph in a pane" beside notes (⌥⌘G). Interaction: click a node to travel
+/// and re-center (neighborhood browse); double-click or ↩ opens that note in this pane and
+/// dismisses the overlay; ⌫ steps back along the trail; Esc closes the overlay and returns
+/// focus to the note. Atlas uses the same overlay and the same open/dismiss rules. Orphans
+/// stay hidden until Filter → Show orphans (satellites, no list). Hover graph cards are
+/// unchanged (title-bar button, links, inspector).
 struct GraphView: View {
     @Bindable var ws: Workspace
-    /// In a pane beside notes rather than over the window: keys stay with the editor, scroll only
+    /// In a pane beside notes rather than as an overlay: keys stay with the editor, scroll only
     /// zooms under the pointer, and the focus graph follows the note you're on.
     var docked = false
     @State private var frameInWindow: CGRect = .zero
@@ -71,7 +81,7 @@ struct GraphView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
-                Color.paper.opacity(0.99).ignoresSafeArea()
+                Color.paper
                 let _ = tick
                 if animating {
                     TimelineView(.animation) { tl in canvas(now: tl.date) }
@@ -663,17 +673,9 @@ struct GraphView: View {
                 TextField("Highlight notes", text: $query).textFieldStyle(.plain).font(.system(size: 12)).focused($searchFocused)
                     .onSubmit { jumpToMatch() }
             }
-            .padding(.horizontal, 8).padding(.vertical, 5).frame(width: docked ? 130 : 180)
+            .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 130)
             .background(Color.paper, in: RoundedRectangle(cornerRadius: 6)).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.hairline))
-            if !docked { HStack(spacing: 6) {
-                Image(systemName: "clock").font(.system(size: 10.5)).foregroundStyle(Color.faint)
-                Slider(value: $recency, in: 0...0.995).frame(width: 110).controlSize(.mini)
-                Text(recencyLabel).font(.system(size: 10.5)).foregroundStyle(Color.faint).frame(width: 92, alignment: .leading)
-            } }
             Spacer(minLength: 0)
-            if let g = store.index, !docked {
-                Text(statusText(g)).font(.system(size: 10.5)).foregroundStyle(Color.faint)
-            }
             if docked {
                 Button { ws.closeGraphPane() } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }
                     .buttonStyle(.plain).help("Close graph pane (⌘W)")
@@ -685,7 +687,7 @@ struct GraphView: View {
             }
         }
         .controlSize(.small)
-        .padding(.leading, docked ? 12 : 84).padding(.trailing, docked ? 10 : 18).padding(.top, 6).frame(height: 40)
+        .padding(.leading, docked ? 12 : 16).padding(.trailing, docked ? 10 : 12).padding(.top, 6).frame(height: 40)
     }
 
     var filterMenu: some View {
@@ -700,6 +702,10 @@ struct GraphView: View {
             }
             Divider()
             Toggle("Show orphans", isOn: $showOrphans)
+            Section("Recency") {
+                Slider(value: $recency, in: 0...0.995).controlSize(.mini)
+                Text(recencyLabel).foregroundStyle(Color.faint)
+            }
             if !folderFilter.isEmpty || !tagFilter.isEmpty || recency > 0 { Button("Clear filters") { folderFilter = ""; tagFilter = ""; recency = 0 } }
         } label: {
             Label(filterLabel, systemImage: "line.3.horizontal.decrease").font(.system(size: 11.5))
@@ -728,14 +734,6 @@ struct GraphView: View {
         guard recency > 0.001, let g = store.index else { return "Any time" }
         return "Since " + cutoffDate(g).formatted(.dateTime.month(.abbreviated).year())
     }
-    func statusText(_ g: GraphIndex) -> String {
-        if ws.graphAtlas, let a = store.atlas {
-            return "\(a.clusters.filter { $0.level == 0 }.count) regions · \(a.notePos.count) linked notes"
-        }
-        let ring1 = layout.filter { $0.ring == 1 }
-        return "\(ring1.filter(\.outgoing).count) links out · \(ring1.filter(\.incoming).count) in · \(layout.filter { $0.ring == 2 }.count) beyond"
-    }
-
     var breadcrumbs: some View {
         HStack(spacing: 6) {
             Button { back() } label: { Image(systemName: "chevron.left").font(.system(size: 10, weight: .semibold)) }
@@ -787,22 +785,38 @@ struct GraphView: View {
         return out
     }
 
+    @ViewBuilder var legendKeys: some View {
+        HStack(spacing: 5) { Circle().fill(Color.ink).frame(width: 7, height: 7); Text("links to") }
+        HStack(spacing: 5) { Circle().strokeBorder(Color.ink, lineWidth: 1).frame(width: 8, height: 8); Text("links here") }
+        HStack(spacing: 5) { Circle().fill(Color.muted.opacity(0.6)).frame(width: 6, height: 6); Text("two steps away") }
+        HStack(spacing: 5) { Capsule().fill(Color.muted).frame(width: 16, height: 2); Text("part of") }
+        HStack(spacing: 5) { Text("┄").foregroundStyle(Color.cursorBlue); Text("related") }
+    }
+
     var legend: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 12) {
             if ws.graphAtlas {
-                Text("Pinch or scroll to zoom into a region · click a region to enter it · click a note to focus it").foregroundStyle(Color.faint)
+                ViewThatFits(in: .horizontal) {
+                    Text("Pinch or scroll to zoom into a region · click a region to enter it · click a note to focus it").foregroundStyle(Color.faint).lineLimit(1)
+                    Text("Scroll to zoom · click to enter · ↩ opens · Esc closes").foregroundStyle(Color.faint).lineLimit(1)
+                }
             } else {
-                HStack(spacing: 5) { Circle().fill(Color.ink).frame(width: 7, height: 7); Text("links to") }
-                HStack(spacing: 5) { Circle().strokeBorder(Color.ink, lineWidth: 1).frame(width: 8, height: 8); Text("links here") }
-                HStack(spacing: 5) { Circle().fill(Color.muted.opacity(0.6)).frame(width: 6, height: 6); Text("two steps away") }
-                HStack(spacing: 5) { Capsule().fill(Color.muted).frame(width: 16, height: 2); Text("part of") }
-                HStack(spacing: 5) { Text("┄").foregroundStyle(Color.cursorBlue); Text("related") }
-                Text("click to travel · double-click or ↩ to open · ⌫ back").foregroundStyle(Color.faint)
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        legendKeys
+                        Text("click to travel · double-click or ↩ opens · Esc closes").foregroundStyle(Color.faint).lineLimit(1)
+                    }
+                    HStack(spacing: 10) {
+                        legendKeys
+                        Text("click travels · ↩ opens · Esc closes").foregroundStyle(Color.faint).lineLimit(1)
+                    }
+                    HStack(spacing: 8) { legendKeys }
+                }
             }
-            Spacer()
+            Spacer(minLength: 0)
         }
         .font(.system(size: 10.5)).foregroundStyle(Color.muted)
-        .padding(.horizontal, 26).padding(.bottom, 12).frame(height: 30)
+        .padding(.horizontal, 16).padding(.bottom, 12).frame(height: 30)
     }
 
     func jumpToMatch() {
@@ -818,12 +832,13 @@ struct GraphView: View {
         guard monitors.isEmpty else { return }
         if let m = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { e in
             var loc = e.window.map { w -> CGPoint in let p = e.locationInWindow; return CGPoint(x: p.x, y: (w.contentView?.bounds.height ?? 0) - p.y) } ?? .zero
+            guard frameInWindow.contains(loc) else { return e }
             if docked {
-                guard ws.overlay == .none, frameInWindow.contains(loc) else { return e }
-                loc = CGPoint(x: loc.x - frameInWindow.minX, y: loc.y - frameInWindow.minY)
+                guard ws.overlay == .none else { return e }
             } else {
                 guard ws.overlay == .graph else { return e }
             }
+            loc = CGPoint(x: loc.x - frameInWindow.minX, y: loc.y - frameInWindow.minY)
             let base = camera(Date())
             if e.modifierFlags.contains(.command) || !e.hasPreciseScrollingDeltas {
                 zoom(by: exp(Double(e.scrollingDeltaY) * (e.hasPreciseScrollingDeltas ? 0.01 : 0.1)), around: loc, base: base)

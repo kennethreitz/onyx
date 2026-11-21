@@ -230,14 +230,33 @@ struct RootView: View {
                 }.frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if ws.isSplit {
                 splitPanes
-            } else if ws.isCanvas {
-                CanvasView(ws: ws).transition(.opacity)
-            } else if ws.mode == .edit {
-                EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
             } else {
-                ReaderView(ws: ws, fontSize: readerSize, measure: measure).transition(.opacity)
+                soloNote
+                    .overlay { graphOverlay(paneID: nil, clearTitle: true, clearFooter: true) }
+                    .clipped()
             }
             if let disk = ws.conflict { conflictBanner(disk) }
+        }
+    }
+
+    @ViewBuilder var soloNote: some View {
+        if ws.isCanvas {
+            CanvasView(ws: ws).transition(.opacity)
+        } else if ws.mode == .edit {
+            EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
+        } else {
+            ReaderView(ws: ws, fontSize: readerSize, measure: measure).transition(.opacity)
+        }
+    }
+
+    /// Focus graph / atlas, clipped to one pane (or the solo page) over the note underneath.
+    @ViewBuilder func graphOverlay(paneID: UUID?, clearTitle: Bool, clearFooter: Bool) -> some View {
+        if ws.overlay == .graph, ws.graphOverlayPaneID == paneID {
+            GraphView(ws: ws)
+                .padding(.top, clearTitle ? 28 : 0)
+                .padding(.bottom, clearFooter ? 30 : 0)
+                .background(Color.paper)
+                .transition(.opacity.combined(with: .scale(scale: 0.97)))
         }
     }
 
@@ -266,10 +285,16 @@ struct RootView: View {
                         })
                         // Don't use .opacity on the pane: WKWebView goes blank inside an opacity group.
                         .overlay {
-                            if i != ws.focusedPane {
+                            if i != ws.focusedPane, !(ws.overlay == .graph && ws.graphOverlayPaneID == pane.id) {
                                 Color.paper.opacity(0.14).allowsHitTesting(false)
                             }
                         }
+                        .overlay {
+                            graphOverlay(paneID: pane.id,
+                                         clearTitle: !vertical ? i == 0 : true,
+                                         clearFooter: !vertical ? i == ws.panes.count - 1 : true)
+                        }
+                        .clipped()
                 }
             }
         }
@@ -428,7 +453,8 @@ struct RootView: View {
                 Spacer()
             }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
         case .graph:
-            GraphView(ws: ws).transition(.opacity)
+            // Drawn on the focused pane (or the solo page), not over the window.
+            EmptyView()
         case .none:
             EmptyView()
         }
@@ -542,9 +568,13 @@ struct RootView: View {
             // any click clears "tree focus"; a tree row's own tap sets it again right after
             if e.type == .leftMouseDown { ws.treeFocused = false }
             // a click in an unfocused pane focuses it first, then the click lands as usual
-            guard ws.isSplit, ws.overlay == .none, let w = e.window, let content = w.contentView else { return e }
+            // (allowed while the graph overlay is up, so other panes stay reachable)
+            guard ws.isSplit, ws.overlay == .none || ws.overlay == .graph, let w = e.window, let content = w.contentView else { return e }
             let p = CGPoint(x: e.locationInWindow.x, y: content.bounds.height - e.locationInWindow.y)
-            if let i = ws.panes.firstIndex(where: { ws.paneFrames[$0.id]?.contains(p) == true }), i != ws.focusedPane { ws.focusPane(i) }
+            if let i = ws.panes.firstIndex(where: { ws.paneFrames[$0.id]?.contains(p) == true }), i != ws.focusedPane {
+                if ws.overlay == .graph, ws.graphOverlayPaneID == ws.panes[i].id { return e }
+                ws.focusPane(i)
+            }
             return e
         }
         moveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { e in
@@ -579,7 +609,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph · ⇧⌘G atlas · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph overlay · ⇧⌘G atlas · Esc closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
     ]
 }
 

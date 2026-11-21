@@ -75,6 +75,9 @@ final class Workspace {
     /// Relative sizes along the split axis, one per pane, summing to 1. Session-only
     /// (not written to defaults). Empty when there is no split.
     var paneRatios: [Double] = []
+    /// The note pane the graph/atlas overlay is sitting on. Nil when there is no split
+    /// (the solo page) or when the overlay is closed.
+    var graphOverlayPaneID: UUID?
     /// Topmost visible source line (fractional, 0-based, frontmatter included) of the focused
     /// pane and of each unfocused pane. Reported by the editor and reader as they scroll and
     /// read by a freshly created view, so ⌘↩ and splits land on the same spot. Not observed:
@@ -359,12 +362,37 @@ final class Workspace {
     /// Opening the graph is a place you can go back to; closing it (Esc, ⌘G) steps back to
     /// the note and leaves the graph one ⌘] away.
     private func overlayChanged(from old: Overlay) {
+        // Pane pinning always tracks the overlay, including history navigation
+        // (`navigating` only suppresses the history side-effects below).
+        if overlay == .graph {
+            if graphOverlayPaneID == nil || (isSplit && !panes.contains(where: { $0.id == graphOverlayPaneID })) {
+                graphOverlayPaneID = isSplit && panes.indices.contains(focusedPane) ? panes[focusedPane].id : nil
+            }
+        } else if old == .graph {
+            graphOverlayPaneID = nil
+            if !navigating { restoreNoteFocus() }
+        }
         guard !navigating else { return }
         if overlay == .graph, old != .graph {
             pushHistory(.graph(atlas: graphAtlas))
         } else if old == .graph, overlay != .graph,
                   history.indices.contains(historyIndex), case .graph = history[historyIndex].place, historyIndex > 0 {
             historyIndex -= 1
+        }
+    }
+
+    /// After the graph overlay closes, give the keyboard back to the note underneath.
+    private func restoreNoteFocus() {
+        guard mode == .edit else { return }
+        Task { @MainActor in
+            guard let w = MainWindow.current, let root = w.contentView else { return }
+            var stack: [NSView] = [root]
+            var found: OnyxTextView?
+            while let v = stack.popLast() {
+                if let tv = v as? OnyxTextView, tv.isEditable { found = tv; break }
+                stack.append(contentsOf: v.subviews)
+            }
+            if let tv = found { w.makeFirstResponder(tv) }
         }
     }
 
@@ -1147,6 +1175,10 @@ extension Workspace {
             paneRatios = PaneRatios.splitting(paneRatios.isEmpty ? [1] : paneRatios, at: focusedPane)
             panes.insert(fresh, at: focusedPane + 1)
             focusedPane += 1
+            // A graph that was over the solo page stays on the source pane, not the new one.
+            if overlay == .graph, graphOverlayPaneID == nil || !panes.contains(where: { $0.id == graphOverlayPaneID }) {
+                graphOverlayPaneID = panes[focusedPane - 1].id
+            }
         }
         chromeLog("split \(axis) panes=\(panes.count) focused=\(focusedPane)")
     }
@@ -1215,6 +1247,9 @@ extension Workspace {
             panes.remove(at: focusedPane)
             focusedPane = min(focusedPane, panes.count - 1)
             if panes[focusedPane].isGraph, let n = panes.indices.filter({ !panes[$0].isGraph }).min(by: { abs($0 - focusedPane) < abs($1 - focusedPane) }) { focusedPane = n }
+            if overlay == .graph, let id = graphOverlayPaneID, !panes.contains(where: { $0.id == id }) {
+                overlay = .none
+            }
         }
         let p = panes[focusedPane]
         if let path = p.path, path != currentPath { openNote(path, recordHistory: false) }

@@ -59,7 +59,7 @@ Wikilinks work the way they do in Obsidian: `[[Note]]`, aliases, headings, and `
 
 Dataview fields are first-class relationships. `partOf:: Knowledge` (or `partOf:: [[Knowledge]]`), `related::`, and a few synonyms become link chips, count as links, draw their own graph edges, and list Part of / Parts / Related in the inspector. Renames update those fields the same way they update wikilinks. Hover a link, an inspector relation, or the title-bar graph button for a small graph card of that note; click a node in the card to open it.
 
-The *focus graph* (<kbd>⌘G</kbd>) puts the current note at the center with its links around it; you travel by clicking. The *atlas* (<kbd>⇧⌘G</kbd>) zooms out to the whole vault as colored regions (folders or tags) that open into sub-regions and notes as you zoom. Filter by folder, tag, or recency; orphans are off until you ask for them. The graph button sits in the title bar, right of the forward arrow: click for the focus graph, shift-click or right-click for the atlas.
+The *focus graph* (<kbd>⌘G</kbd>) opens as an overlay on the current pane, over the note you’re in, with the current note at the center and its links around it. Click a node to travel and re-center; double-click or <kbd>↩</kbd> opens that note in the pane and closes the overlay; <kbd>Esc</kbd> dismisses it and puts you back in the note underneath. In a split, only that pane is covered. The *atlas* (<kbd>⇧⌘G</kbd>) uses the same overlay and zooms out to the whole vault as colored regions (folders or tags) that open into sub-regions and notes as you zoom. Filter by folder, tag, or recency; orphans are off until you ask for them. The graph button sits in the title bar, right of the forward arrow: click for the focus graph, shift-click or right-click for the atlas.
 
 <kbd>⌥⌘G</kbd>, or the dock button on the graph overlay, keeps the graph open as a pane beside your notes. A docked focus graph follows the note you’re on, never steals the editor’s focus, and <kbd>⌘W</kbd> closes it first when it’s the extra pane. Settings has “Open the atlas on startup,” remembered per vault; it defaults to on when the vault’s Obsidian Homepage plugin opens Graph view at launch.
 
@@ -123,7 +123,7 @@ This is unofficial and still new. Try it on a throwaway vault before pointing it
 | <kbd>⇧⌘F</kbd> | Search the vault |
 | <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline · backlinks · properties |
-| <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph · atlas · graph in a pane |
+| <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph overlay · atlas overlay · graph in a pane. <kbd>Esc</kbd> closes the overlay |
 | <kbd>⌘F</kbd> · <kbd>⌥⌘F</kbd> | Find in the note (editor or reader) · find and replace (editor). While the bar is open, <kbd>⌘G</kbd>/<kbd>⇧⌘G</kbd> or <kbd>↩</kbd>/<kbd>⇧↩</kbd> go to the next/previous match, and <kbd>Esc</kbd> closes it |
 | <kbd>⌘↩</kbd> · <kbd>⌘E</kbd> | Read ⇄ edit, and save |
 | <kbd>⌘T</kbd> · <kbd>⌘\\</kbd> | Today’s daily note |

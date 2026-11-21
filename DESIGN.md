@@ -93,11 +93,17 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 
 ## Graph
 
-- **Focus graph** (⌘G): the note at the center, direct links on the first ring (out filled,
-  in hollow), second hop faint beyond. Click travels with an animated re-center and a
-  breadcrumb trail (⌫ back); double-click or ↩ opens.
-- **Atlas** (⇧⌘G): semantic zoom. Folders (or top tags) are regions sized by note count,
-  with edges weighted by cross-links, opening into sub-regions and then notes as you zoom.
+- **Focus graph** (⌘G): an overlay on the current pane (or the solo page) only — never
+  over the sidebar, inspector, or other split panes — with a short fade and scale-in,
+  sitting on top of the note underneath. The note at the center, direct links on the
+  first ring (out filled, in hollow), second hop faint beyond. Click travels with an
+  animated re-center and a breadcrumb trail (⌫ back); double-click or ↩ opens that
+  note in this pane and dismisses the overlay. Esc closes it and returns focus to the
+  note underneath.
+- **Atlas** (⇧⌘G): the same overlay mechanism, in semantic-zoom form. Folders (or top tags)
+  are regions sized by note count, with edges weighted by cross-links, opening into
+  sub-regions and then notes as you zoom. Clicking a note in the atlas focuses it;
+  double-click or ↩ opens and dismisses, same as the focus graph.
 - **Region colors**: each region's name hashes into a muted, hue-ordered palette
   (terracotta, ochre, olive, sage, teal, violet, plum, rose) with light and dark variants.
   Regions on the map get collision-free hues (largest first, ≥2 hue steps apart when it can).
@@ -274,12 +280,18 @@ card. The footer's graph icon remains.
 
 ## Graph pane and startup atlas
 
-The graph can stay open as a pane beside notes: the overlay's "keep open as a pane" button, ⌥⌘G, or
+⌘G / ⇧⌘G (and the title-bar graph button) open the graph as an overlay that covers only the
+focused pane. In a split, the other panes stay visible; Esc or the overlay's close button
+puts the graph away and focuses the note that was under it. The overlay is pinned to the
+pane it was opened from, so focusing another pane doesn't move it.
+
+The graph can also stay open as a pane beside notes: the overlay's "keep open as a pane" button, ⌥⌘G, or
 `openGraphPane`. A graph pane is a `Pane` with `isGraph`; it never takes the editor's focus (focus
 cycling and clicks skip it), its focus graph follows the note you're on, it zooms only under the
 pointer, and keys stay with the editor. ⌘W next to a single note closes the graph pane first.
-"Open the atlas on startup" (Settings ▸ Graph, per vault) shows the atlas over the home note at launch; it
-defaults to on when the vault's Obsidian Homepage plugin opens "Graph view" on startup (~/Notes does).
+"Open the atlas on startup" (Settings ▸ Graph, per vault) shows the atlas as that pane overlay over
+the home note at launch; it defaults to on when the vault's Obsidian Homepage plugin opens "Graph view"
+on startup (~/Notes does).
 
 
 ## Backlinks in the reading view
