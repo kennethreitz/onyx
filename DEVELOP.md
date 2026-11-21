@@ -123,7 +123,7 @@ After a rebuild, macOS may ask for Keychain access if the app was signed ad hoc 
 
 `SIGN_IDENTITY` and `SIGN_KEYCHAIN` override the identity and keychain `bundle.sh` uses. If nothing is available, the app is signed ad hoc, and Keychain will prompt again after each rebuild.
 
-The official release builds are not notarized, which is why first launch needs the Gatekeeper step in the README.
+The official release builds are not notarized, which is why first launch needs the Gatekeeper step in [docs/compatibility.md](docs/compatibility.md).
 
 ## Tests
 
@@ -147,7 +147,7 @@ Add a test when you’re touching parsing, typography, sync, or link rewriting.
 
 4. Publish with `gh release create` (or `gh release upload --clobber` if you’re replacing an asset on an existing tag). Don’t move a tag unless you mean to.
 
-The official zip is Apple silicon. Include the Gatekeeper first-open note in the release text; the README already has a copy.
+The official zip is Apple silicon. Include the Gatekeeper first-open note in the release text; [docs/compatibility.md](docs/compatibility.md) has the full copy.
 
 ## Contributing
 

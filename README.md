@@ -5,8 +5,7 @@
 <h1 align="center">Onyx</h1>
 
 <p align="center"><b>Notes, typeset.</b><br>
-A native Mac app for your Obsidian vault, typeset like a book.<br>
-Quiet, fast, and yours — no database, no account, no lock-in.</p>
+A native Mac app for your Obsidian vault, typeset like a book.</p>
 
 <p align="center">
   <img src="docs/hero.png" alt="Onyx: a typeset typography note beside its focus graph" width="100%">
@@ -14,10 +13,8 @@ Quiet, fast, and yours — no database, no account, no lock-in.</p>
 
 ---
 
-Onyx opens a folder of `.md` files and gets out of the way. It edits like a calm text editor and reads like a typeset page — Latin Modern, hyphenated, ragged-right (justification is opt-in). Your Obsidian vault opens as-is. Obsidian can keep running right alongside it.
-
 - **Typeset reading** — small caps, collision-free sidenotes, hyphenation, the page as a book
-- **PDF and print** — the note as a book page, margin notes, a running head, working links
+- **PDF and print** — the note as a book page, with margin notes and a running head
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place
 - **Wikilinks, daily notes, and search** — the usual, without the chrome
@@ -27,149 +24,20 @@ Onyx opens a folder of `.md` files and gets out of the way. It edits like a calm
 
 The latest build is on the [releases page](https://github.com/kennethreitz/onyx/releases/latest). Unzip it and drag `Onyx.app` to `/Applications`.
 
-This build is not notarized, so macOS will block the first launch. Open Onyx once, then go to System Settings ▸ Privacy & Security, scroll to Security, and click **Open Anyway** next to “Onyx was blocked…”. Confirm when asked. You can also right-click `Onyx.app` and choose **Open**, or clear quarantine from Terminal:
+This build is not notarized, so the first launch needs System Settings ▸ Privacy & Security ▸ **Open Anyway**. It updates itself from v0.1.1 on. Requires macOS 14 (Sonoma) or later, Apple silicon.
 
-```bash
-xattr -dr com.apple.quarantine /Applications/Onyx.app
-```
+## Docs
 
-Starting with v0.1.1, Onyx checks GitHub for a newer release when it launches and every six hours. There’s also a **Check for Updates…** menu item, and you can turn the checks off in Settings. v0.1.0 has to be updated by hand; after that, updates install in place and relaunch on their own.
-
-Requires macOS 14 (Sonoma) or later. The official download is Apple silicon.
-
-## Typeset reading
-
-<p align="center"><img src="docs/reader.png" alt="Reading view: a note typeset in Latin Modern" width="85%"></p>
-
-Two modes, one keystroke. The editor is IBM Plex Mono with live Markdown styling. The reader is the Reitz LaTeX theme: a measure you can set, Tufte-style sidenotes, footnotes, tables, callouts, and Mermaid figures. <kbd>⌘↩</kbd> (or <kbd>⌘E</kbd>) flips between them, saves, and keeps your place in the note. A single newline inside a paragraph is a line break, the way Obsidian does it unless “Strict line breaks” is on.
-
-Typeset reading (on by default, Settings ▸ Reading) sets the page the way a book would: curly quotes and real dashes (never inside code), true small caps for acronyms, old-style figures in prose and lining tabular figures in tables, hyphenation in the note’s `lang`, ragged-right text (Settings ▸ Reading can turn on justification), hanging punctuation, a small-caps lead-in or drop cap, epigraphs, booktabs tables, and numbered figure and table captions. Choose Latin Modern or ET Book. Sidenotes stack and never collide, and they reflow when fonts, images, or the window change. Write `[^n]: {-} …` for an unnumbered margin note. When the window is narrow, notes fold behind a tap. Turn it off to get the plain Reitz LaTeX page back.
-
-File ▸ Export as PDF… (<kbd>⇧⌘E</kbd>) and Print… (<kbd>⌥⌘P</kbd>) lay the note out as a book page. You get sidenotes as margin notes, a running head in small caps, and folios, and links keep working.
-
-Frontmatter, `%%comments%%`, embeds, images, PDFs, audio and video all render in the reader. Dataview-lite runs the `TABLE` and `LIST` queries a vault actually uses (`FROM`, `WHERE`, `SORT`, `LIMIT`, and functions such as `choice()`, `join()`, and `contains()`). <kbd>⌥⌘R</kbd> turns on RhymePad highlighting for verse.
-
-Saves are atomic and conflict-aware: if the file changed on disk, Onyx offers to keep yours, take theirs, or keep both. Light, dark, or auto, text size, and line measure live in <kbd>⌘,</kbd>. <kbd>⌃⌘F</kbd> is focus mode — just the text.
-
-Split with <kbd>⌘D</kbd> (side by side) or <kbd>⇧⌘D</kbd> (stacked), up to four panes. Drag the divider to resize (240pt minimum); double-click it to equalize. Each pane keeps its own note, its own history, and its own read/edit mode. <kbd>⌘W</kbd> closes the focused pane, or the window when there is only one.
-
-## Linking and the graph
-
-Wikilinks work the way they do in Obsidian: `[[Note]]`, aliases, headings, and `![[embeds]]`. Type `[[` and a quiet popup offers existing notes; you can also type a name that does not exist yet. <kbd>⌘</kbd>-click a link in the editor to follow it. Clicking an unresolved link creates the note.
-
-Dataview fields are first-class relationships. `partOf:: Knowledge` (or `partOf:: [[Knowledge]]`), `related::`, and a few synonyms become link chips, count as links, draw their own graph edges, and list Part of / Parts / Related in the inspector. Renames update those fields the same way they update wikilinks. Hover a link, an inspector relation, or the title-bar graph button for a small graph card of that note; click a node in the card to open it.
-
-The *focus graph* (<kbd>⌘G</kbd>) opens as an overlay on the current pane, over the note you’re in, with the current note at the center and its links around it. Click a node to travel and re-center; double-click or <kbd>↩</kbd> opens that note in the pane and closes the overlay; <kbd>Esc</kbd> dismisses it and puts you back in the note underneath. In a split, only that pane is covered. The *atlas* (<kbd>⇧⌘G</kbd>) uses the same overlay and zooms out to the whole vault as colored regions (folders or tags) that open into sub-regions and notes as you zoom. Filter by folder, tag, or recency; orphans are off until you ask for them. The graph button sits in the title bar, right of the forward arrow: click for the focus graph, shift-click or right-click for the atlas.
-
-<kbd>⌥⌘G</kbd>, or the dock button on the graph overlay, keeps the graph open as a pane beside your notes. A docked focus graph follows the note you’re on, never steals the editor’s focus, and <kbd>⌘W</kbd> closes it first when it’s the extra pane. Settings has “Open the atlas on startup,” remembered per vault; it defaults to on when the vault’s Obsidian Homepage plugin opens Graph view at launch.
-
-## Canvas and Kanban
-
-Obsidian's `.canvas` boards (JSON Canvas) open from the sidebar, <kbd>⌘O</kbd>, links, backlinks, and the graph. Text cards are typeset like the reader; note cards show the note (or one heading of it), and images, PDFs, links, and groups are drawn quietly, with Obsidian's six colors as tints. Connections curve out of the side they leave from, with arrows, labels, and colors.
-
-Two-finger scroll pans, pinch zooms, and <kbd>⇧1</kbd> zooms to fit. Everything is editable: drag to move (a group carries its cards), drag an edge to resize, double-click empty space for a card, double-click a card to type in it or open its note, drag from the dots on a card's sides to connect, <kbd>⌫</kbd> to delete, <kbd>⌘Z</kbd> to undo. Right-click adds cards, notes, and groups and sets colors and arrows. Canvases are saved in Obsidian's exact format, ids and unknown fields included, so both apps can share them, and they count as linking to their cards in backlinks and the graph.
-
-Kanban boards written by the Obsidian Kanban plugin open as columns of cards. You can move cards and collapse columns in the focused pane; split and preview copies stay read-only. They’re saved in the same format Obsidian uses.
-
-Obsidian Bases (`.base` files) open from the sidebar and <kbd>⌘O</kbd> as a table, a list, or a card grid. Views switch at the top, columns sort with a click, and note names open the note. Filters, formulas, and the subset of `file.*` functions those files use are evaluated against the live vault index. Bases are read-only in this release: you can look, not edit the YAML. A fenced `base` code block in a note renders the same way.
-
-<p align="center">
-  <img src="docs/focus-graph.png" alt="Focus graph centered on a note" width="49%">
-  <img src="docs/title-path.png" alt="Title path revealing a folder in the sidebar" width="49%">
-</p>
-
-The inspector (<kbd>⌘I</kbd>) holds the outline, backlinks, and properties. Backlinks also appear at the bottom of the reader, and in the footer when you hover it.
-
-## Getting around
-
-<kbd>⌘O</kbd> is the quick switcher. It ranks exact matches first, then prefix, initials, substring, and fuzzy; it ignores accents, matches folders and aliases (“hebrew aleph”, “hl”, “resume” → Résumé), and highlights what matched. <kbd>⌘↩</kbd> opens in a split; <kbd>⇧↩</kbd> creates a note. <kbd>⌘P</kbd> (or <kbd>⇧⌘P</kbd>) is every command.
-
-The title path whispers the folder above the page; click a segment to reveal it in the sidebar and open its folder note. <kbd>⌘[</kbd> and <kbd>⌘]</kbd> go back and forward per pane (mouse buttons and swipe too). Daily notes follow the vault’s own `.obsidian/daily-notes.json` folder; <kbd>⌘T</kbd> or <kbd>⌘\</kbd> opens today, <kbd>⌥⌘[</kbd> and <kbd>⌥⌘]</kbd> step through them. <kbd>⇧⌘H</kbd> opens the homepage from the Obsidian Homepage plugin, or `Home.md`.
-
-<kbd>⇧⌘F</kbd> searches the vault. <kbd>⌘F</kbd> finds in the current note (editor or reader); <kbd>⌥⌘F</kbd> is find and replace in the editor.
-
-## Files and the sidebar
-
-<kbd>⌘K</kbd> shows or hides the file list. The sidebar can be dragged as narrow as 140pt, the inspector as narrow as 150pt; double-click the edge to reset. Tabs cover files, vault search (<kbd>⇧⌘F</kbd>), recent files, bookmarks, tags, and source control.
-
-Sort the sidebar by name (natural order, so “Note 2” precedes “Note 10”), modified, or created, ascending or descending, with folders on top if you want. The choice is remembered per vault. Right-click a folder to override the sort for just that folder, or to create a new note there.
-
-Shift-click selects a range; <kbd>⌘</kbd>-click adds or removes one file without changing the open note. Right-click the selection to move, reveal in Finder, or delete them all (one confirmation, one git commit). <kbd>Esc</kbd> clears the selection; after clicking in the sidebar, <kbd>⌘⌫</kbd> deletes it.
-
-Rename or Move to… (<kbd>⇧⌘M</kbd>) from the File menu or a right-click. Wikilinks — including path links, aliases, headings, embeds, and bare `partOf::` / `related::` names — are rewritten to follow, and so are standard Markdown links and embeds (`[text](folder/note.md)`, `![](image.png)`). The note stays open. Delete sends files to the Trash after a confirm. “Open in Obsidian” is on the same menu, for a note you want to check in the official app.
-
-## Sync
-
-### Git, continuously
-
-If the vault is a git repository and `git` is installed, Onyx uses it without being asked. It commits a moment after you stop typing (the message names the notes), and immediately on delete, rename, move, switching notes, or quit. It pulls with `--rebase` on launch, on focus, before each push, and every 30 seconds, then pushes. It never force-pushes and never rewrites published history. On a rebase conflict, your version keeps the path and the incoming one is saved beside it as `Note (conflict YYYY-MM-DD HHMM).md`; both are committed. Anything unexpected aborts the rebase and leaves your branch as it was.
-
-A tiny footer glyph shows synced, syncing, offline, local-only, or conflict.
-
-### Obsidian Sync, optional
-
-Off by default, and opt-in per vault. In Settings ▸ Sync, sign in to your Obsidian account (2FA is supported), pick a remote vault, enter its encryption password, preview what the first sync will do, then connect. Onyx speaks Obsidian’s end-to-end encrypted protocol and merges Markdown the way Obsidian does. Credentials live in the macOS Keychain; the sign-in token is not read until you actually use Sync, so a rebuild should not prompt you for the keychain unless Sync is connected.
-
-Safety rails: the first sync never deletes on either side, and differing files are kept twice. A mass deletion or an empty-looking vault folder pauses for confirmation instead of propagating. Local deletions go to the Trash; overwritten Markdown is backed up first.
-
-This is unofficial and still new. Try it on a throwaway vault before pointing it at the real one. If you’d rather not use it, Obsidian’s official [`obsidian-headless`](https://www.npmjs.com/package/obsidian-headless) CLI (`npx obsidian-headless`) can keep a folder in sync while Onyx simply edits the files.
-
-## Keys
-
-| Key | Does |
-| --- | --- |
-| <kbd>⌘O</kbd> | Quick switcher: find or create a note (<kbd>⌘↩</kbd> opens in a split, <kbd>⇧↩</kbd> creates) |
-| <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> | Command palette |
-| <kbd>⇧⌘O</kbd> | Open vault… |
-| <kbd>⌘K</kbd> | Show or hide the sidebar (opens on Files) |
-| <kbd>⇧⌘F</kbd> | Search the vault |
-| <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
-| <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline · backlinks · properties |
-| <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph overlay · atlas overlay · graph in a pane. <kbd>Esc</kbd> closes the overlay |
-| <kbd>⌘F</kbd> · <kbd>⌥⌘F</kbd> | Find in the note (editor or reader) · find and replace (editor). While the bar is open, <kbd>⌘G</kbd>/<kbd>⇧⌘G</kbd> or <kbd>↩</kbd>/<kbd>⇧↩</kbd> go to the next/previous match, and <kbd>Esc</kbd> closes it |
-| <kbd>⌘↩</kbd> · <kbd>⌘E</kbd> | Read ⇄ edit, and save |
-| <kbd>⌘T</kbd> · <kbd>⌘\\</kbd> | Today’s daily note |
-| <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
-| <kbd>⇧⌘H</kbd> | Homepage |
-| <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked |
-| <kbd>⌘W</kbd> | Close the focused pane (the window, when there’s one pane) |
-| <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane |
-| <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
-| <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm). After clicking in the sidebar, deletes the selection |
-| <kbd>⇧</kbd>/<kbd>⌘</kbd>-click | Sidebar multi-select (range / toggle); right-click to Move, Reveal, or Delete them all; Esc clears |
-| <kbd>⇧⌘M</kbd> | Move note to… a folder (fuzzy; type a new name to create one). Rename from File or right-click |
-| <kbd>⌘N</kbd> | New note |
-| <kbd>⌃⌘F</kbd> | Focus mode: just the text |
-| <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
-| <kbd>⌘,</kbd> | Settings |
-| <kbd>Esc</kbd> | Put away whatever’s on top |
-
-Every command is also in the menu bar with its shortcut. The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
-
-## Obsidian compatibility
-
-Onyx is built to open an Obsidian vault without converting anything. It understands wikilinks (aliases, headings, embeds), frontmatter, nested tags, folder notes, `%%comments%%`, callouts, footnotes, and Mermaid. It reads a few things out of `.obsidian`: the daily-notes folder, default view mode, user ignore filters, bookmarks, and the Homepage plugin’s start note. Rename and move rewrite wikilinks and standard Markdown links and embeds. Kanban boards, `.canvas` files, and `.base` files open in place.
-
-It is not a plugin host, and it does not implement Templates, Excalidraw, or Bases. You can keep using Obsidian for those, and “Open in Obsidian” is one click away.
-
-Early days, moving fast. It is tested against a real vault of a few thousand notes, but expect rough edges. Back up your vault — or point Onyx at a copy — while it settles.
-
-## Privacy
-
-Your notes live in a folder you choose. Onyx does not require an account and does not phone home. The only network it uses, and only if you ask it to, is:
-
-- **Git**, to the remotes already configured on that vault.
-- **Obsidian Sync**, if you connect a vault under Settings. Tokens and encryption keys stay in the Keychain; file contents are encrypted with Obsidian’s protocol before they leave the machine. Sync hosts are limited to `*.obsidian.md`.
-- **Rhyme view** (<kbd>⌥⌘R</kbd>), which sends the current note (with non-verse text masked) to [rhymepad.org](https://rhymepad.org) for analysis.
-
-Starting with v0.1.1, the auto-updater also talks to GitHub, and only to check for (and download) a newer release.
-
-## Requirements
-
-macOS 14 (Sonoma) or later. The official download is Apple silicon.
+- [Reading](docs/reading.md) — typography, sidenotes, PDF and print
+- [Graph and atlas](docs/graph.md)
+- [Bases](docs/bases.md)
+- [Canvas and Kanban](docs/boards.md)
+- [Getting around](docs/navigation.md)
+- [Sync](docs/sync.md)
+- [Keyboard shortcuts](docs/shortcuts.md)
+- [Compatibility and privacy](docs/compatibility.md)
+- [Building from source](DEVELOP.md)
 
 ## License
 
 Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
-
-Building from source? See [DEVELOP.md](DEVELOP.md).
