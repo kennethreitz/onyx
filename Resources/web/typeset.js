@@ -5,7 +5,7 @@
 // kerns for quotes. Code, math, tags and interface text are never touched.
 // Pure string helpers are exported for Tests/reader; apply() works on the DOM.
 (function () {
-  const SKIP = 'code, pre, kbd, samp, script, style, textarea, svg, .mermaid, .math, .tag, .field-key, .inline-field, .properties, .dataview-error, .kanban .count';
+  const SKIP = 'code, pre, kbd, samp, script, style, textarea, svg, .mermaid, .math, .katex, .tag, .field-key, .inline-field, .properties, .dataview-error, .kanban .count';
   const NO_SC = SKIP + ', h1, h2, h3, h4, h5, h6, strong, b, .callout-title, .doc-backlinks, .lead-in, .sc, .fallback-title, a.field-chip, sup, .attribution-dash';
   const BLOCK = /^(P|LI|H[1-6]|BLOCKQUOTE|TD|TH|DT|DD|FIGCAPTION|CAPTION|DIV|SECTION|ASIDE|DETAILS|SUMMARY|FOOTER|MAIN|UL|OL|TABLE)$/;
 

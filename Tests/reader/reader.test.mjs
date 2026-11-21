@@ -17,7 +17,7 @@ const window = { innerHeight: 800, innerWidth: 1000, scrollY: 0, addEventListene
 const ctx = vm.createContext({ window, document: stub(), console, setTimeout, clearTimeout, requestAnimationFrame: f => setTimeout(f, 0),
   getComputedStyle: () => stub(), NodeFilter: { SHOW_COMMENT: 128 }, ResizeObserver: class { observe() {} }, MutationObserver: class { observe() {} } });
 ctx.self = ctx.globalThis = ctx; Object.assign(window, { document: ctx.document });
-for (const f of ['marked.js', 'marked-footnote.js', 'typeset.js', 'reader.js']) {
+for (const f of ['marked.js', 'marked-footnote.js', 'katex/katex.min.js', 'math.js', 'typeset.js', 'reader.js']) {
   vm.runInContext(fs.readFileSync(path.join(web, f), 'utf8'), ctx, { filename: f });
   if (f !== 'reader.js') {
     Object.assign(ctx, window);   // UMD builds hang their globals on window/self
@@ -25,6 +25,8 @@ for (const f of ['marked.js', 'marked-footnote.js', 'typeset.js', 'reader.js']) 
     // reader would skip marked-footnote unless we attach it to window too.
     if (ctx.marked) window.marked = ctx.marked;
     if (ctx.markedFootnote) window.markedFootnote = ctx.markedFootnote;
+    if (ctx.katex) window.katex = ctx.katex;
+    if (ctx.OnyxMath) window.OnyxMath = ctx.OnyxMath;
   }
 }
 const html = (md) => ctx.window.Onyx._html(md).replace(/<!--L\d+:\d+-->/g, '');
@@ -239,4 +241,41 @@ test('the specimen fixture parses: notes, table, figure and code survive', () =>
   assert.match(out, /<img src="[^"]*chart\.svg"[^>]*title="Downloads per month/);
   assert.match(out, /<code class="language-python">print\(&quot;--- don't touch ---&quot;\)/);
   assert.match(out, /<blockquote>/);
+});
+
+// --- Math ($ / $$) -----------------------------------------------------------
+test('inline $...$ becomes typeset math, and underscores stay out of <em>', () => {
+  const out = html('see $a_1+b^2$ here');
+  assert.match(out, /class="math inline"/);
+  assert.match(out, /katex/);
+  assert.doesNotMatch(out, /<em>/);
+});
+
+test('multi-line $$ is display math', () => {
+  const out = html('$$\nE = mc^2\n$$\n');
+  assert.match(out, /class="math display"/);
+  assert.match(out, /katex/);
+});
+
+test('currency and spaced dollars are not math', () => {
+  const money = html('it costs $5 and $10 today');
+  assert.doesNotMatch(money, /class="math/);
+  const spaced = html('this is $ not $ math');
+  assert.doesNotMatch(spaced, /class="math/);
+});
+
+test('math inside a code block is left as text', () => {
+  const out = html('```\n$x$\n```\n');
+  assert.doesNotMatch(out, /class="math/);
+  assert.match(out, /\$x\$/);
+});
+
+test('bad TeX shows an inline error instead of breaking the page', () => {
+  const out = html('see $\\notacommand$ here');
+  assert.match(out, /class="math math-error/);
+  assert.doesNotMatch(out, /<pre>/);
+  const page = html('# Title\n\n$\\notacommand$\n\nand more\n');
+  assert.match(page, /<h1>Title<\/h1>/);
+  assert.match(page, /math-error/);
+  assert.match(page, /and more/);
 });

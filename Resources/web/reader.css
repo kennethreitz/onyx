@@ -297,3 +297,23 @@ mark.onyx-find.current { background: rgba(255, 138, 0, .62); box-shadow: 0 0 0 1
   background: var(--background-primary); border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,.18); }
 .kb-menu button { border: 0; background: none; color: var(--text-normal); font: 13px -apple-system, sans-serif; text-align: left; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 .kb-menu button:hover { background: var(--text-selection, rgba(127,127,127,.15)); }
+
+
+/* KaTeX math: Computer Modern sits with Latin Modern / Reitz LaTeX. */
+.math { color: inherit; }
+.math .katex { font-size: 1.05em; color: inherit; }
+.math.inline { display: inline; }
+.math.display { display: block; text-align: center; margin: 0.85em 0; overflow-x: auto; break-inside: avoid; page-break-inside: avoid; }
+.math.display .katex-display { margin: 0; }
+.math-error {
+  background: rgba(180, 60, 40, 0.10);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 0.25em;
+  cursor: help;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.88em;
+  white-space: pre-wrap;
+}
+.math-error.display { text-align: left; padding: 0.4em 0.6em; }
+body.theme-dark .math-error { background: rgba(220, 90, 70, 0.16); }

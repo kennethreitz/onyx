@@ -40,7 +40,7 @@
       case 'note':
         if (embedDepth.n > 1) return linkHTML(inner);
         embedDepth.n++;
-        const html = embedMarked.parse(stripComments(e.markdown));
+        const html = withMath(stripComments(e.markdown), s => embedMarked.parse(s));
         embedDepth.n--;
         return `<div class="markdown-embed"><a class="internal-link embed-link" data-path="${esc(e.path)}" data-target="${esc(l.target)}">${esc(e.name)} ↗</a>${html}</div>`;
       default: return linkHTML(inner);
@@ -120,12 +120,21 @@
 
   function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, m => m.replace(/[^\n]/g, '')); }  // keep line numbers
 
+  function withMath(md, parse) {
+    if (!window.OnyxMath) return parse(md);
+    const prep = window.OnyxMath.protect(md);
+    return window.OnyxMath.restore(parse(prep.text), prep.slots);
+  }
+  function parseInlineMath(s) { return withMath(s, x => embedMarked.parseInline(x)); }
+
+
   // Source-line anchors. Each top-level block gets data-line (0-based line in the note file,
   // frontmatter included) and data-lines (how many source lines it spans), so the reader and
   // editor can hand each other "where you are" by source position rather than pixels.
   const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
   function parseWithLines(md, base) {
-    const toks = mainMarked.lexer(md);
+    const prep = window.OnyxMath ? window.OnyxMath.protect(md) : { text: md, slots: [] };
+    const toks = mainMarked.lexer(prep.text);
     // marked-footnote injects a `footnotes` token at the start of the lexer
     // list and moves it to the end in walkTokens — but only in that original
     // array. We copy tokens into a new `out` list (and insert line-marker
@@ -149,7 +158,8 @@
     }
     out.links = toks.links;
     if (mainMarked.defaults.walkTokens) mainMarked.walkTokens(out, mainMarked.defaults.walkTokens);
-    return mainMarked.parser(out);
+    const html = mainMarked.parser(out);
+    return window.OnyxMath ? window.OnyxMath.restore(html, prep.slots) : html;
   }
   function markLines() {
     const walker = document.createTreeWalker(page, NodeFilter.SHOW_COMMENT);
@@ -242,11 +252,11 @@
     const editable = !P.preview && P.kanbanEditable;
     return `<div class="kanban${editable ? ' editable' : ''}">` + lanes.map((l, li) => l.collapsed ?
       // collapsed: a thin strip, title rotated, with the count; click to expand
-      `<section class="lane collapsed" data-lane="${li}"${editable ? ' title="Expand"' : ''}><span class="kb-strip-count">${l.cards.length}</span><span class="kb-strip-title">${embedMarked.parseInline(l.title)}</span></section>` :
-      `<section class="lane" data-lane="${li}"><h3>${editable ? '<button class="kb-fold" title="Collapse (right-click: collapse all except this)">&#x2039;</button>' : ''}${embedMarked.parseInline(l.title)}<span class="count">${l.cards.length}</span></h3><div class="kb-cards">` +
+      `<section class="lane collapsed" data-lane="${li}"${editable ? ' title="Expand"' : ''}><span class="kb-strip-count">${l.cards.length}</span><span class="kb-strip-title">${parseInlineMath(l.title)}</span></section>` :
+      `<section class="lane" data-lane="${li}"><h3>${editable ? '<button class="kb-fold" title="Collapse (right-click: collapse all except this)">&#x2039;</button>' : ''}${parseInlineMath(l.title)}<span class="count">${l.cards.length}</span></h3><div class="kb-cards">` +
       l.cards.map((c, ci) => `<div class="card${c.done ? ' done' : ''}"${editable ? ' draggable="true"' : ''} data-lane="${li}" data-card="${ci}" data-raw="${esc(c.text)}">` +
         (editable ? `<input type="checkbox" class="kb-check"${c.done ? ' checked' : ''} title="Done">` : '') +
-        `<div class="kb-text">${embedMarked.parseInline(c.text.replace(/\n/g, ' '))}</div>` +
+        `<div class="kb-text">${parseInlineMath(c.text.replace(/\n/g, ' '))}</div>` +
         (editable ? '<button class="kb-archive" title="Archive card">&#x2193;</button>' : '') + '</div>').join('') +
       `</div>${editable ? '<button class="kb-add">+ Add a card</button>' : ''}</section>`).join('') + '</div>';
   }
@@ -464,7 +474,7 @@
       const li = cb.closest('li');
       if (li) { li.classList.add('task-list-item'); if (cb.checked) li.classList.add('is-checked'); }
     });
-    page.querySelectorAll('.onyx-inline-md').forEach(s => { s.innerHTML = embedMarked.parseInline(s.textContent); });
+    page.querySelectorAll('.onyx-inline-md').forEach(s => { s.innerHTML = parseInlineMath(s.textContent); });
   }
 
   // ⌘F in the reader: mark every match in the note (not the backlinks), the current one brighter.
@@ -530,7 +540,7 @@
         html = `<h1>${esc(payload.name)}</h1>` + kanbanHTML(payload.kanban);
       } else {
         try { html = parseWithLines(md, payload.lineBase || 0); }
-        catch (e) { try { html = mainMarked.parse(md); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
+        catch (e) { try { html = withMath(md, s => mainMarked.parse(s)); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
         html = html.replace(/<div class="onyx-dataview" data-i="(\d+)"><\/div>/g, (_, i) => payload.dataview[+i] || '');
         if (!/<h1[\s>]/.test(html)) html = `<h1 class="fallback-title">${esc(payload.name)}</h1>` + html;
       }
@@ -605,7 +615,7 @@
     fragment(md, ctx) {
       const old = P;
       P = Object.assign({ links: {}, embeds: {}, base: '' }, ctx || {});
-      try { return embedMarked.parse(stripComments(md || '')); }
+      try { return withMath(stripComments(md || ''), s => embedMarked.parse(s)); }
       catch (e) { return `<pre>${esc(md)}</pre>`; }
       finally { P = old; }
     },

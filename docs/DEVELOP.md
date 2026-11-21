@@ -41,7 +41,7 @@ Sources/Onyx         the macOS app (SwiftUI + AppKit, WKWebView reader)
 Sources/OnyxSync     Obsidian Sync protocol
 Sources/OnyxSyncPOC  a small command-line client for the same protocol
 Resources/web        reader.html + reader.js/css (the Reitz LaTeX page) and
-                     typeset.js/css (book typography); canvas.html/js/css for .canvas boards; BasesView for .base files
+                     typeset.js/css (book typography); katex/ (offline math, MIT); canvas.html/js/css for .canvas boards; BasesView for .base files
 Tests/               OnyxCore and OnyxSync tests; Tests/reader for the typography
 ```
 

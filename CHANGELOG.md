@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `$inline$` and `$$display$$` math in the typeset reader, including multi-line `$$` blocks, PDF, and print. KaTeX is bundled (offline, MIT). Currency like `$5 and $10`, escaped `\$`, and dollars inside code are left alone; bad TeX shows an inline error. The editor still shows the source.
 - ⌘-drag notes and folders in the file tree to move them into a folder, or into the vault root (drop on the empty area). The drop target highlights and a collapsed folder expands on hover. Multi-selections move together. A folder can’t be moved into itself or its descendants, and a name collision shows an error. Plain drag does not move files.
 
 ### Changed

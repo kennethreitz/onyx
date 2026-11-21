@@ -13,7 +13,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 
 ---
 
-- **Typeset reading** — small caps, collision-free sidenotes, hyphenation, the page as a book
+- **Typeset reading** — small caps, collision-free sidenotes, hyphenation, `$` / `$$` math, the page as a book
 - **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
