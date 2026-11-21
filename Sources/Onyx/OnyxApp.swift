@@ -259,7 +259,6 @@ struct OnyxApp: App {
             Button("Properties") { ws.toggleInspector(.properties) }.keyboardShortcut("3", modifiers: [.command, .option])
             Button("Three-Pane Workspace") { ws.toggleWorkspaceLayout() }.keyboardShortcut("0", modifiers: [.command, .option])
             Divider()
-            Button(ws.rhymesOn ? "Hide Rhymes" : "Show Rhymes") { ws.rhymesOn.toggle(); if ws.rhymesOn { ws.mode = .edit } }.keyboardShortcut("r", modifiers: [.command, .option])
             Button(ws.sidenotes ? "Footnotes at End" : "Footnotes as Sidenotes") { ws.sidenotes.toggle() }
             Menu("Appearance") {
                 Button("Light") { appearance = "light"; apply("light") }

@@ -170,7 +170,6 @@ struct RootView: View {
             s += " · \(ws.text.count.formatted()) characters"
             if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 { s += " · \(c) backlinks" }
         }
-        if ws.rhymesOn { s += " · ♪" }
         return s
     }
 

@@ -423,7 +423,6 @@ struct EditorView: NSViewRepresentable {
             tv.typingAttributes = MarkdownHighlighter().baseAttributes
             tv.needsLayout = true
         }
-        if c.rhymesOn != ws.rhymesOn { c.rhymesOn = ws.rhymesOn; c.updateRhymes(force: true) }
     }
 
     @MainActor
@@ -435,13 +434,11 @@ struct EditorView: NSViewRepresentable {
         var isEditing = false
         var wasLive = true
         var scheme: ColorScheme?
-        var rhymesOn = false
         var typeKey = ""
         var restoring = false
         var anchor: Double = 0   // last position the writer chose (scroll or restore)
         var scrollHandled: Int?
         private var reportQueued = false
-        private var rhymeTask: Task<Void, Never>?
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }
 
         init(_ p: EditorView) { parent = p }
@@ -460,7 +457,6 @@ struct EditorView: NSViewRepresentable {
                 tv.scroll(.zero)
             }
             tv.undoManager?.removeAllActions()
-            updateRhymes(force: true)
         }
 
         /// Start writing below the frontmatter and title, like opening a notebook to the page.
@@ -472,7 +468,6 @@ struct EditorView: NSViewRepresentable {
             guard let ts = textView?.textStorage else { return }
             highlighter.apply(to: ts)
             textView?.needsDisplay = true
-            updateRhymes(force: true)
         }
 
         /// Distance below the visible top that counts as "where you are": just under the title line.
@@ -575,60 +570,6 @@ struct EditorView: NSViewRepresentable {
                 let ws = parent.ws
                 DispatchQueue.main.async { ws.runFind(reveal: false, fromCaret: false) }
             }
-            updateRhymes(force: false)
         }
-
-        // MARK: RhymePad paint (temporary attributes, never touches the text)
-        func updateRhymes(force: Bool) {
-            guard let tv = textView, let lm = tv.layoutManager else { return }
-            rhymeTask?.cancel()
-            let full = NSRange(location: 0, length: (tv.string as NSString).length)
-            if !rhymesOn {
-                lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
-                lm.removeTemporaryAttribute(.underlineStyle, forCharacterRange: full)
-                return
-            }
-            let text = tv.string
-            let dark = tv.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-            rhymeTask = Task { [weak self] in
-                if !force { try? await Task.sleep(nanoseconds: 600_000_000) }
-                guard !Task.isCancelled else { return }
-                guard let a = await RhymeClient.analyze(text) else { self?.parent.ws.toast = "RhymePad: couldn’t reach the rhyme engine"; return }
-                guard !Task.isCancelled, let self, let tv = self.textView, tv.string == text, let lm = tv.layoutManager else { return }
-                let lines = RhymePad.mask(text).components(separatedBy: "\n")
-                var starts: [Int] = []; var acc = 0
-                for l in lines { starts.append(acc); acc += (l as NSString).length + 1 }
-                lm.removeTemporaryAttribute(.backgroundColor, forCharacterRange: full)
-                lm.removeTemporaryAttribute(.underlineStyle, forCharacterRange: full)
-                let palette = dark ? RhymePad.darkPalette : RhymePad.lightPalette
-                for seg in RhymePad.segments(a, docLines: lines) {
-                    let r = NSRange(location: starts[seg.line] + seg.start, length: seg.end - seg.start)
-                    if let c = seg.color {
-                        lm.addTemporaryAttribute(.backgroundColor, value: NSColor(hex: palette[c], alpha: seg.alpha * 1.4), forCharacterRange: r)
-                        if seg.tail { lm.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.thick.rawValue, .underlineColor: NSColor(hex: palette[c], alpha: 0.4 + seg.tailAlpha)], forCharacterRange: r) }
-                    } else if seg.near {
-                        lm.addTemporaryAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue | NSUnderlineStyle.patternDot.rawValue, .underlineColor: NSColor(hex: 0xc79a10)], forCharacterRange: r)
-                    } else if seg.open {
-                        lm.addTemporaryAttribute(.backgroundColor, value: NSColor.gray.withAlphaComponent(0.18), forCharacterRange: r)
-                    }
-                }
-            }
-        }
-    }
-}
-
-enum RhymeClient {
-    /// Same endpoint and settings as the obsidian-rhymepad plugin (apiBase in its data.json).
-    static var apiBase: String = "https://rhymepad.org"
-
-    static func analyze(_ text: String) async -> RhymePad.Analysis? {
-        guard let url = URL(string: apiBase + "/api/analyze") else { return nil }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try? JSONSerialization.data(withJSONObject: ["text": RhymePad.mask(text)])
-        req.timeoutInterval = 15
-        guard let (data, resp) = try? await URLSession.shared.data(for: req), (resp as? HTTPURLResponse)?.statusCode == 200 else { return nil }
-        return try? JSONDecoder().decode(RhymePad.Analysis.self, from: data)
     }
 }

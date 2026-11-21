@@ -10,7 +10,7 @@ Typeset reading (on by default, Settings ▸ Reading) sets the page the way a bo
 
 File ▸ Export as PDF… (<kbd>⇧⌘E</kbd>) and Print… (<kbd>⌥⌘P</kbd>) lay the note out as a book page. You get sidenotes as margin notes, a running head in small caps, and folios, and links keep working.
 
-Frontmatter, `%%comments%%`, embeds, images, PDFs, audio and video all render in the reader. Dataview-lite runs the `TABLE` and `LIST` queries a vault actually uses (`FROM`, `WHERE`, `SORT`, `LIMIT`, and functions such as `choice()`, `join()`, and `contains()`). <kbd>⌥⌘R</kbd> turns on RhymePad highlighting for verse.
+Frontmatter, `%%comments%%`, embeds, images, PDFs, audio and video all render in the reader. Dataview-lite runs the `TABLE` and `LIST` queries a vault actually uses (`FROM`, `WHERE`, `SORT`, `LIMIT`, and functions such as `choice()`, `join()`, and `contains()`).
 
 Saves are atomic and conflict-aware: if the file changed on disk, Onyx offers to keep yours, take theirs, or keep both. Light, dark, or auto, text size, and line measure live in <kbd>⌘,</kbd>. <kbd>⌃⌘F</kbd> is focus mode — just the text.
 

@@ -108,7 +108,6 @@ final class Workspace {
             }
         }
     }
-    var rhymesOn = false
     var sidenotes = true
     var externalPulse: Date? = nil
     var lastExternalChange: Date? = nil

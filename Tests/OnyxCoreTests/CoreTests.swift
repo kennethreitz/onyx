@@ -73,11 +73,6 @@ final class CoreTests: XCTestCase {
         XCTAssertTrue(DailyNotes.template(for: d).contains("# Sunday, October 25, 2026"))
     }
 
-    func testRhymeMask() {
-        let m = RhymePad.mask("---\na: b\n---\nline `code` end\n```\nx\n```\nlast")
-        XCTAssertEqual(m.components(separatedBy: "\n"), ["", "", "", "line        end", "", "", "", "last"])
-    }
-
     func testGraphLayout() {
         var g = GraphData.build(snapshot())
         XCTAssertEqual(g.ids.count, 4)

@@ -30,7 +30,6 @@ Your notes live in a folder you choose. Onyx does not require an account and doe
 
 - **Git**, to the remotes already configured on that vault.
 - **Obsidian Sync**, if you connect a vault under Settings. Tokens and encryption keys stay in the Keychain; file contents are encrypted with Obsidian’s protocol before they leave the machine. Sync hosts are limited to `*.obsidian.md`.
-- **Rhyme view** (<kbd>⌥⌘R</kbd>), which sends the current note (with non-verse text masked) to [rhymepad.org](https://rhymepad.org) for analysis.
 
 Starting with v0.1.1, the auto-updater also talks to GitHub, and only to check for (and download) a newer release.
 
