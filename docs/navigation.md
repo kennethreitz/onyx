@@ -2,6 +2,8 @@
 
 <kbd>⌘O</kbd> is the quick switcher. It ranks exact matches first, then prefix, initials, substring, and fuzzy; it ignores accents, matches folders and aliases (“hebrew aleph”, “hl”, “resume” → Résumé), and highlights what matched. <kbd>⌘↩</kbd> opens in a split; <kbd>⇧↩</kbd> creates a note. <kbd>⌘P</kbd> (or <kbd>⇧⌘P</kbd>) is every command.
 
+<kbd>⌘D</kbd> splits side by side and <kbd>⇧⌘D</kbd> stacks, up to four panes. The axis, divider positions, and the note in each pane are remembered per vault and come back when you reopen it.
+
 The title path whispers the folder above the page; click a segment to reveal it in the sidebar and open its folder note. <kbd>⌘[</kbd> and <kbd>⌘]</kbd> go back and forward per pane (mouse buttons and swipe too). Daily notes follow the vault’s own `.obsidian/daily-notes.json` folder; <kbd>⌘T</kbd> or <kbd>⌘\</kbd> opens today, <kbd>⌥⌘[</kbd> and <kbd>⌥⌘]</kbd> step through them. <kbd>⇧⌘H</kbd> opens the homepage from the Obsidian Homepage plugin, or `Home.md`.
 
 <kbd>⇧⌘F</kbd> searches the vault. <kbd>⌘F</kbd> finds in the current note (editor or reader); <kbd>⌥⌘F</kbd> is find and replace in the editor.

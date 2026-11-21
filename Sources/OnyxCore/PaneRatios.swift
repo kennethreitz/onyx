@@ -48,6 +48,17 @@ public enum PaneRatios {
         return raw
     }
 
+    /// Ratios that honor `minPane` in `total` points along the axis.
+    /// When the window is too tight, the floor shrinks so every pane still fits.
+    public static func clamped(_ ratios: [Double], count: Int? = nil, total: Double, minPane: Double = minPane, thickness: Double = thickness) -> [Double] {
+        let n = count ?? ratios.count
+        guard n > 0 else { return [] }
+        if n == 1 { return [1] }
+        let available = max(0, total - thickness * Double(n - 1))
+        guard available > 0 else { return normalized(ratios, count: n) }
+        return sizes(ratios, count: n, total: total, minPane: minPane, thickness: thickness).map { $0 / available }
+    }
+
     /// Split the pane at `index` in half and insert the new half immediately after it.
     public static func splitting(_ ratios: [Double], at index: Int) -> [Double] {
         var r = ratios.isEmpty ? [1.0] : normalized(ratios, count: ratios.count)

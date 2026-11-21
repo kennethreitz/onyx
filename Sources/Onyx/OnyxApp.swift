@@ -143,13 +143,13 @@ struct OnyxApp: App {
         // git: leaving the app commits at once, coming back pulls, quitting commits and pushes
         let nc = NotificationCenter.default
         nc.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.flushSave(); ws.git?.commitNow() }
+            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.commitNow() }
         }
         nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
             MainActor.assumeIsolated { ws.git?.syncNow(); ws.obsidianSync?.syncNow() }
         }
         nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.flushSave(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
+            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
         }
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
@@ -159,7 +159,8 @@ struct OnyxApp: App {
         if let sb = options.sidebar { ws.sidebarVisible = sb; ws.sidebarPinned = sb }
         ws.sidenotes = UserDefaults.standard.object(forKey: Prefs.sidenotes) as? Bool ?? true
         if UserDefaults.standard.bool(forKey: Prefs.startFocus) { ws.toggleFocusMode() }
-        ws.open(vault: url, initialNote: options.open)
+        // --open / --split are test and screenshot hooks: don't restore a saved layout over them.
+        ws.open(vault: url, initialNote: options.open, restoreSplits: options.split == nil && options.open == nil)
         if let m = options.mode { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { ws.mode = m } }
         if let s = options.show {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
@@ -178,7 +179,8 @@ struct OnyxApp: App {
                 }
             }
         }
-        // Screenshot / test hook: do not persist. Ratios live on the Workspace for this window only.
+        // Screenshot / test hook: --split implies SessionPersistence is off, so this layout
+        // stays in this window only and is never written to defaults.
         // Wait until the vault has opened the first note; otherwise the left pane is born empty.
         if options.split != nil {
             func applySplit(attempt: Int = 0) {

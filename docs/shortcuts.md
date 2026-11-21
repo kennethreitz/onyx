@@ -15,7 +15,7 @@
 | <kbd>⌘T</kbd> · <kbd>⌘\\</kbd> | Today’s daily note |
 | <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
 | <kbd>⇧⌘H</kbd> | Homepage |
-| <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked |
+| <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked. Layout (ratios, axis, open notes) is remembered per vault. |
 | <kbd>⌘W</kbd> | Close the focused pane (the window, when there’s one pane) |
 | <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane |
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |

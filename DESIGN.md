@@ -34,8 +34,10 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 - **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes; a new split sets
   the axis for the whole group. The hairline between panes is draggable (resize cursor on
   hover, a small grip while dragging, 240pt minimum; when the window is tighter, panes
-  shrink together). Double-click a divider to equalize. Ratios last for the window
-  session and are not written to defaults. Swap model: the focused pane drives the live
+  shrink together). Double-click a divider to equalize. Ratios, axis, and the note
+  (or docked graph) in each pane are remembered per vault and restored on the next
+  launch, clamped to a 240pt minimum for the current window. Screenshot and test
+  hooks never write this. Swap model: the focused pane drives the live
   editor/reader state; unfocused panes keep their own path, text and mode and render
   read-only (dimmed a touch) until clicked or reached with ⌃⇥. Two panes on the same
   note show the live text in both.

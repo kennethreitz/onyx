@@ -841,7 +841,10 @@ struct SplitPaneDivider: View {
                             let delta = vertical ? v.translation.width : v.translation.height
                             ws.resizePanes(from: start ?? ws.paneRatios, divider: index, delta: delta, total: total)
                         }
-                        .onEnded { _ in start = nil; dragging = false; updateCursor() }
+                        .onEnded { _ in
+                            start = nil; dragging = false; updateCursor()
+                            ws.persistSplitLayout()
+                        }
                 )
                 .onTapGesture(count: 2) { ws.equalizePanes() }
         }

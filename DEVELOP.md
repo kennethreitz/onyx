@@ -64,7 +64,7 @@ These are for development and screenshots. Don’t set them in normal use unless
 | `ONYX_NO_STARTUP_GRAPH=1` | Skip opening the atlas on startup, even if that setting is on. |
 | `ONYX_OPEN_SETTINGS=1` | Open Settings at launch (screenshots / UI checks). |
 | `ONYX_SETTINGS_TAB=<name>` | Open a given Settings tab: `general`, `editor`, `reading`, `graph`, `sync`, `updates`. Aliases: `typography`, `typesetting`, `atlas`, `advanced`. |
-| `ONYX_SHOT_QUIET=1` | Park the window off-screen and deaf to the pointer, so a screenshot run doesn’t cover someone’s work or sprout hover cards. Never autosaves or restores that frame (the shot app shares the real app’s defaults). |
+| `ONYX_SHOT_QUIET=1` | Park the window off-screen and deaf to the pointer, so a screenshot run doesn’t cover someone’s work or sprout hover cards. Never autosaves or restores that frame (the shot app shares the real app’s defaults). Also skips writing per-vault session state such as the split layout. |
 | `ONYX_SCROLL_TEST=<seconds>` | Scroll every scroll view and the reader in small steps for that long (values `≤ 1` become 4). |
 | `ONYX_DUMP_MENUS=1` | Print every menu key equivalent, to catch double bindings. |
 | `ONYX_KEY_SELFTEST=1` | Offer each help-sheet shortcut to the view hierarchy with the editor or reader as first responder, to catch a view swallowing it before the menu. |
@@ -129,7 +129,7 @@ The official release builds are not notarized, which is why first launch needs t
 
 `make test` runs `swift test`, then `node --test Tests/reader`.
 
-- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, Obsidian Bases (`.base` parse/filter/formula), find, git text, fuzzy matching, auto-update from GitHub Releases, and the optional fixture / bench tests above.
+- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, Obsidian Bases (`.base` parse/filter/formula), find, git text, fuzzy matching, auto-update from GitHub Releases, split-layout encode/decode/clamp, and the optional fixture / bench tests above.
 - `Tests/OnyxSyncTests` — crypto, the sync engine, a mock server, and protocol vectors in `Tests/OnyxSyncTests/Resources/`.
 - `Tests/reader` — typography and sidenote layout in Node, with fixtures in `Tests/reader/fixtures/` (`typeset-specimen.md`, `named-sidenotes.md`).
 

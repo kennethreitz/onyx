@@ -74,7 +74,7 @@ final class Workspace {
     var paneFrames: [UUID: CGRect] = [:]   // window coords, top-left origin
     /// Relative sizes along the split axis, one per pane, summing to 1. Session-only
     /// (not written to defaults). Empty when there is no split.
-    var paneRatios: [Double] = []
+    var paneRatios: [Double] = []   // persisted per vault with the axis and open notes
     /// The note pane the graph/atlas overlay is sitting on. Nil when there is no split
     /// (the solo page) or when the overlay is closed.
     var graphOverlayPaneID: UUID?
@@ -143,8 +143,16 @@ final class Workspace {
     /// Obsidian Sync, only for folders the user connected in Settings ▸ Sync (see VaultSync); nil otherwise.
     var obsidianSync: VaultSync?
 
-    func open(vault url: URL, initialNote: String? = nil) {
-        root = url.standardizedFileURL
+    func open(vault url: URL, initialNote: String? = nil, restoreSplits: Bool = true) {
+        let next = url.standardizedFileURL
+        if root != nil, root != next {
+            persistSplitLayout()
+            currentPath = nil
+            text = ""; lastSaved = ""
+            history = []; historyIndex = -1
+        }
+        panes = []; focusedPane = 0; paneRatios = []; paneFrames = [:]; paneTop = [:]
+        root = next
         git?.stop()
         git = GitSync.detect(root!)
         git?.beforeCommit = { [weak self] in self?.flushSave() }
@@ -158,6 +166,7 @@ final class Workspace {
         isIndexing = true
         let root = self.root!
         let ignore = obsidianIgnore()
+        let restoreSplits = restoreSplits
         Task.detached(priority: .userInitiated) {
             let t0 = Date()
             let snap = VaultSnapshot.scan(root: root, ignore: ignore)
@@ -167,6 +176,7 @@ final class Workspace {
                 self.indexMillis = ms
                 self.isIndexing = false
                 if let n = initialNote { self.openNote(n) }
+                else if restoreSplits && self.restoreSplitLayout() { }
                 else if self.currentPath == nil {
                     self.openHome()
                     // like Obsidian's Homepage "Graph view": the atlas is the first thing you see
@@ -267,6 +277,7 @@ final class Workspace {
         }
         if !sidebarPinned { sidebarVisible = false }
         if overlay != .none { navigating = true; overlay = .none; navigating = false }
+        if isSplit { persistSplitLayout() }
     }
 
     // MARK: [[ suggestions (editor)
@@ -1185,6 +1196,7 @@ extension Workspace {
             }
         }
         chromeLog("split \(axis) panes=\(panes.count) focused=\(focusedPane)")
+        persistSplitLayout()
     }
 
     /// Click or ⌃⇥: hand the live editor state to another pane.
@@ -1199,6 +1211,7 @@ extension Workspace {
         liveTop = paneTop[p.id] ?? 0
         mode = p.mode
         chromeLog("focusPane \(i) → \(currentPath ?? "-") \(mode)")
+        persistSplitLayout()
     }
     func focusNextPane(_ step: Int = 1) {
         guard isSplit else { return }
@@ -1225,6 +1238,7 @@ extension Workspace {
             paneRatios = PaneRatios.splitting(paneRatios.isEmpty ? [1] : paneRatios, at: panes.count - 1)
             panes.append(Pane(id: UUID(), path: nil, text: "", mode: mode, isGraph: true))
         }
+        persistSplitLayout()
     }
     func closeGraphPane() {
         guard let g = graphPaneIndex else { return }
@@ -1236,6 +1250,7 @@ extension Workspace {
             focusedPane = min(focusedPane, max(0, panes.count - 1))
             if panes.count <= 1 { panes = []; focusedPane = 0; paneRatios = [] }
         }
+        persistSplitLayout()
     }
 
     /// ⌘W with panes: close the focused one. Returns false when there is nothing to close
@@ -1262,6 +1277,7 @@ extension Workspace {
         mode = p.mode
         if panes.count <= 1 { panes = []; focusedPane = 0; paneRatios = [] }
         chromeLog("closePane → panes=\(panes.count) \(currentPath ?? "-")")
+        persistSplitLayout()
         return true
     }
 
@@ -1276,6 +1292,7 @@ extension Workspace {
     func setPaneRatios(_ ratios: [Double]) {
         guard panes.count > 1 else { return }
         paneRatios = PaneRatios.normalized(ratios, count: panes.count)
+        persistSplitLayout()
     }
 
     func equalizePanes() {
@@ -1283,6 +1300,7 @@ extension Workspace {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
             paneRatios = PaneRatios.equal(panes.count)
         }
+        persistSplitLayout()
     }
 
     /// Drag the divider between pane `divider` and the next. `from` is the ratio snapshot
@@ -1290,5 +1308,80 @@ extension Workspace {
     func resizePanes(from start: [Double], divider: Int, delta: CGFloat, total: CGFloat) {
         guard panes.count > 1 else { return }
         paneRatios = PaneRatios.dragging(start, divider: divider, delta: Double(delta), total: Double(total))
+    }
+
+    /// Write this vault's split (axis, ratios, open notes) to defaults, or clear it when there's one pane.
+    /// No-op under screenshot/test hooks and for /tmp vaults, which share the installed app's defaults.
+    func persistSplitLayout() {
+        guard let path = root?.path, SessionPersistence.isEnabled(vaultPath: path) else { return }
+        if !isSplit {
+            UserDefaults.standard.removeObject(forKey: key("splitLayout"))
+            return
+        }
+        captureFocused()
+        let layout = SplitLayout(
+            axis: splitAxis == .horizontal ? .horizontal : .vertical,
+            ratios: paneRatios,
+            panes: panes.map { SplitLayout.Pane(path: $0.path, isGraph: $0.isGraph) },
+            focused: focusedPane
+        )
+        UserDefaults.standard.set(layout.encoded(), forKey: key("splitLayout"))
+    }
+
+    /// Reopen the last split for this vault. Returns false when nothing was saved or nothing still exists.
+    @discardableResult
+    func restoreSplitLayout() -> Bool {
+        guard SessionPersistence.isEnabled(vaultPath: root?.path),
+              let data = UserDefaults.standard.data(forKey: key("splitLayout")),
+              let raw = SplitLayout.decode(data) else { return false }
+        let exists: (String) -> Bool = { p in
+            self.snapshot?.notes[p] != nil || self.snapshot?.canvases[p] != nil || self.snapshot?.bases[p] != nil
+        }
+        let axis: SplitAxis = raw.axis == .horizontal ? .horizontal : .vertical
+        guard let layout = raw.sanitized(existing: exists, total: splitAxisTotal(axis)) else { return false }
+        if layout.panes.count < 2 {
+            if let path = layout.panes.first(where: { !$0.isGraph })?.path { openNote(path); return true }
+            return false
+        }
+        splitAxis = axis
+        paneRatios = layout.ratios
+        panes = layout.panes.map { pane in
+            Pane(id: UUID(), path: pane.path, text: contentForPane(pane.path), mode: .read, isGraph: pane.isGraph)
+        }
+        focusedPane = layout.focused
+        if panes.indices.contains(focusedPane), panes[focusedPane].isGraph {
+            focusedPane = panes.indices.first(where: { !panes[$0].isGraph }) ?? 0
+        }
+        let p = panes[focusedPane]
+        history = p.history
+        historyIndex = p.historyIndex
+        guard let path = p.path else { return false }
+        openNote(path, recordHistory: true)
+        return isSplit
+    }
+
+    /// Content-area length along the split axis, minus docked sidebar/inspector for a side-by-side split.
+    func splitAxisTotal(_ axis: SplitAxis) -> Double {
+        let win = MainWindow.current
+        let size = win?.contentView?.bounds.size ?? win?.frame.size ?? CGSize(width: 1180, height: 820)
+        if axis == .horizontal { return max(Double(size.height) - 58, PaneRatios.minPane) }
+        var width = Double(size.width)
+        if sidebarPinned && sidebarVisible {
+            let w = UserDefaults.standard.object(forKey: "onyx.sidebarWidth") as? Double ?? 270
+            width -= min(max(w, 140), 560)
+        }
+        if inspectorPinned && inspectorVisible {
+            let w = UserDefaults.standard.object(forKey: "onyx.inspectorWidth") as? Double ?? 300
+            width -= min(max(w, 150), 600)
+        }
+        return max(width, PaneRatios.minPane)
+    }
+
+    private func contentForPane(_ path: String?) -> String {
+        guard let path else { return "" }
+        if let n = snapshot?.notes[path] { return n.content }
+        if path.isBasePath, let b = snapshot?.bases[path] { return b }
+        if let root { return (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? "" }
+        return ""
     }
 }
