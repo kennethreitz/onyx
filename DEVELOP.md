@@ -1,0 +1,153 @@
+# Developing Onyx
+
+This is the technical guide: building, architecture, test hooks, signing, and releases. The user-facing guide is [README.md](README.md). Design notes live in [DESIGN.md](DESIGN.md).
+
+## Building from Terminal
+
+Requires macOS 14+ and Swift 5.10 (Xcode 15.3 or newer). There is no Xcode project: it is a Swift package, built from Terminal.
+
+```sh
+make run                       # build Onyx.app and open your vault
+make run VAULT=~/path/to/vault # any folder of Markdown; does not change the remembered vault
+make run-test                  # the disposable test copy (/tmp/onyx-vault), never ~/Notes
+make app                       # build Onyx.app in build/
+make test                      # Swift tests, then the reader tests
+make install                   # copy Onyx.app to /Applications
+make dev                       # debug binary, pointed at a test vault
+make open                      # open the built app on the remembered vault
+make demo-vault                # a disposable copy under /tmp/onyx-vault
+make clean                     # remove .build and build/
+```
+
+With no `--vault`, Onyx opens the last vault you chose, or `~/Notes` if that folder exists. A vault in `/tmp` is never remembered, so test copies don’t stick. `ONYX_NO_DEFAULT_VAULT=1` skips the fallback entirely (used by `make run-test` and `make dev`). `--vault` never overwrites the remembered vault.
+
+**Never write test files into `~/Notes`.** Point the app at a copy under `/tmp`. `make demo-vault` builds `/tmp/onyx-vault` from the neutral parts of a real vault (read-only on the source). Prefer a git worktree so you don’t overwrite a running `build/Onyx.app` someone is using.
+
+To leave git or Obsidian Sync alone for a session:
+
+```sh
+ONYX_NO_GIT=1 make run         # don’t auto-commit, pull, or push
+ONYX_NO_SYNC=1 make run        # don’t start Obsidian Sync, even if this vault is connected
+```
+
+## Architecture
+
+```
+Sources/OnyxCore     vault index, parsing, link resolution, Dataview-lite, graph layout,
+                     canvas, kanban, daily notes
+Sources/Onyx         the macOS app (SwiftUI + AppKit, WKWebView reader)
+Sources/OnyxSync     Obsidian Sync protocol
+Sources/OnyxSyncPOC  a small command-line client for the same protocol
+Resources/web        reader.html + reader.js/css (the Reitz LaTeX page) and
+                     typeset.js/css (book typography); canvas.html/js/css for .canvas boards
+Tests/               OnyxCore and OnyxSync tests; Tests/reader for the typography
+```
+
+The reader is a WKWebView. `reader.js` / `reader.css` render the page; `typeset.js` / `typeset.css` add the book typography (small caps, old-style figures, hyphenation, drop caps, sidenote layout) when Typeset reading is on. Graph layout lives in OnyxCore (`Graph.swift`, `GraphIndex.swift`, `RelationGraph.swift`) and is drawn by `GraphView.swift`. Git autosync is `GitSync.swift`. Obsidian Sync is the `OnyxSync` package plus `ObsidianSync.swift`. Protocol notes are in [docs/obsidian-sync-protocol.md](docs/obsidian-sync-protocol.md).
+
+`scripts/bundle.sh` wraps the SwiftPM binary into `build/Onyx.app` and signs it.
+
+## Environment variables and test hooks
+
+These are for development and screenshots. Don’t set them in normal use unless you mean to.
+
+| Variable | What it does |
+| --- | --- |
+| `ONYX_NO_DEFAULT_VAULT=1` | Don’t fall back to the remembered vault or `~/Notes`. Used by `make run-test` and `make dev`. |
+| `ONYX_NO_GIT=1` | Don’t auto-commit, pull, or push for this session. |
+| `ONYX_NO_SYNC=1` | Don’t start Obsidian Sync, even if this vault is connected. |
+| `ONYX_GIT_INTERVAL=<seconds>` | Git poll interval (default 30; tests use 5 or 600). |
+| `ONYX_NO_STARTUP_GRAPH=1` | Skip opening the atlas on startup, even if that setting is on. |
+| `ONYX_OPEN_SETTINGS=1` | Open Settings at launch (screenshots / UI checks). |
+| `ONYX_SHOT_QUIET=1` | Park the window off-screen and deaf to the pointer, so a screenshot run doesn’t cover someone’s work or sprout hover cards. Never autosaves or restores that frame (the shot app shares the real app’s defaults). |
+| `ONYX_SCROLL_TEST=<seconds>` | Scroll every scroll view and the reader in small steps for that long (values `≤ 1` become 4). |
+| `ONYX_DUMP_MENUS=1` | Print every menu key equivalent, to catch double bindings. |
+| `ONYX_KEY_SELFTEST=1` | Offer each help-sheet shortcut to the view hierarchy with the editor or reader as first responder, to catch a view swallowing it before the menu. |
+| `ONYX_DEBUG_KEYS=1` | Log key handling in the root view and switcher. |
+| `ONYX_DEBUG=1` | Chrome / link-suggest debug logging to stderr. |
+| `ONYX_TYPE_TEST=<script file>` | Type into the editor in-process (the test window can’t become key without stealing focus). See below. |
+| `ONYX_PREVIEW_DELAY=<seconds>` | Hover graph-card delay (default 0.4). |
+| `ONYX_SWITCHER_QUERY=<text>` | Prefill the quick switcher query. |
+| `ONYX_KANBAN_FILE=/tmp/…/Ideas.md` | Optional test: a real board (a copy) must round-trip byte for byte. Skipped if unset. |
+| `ONYX_CANVAS_FIXTURES=<folder>` | Optional canvas fixture tests; defaults to `/tmp/onyx-canvas-vault`, skipped when the folder isn’t there. |
+| `ONYX_BENCH_VAULT=~/Notes` | Optional read-only smoke check against a real vault: `ONYX_BENCH_VAULT=~/Notes swift test --filter RealVault`. Skipped if unset. Never write to this vault. |
+
+### Launch arguments
+
+Useful with `open -n build/Onyx.app --args …` or `make run ARGS='…'`:
+
+| Argument | What it does |
+| --- | --- |
+| `--vault <path>` | Open this folder. Does not change the remembered vault. |
+| `--open <note>` | Open this note once the vault is up. |
+| `--mode read` / `--mode edit` | Start in that mode. |
+| `--appearance light` / `dark` / `system` | Override the appearance for this launch. |
+| `--show sidebar` / `search` / `inspector` / `outline` / `switcher` / `palette` / `graph` / `atlas` / `workspace` / `daily` | Open that UI after launch (for screenshots). |
+| `--sidebar open` | Start with the sidebar docked. |
+| `--size <W>x<H>` | Window content size (default 1180×820). |
+| `--window-id-file <path>` | Write the window number here, for `screencapture -l`. |
+
+`scripts/shoot.sh NAME [onyx args…]` launches Onyx against the test vault (`VAULT`, default `/tmp/onyx-vault`) and captures the window to `build/shots`. Use `ONYX_SHOT_QUIET=1` so the window stays off-screen. Never point a screenshot run at `~/Notes`.
+
+### Type-test scripts
+
+`ONYX_TYPE_TEST=<file>` runs a small script against the editor after launch. Lines may be:
+
+```
+# comments are ignored
+type <text>
+key <code> [cmd|shift|opt]
+wait <seconds>
+dump                  # print the note text
+open <path>
+openat <line> <path>  # open a note scrolled to a source line
+exportpdf <path>      # write the book-page PDF quietly
+split
+back
+trash <path>          # no confirm
+move <path> -> <folder>
+rename <path> -> <new path>
+```
+
+There are more workspace commands for tree selection, previews, and relations; see `TypeSelfTest` in `Sources/Onyx/LinkSuggest.swift`. Never set `ONYX_TYPE_TEST` in normal use.
+
+## Signing
+
+After a rebuild, macOS may ask for Keychain access if the app was signed ad hoc (the signature changes every build). `make app` (via `scripts/bundle.sh`) signs with an Apple Development or Developer ID identity if you have one, otherwise with a stable local “Onyx Local Signing” identity. Create that once with `scripts/make-signing-cert.sh`. Then “Always Allow” lasts across rebuilds.
+
+`SIGN_IDENTITY` and `SIGN_KEYCHAIN` override the identity and keychain `bundle.sh` uses. If nothing is available, the app is signed ad hoc, and Keychain will prompt again after each rebuild.
+
+The official release builds are not notarized, which is why first launch needs the Gatekeeper step in the README.
+
+## Tests
+
+`make test` runs `swift test`, then `node --test Tests/reader`.
+
+- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, find, git text, fuzzy matching, and the optional fixture / bench tests above.
+- `Tests/OnyxSyncTests` — crypto, the sync engine, a mock server, and protocol vectors in `Tests/OnyxSyncTests/Resources/`.
+- `Tests/reader` — typography and sidenote layout in Node, with fixtures in `Tests/reader/fixtures/` (`typeset-specimen.md`, `named-sidenotes.md`).
+
+Add a test when you’re touching parsing, typography, sync, or link rewriting.
+
+## Release process
+
+1. Bump `VERSION`.
+2. From a clean tree: `make app`.
+3. Zip the bundle:
+
+   ```sh
+   ditto -c -k --keepParent build/Onyx.app "Onyx-$(cat VERSION)-macOS.zip"
+   ```
+
+4. Publish with `gh release create` (or `gh release upload --clobber` if you’re replacing an asset on an existing tag). Don’t move a tag unless you mean to.
+
+The official zip is Apple silicon. Include the Gatekeeper first-open note in the release text; the README already has a copy.
+
+## Contributing
+
+Patches are welcome. Keep the page quiet — if you’re changing how it looks or feels, read [DESIGN.md](DESIGN.md) first.
+
+- Work on a branch or a git worktree. `git pull --rebase` before you push, and don’t force-push `master`.
+- Run `make test`.
+- Point the app at a copy under `/tmp` while you work. Never write test files into a real vault.
+- Onyx is [AGPL-3.0](LICENSE).
