@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-21
+
 ### Added
 - Customizable keyboard shortcuts in Settings ▸ Shortcuts. Every bindable command is listed by group with its current shortcut; click a row to record a new combination, or Clear / Reset that row, or Reset All. A conflict with another command, or a reserved system combination such as ⌘Q, shows a warning so you can reassign or cancel. Overrides persist in UserDefaults, and the menu bar and command palette use the live bindings. Text-editing keys are left alone.
 - Read Aloud in the command palette and the Note menu, using the Mac’s system voices (AVSpeechSynthesizer). It speaks the selection if there is one, otherwise the current note, with frontmatter, comments, code blocks, URLs, and Markdown markup stripped so the voice reads prose (wikilinks speak the alias or name). Pause/Resume Reading and Stop Reading are in the same places; a quiet “Reading” chip in the footer (and in focus mode) has pause and stop controls. Voice and Rate live in Settings ▸ Reading. Reading stops when you switch notes.
@@ -102,7 +104,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/kennethreitz/onyx/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/kennethreitz/onyx/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/kennethreitz/onyx/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/kennethreitz/onyx/compare/v0.1.1...v0.1.2

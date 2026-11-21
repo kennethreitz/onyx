@@ -30,7 +30,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Onyx"
 rsync -a --delete --exclude AppIcon.icns "$ROOT/Resources/" "$APP/Contents/Resources/OnyxResources/"
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
-VERSION="$(cat "$ROOT/VERSION" 2>/dev/null || echo 0.1.4)"
+VERSION="$(cat "$ROOT/VERSION" 2>/dev/null || echo 0.1.5)"
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
