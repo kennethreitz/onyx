@@ -26,4 +26,13 @@ final class TitlePathTests: XCTestCase {
         let c = TitlePath.crumbs(folder: "", name: "Home")
         XCTAssertEqual(c, [TitleCrumb(name: "Home", kind: .note)])
     }
+
+    func testAncestryReplacesFolders() {
+        let c = TitlePath.crumbs(folder: "Health/Meds", name: "Sertraline", ancestry: ["Health/Medication.md", "Health/SSRI.md"], otherParents: ["Antidepressants.md"])
+        XCTAssertEqual(c.map(\.name), ["Medication", "SSRI", "Sertraline"])
+        XCTAssertEqual(c[0].kind, .ancestor(path: "Health/Medication.md", others: []))
+        XCTAssertEqual(c[1].kind, .ancestor(path: "Health/SSRI.md", others: ["Antidepressants.md"]))
+        XCTAssertEqual(c[2].kind, .note)
+        XCTAssertEqual(TitlePath.crumbs(folder: "A", name: "B", ancestry: []).map(\.name), ["A", "B"])
+    }
 }

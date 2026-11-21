@@ -136,6 +136,12 @@ final class Workspace {
         guard let p = currentPath, isCanvas || isBase else { return nil }
         return ((p as NSString).deletingLastPathComponent, ((p as NSString).lastPathComponent as NSString).deletingPathExtension)
     }
+    /// Title-bar crumbs: the `partOf` ancestry when the note has one, else its folders.
+    func titleCrumbs(_ n: (folder: String, name: String)) -> [TitleCrumb] {
+        guard let p = currentPath, let snap = snapshot, snap.notes[p] != nil else { return TitlePath.crumbs(folder: n.folder, name: n.name) }
+        let a = snap.ancestry(of: p)
+        return TitlePath.crumbs(folder: n.folder, name: n.name, ancestry: a.chain, otherParents: a.otherParents)
+    }
     var isDirty: Bool { text != lastSaved }
     var anyChrome: Bool { sidebarVisible || inspectorVisible || overlay != .none }
 

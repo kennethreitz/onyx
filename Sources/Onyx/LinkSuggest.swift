@@ -211,8 +211,8 @@ enum TypeSelfTest {
             print("[expanded] \(ws.expanded.sorted().joined(separator: ",")) current=\(ws.currentPath ?? "-")")
         case "titlepath":
             if let n = ws.titleParts {
-                let crumbs = TitlePath.crumbs(folder: n.folder, name: n.name)
-                print("[titlepath] " + crumbs.map(\.name).joined(separator: " / "))
+                let crumbs = ws.titleCrumbs(n)
+                print("[titlepath] " + crumbs.map(\.name).joined(separator: crumbs.first?.isAncestor == true ? " › " : " / "))
             } else { print("[titlepath] -") }
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")

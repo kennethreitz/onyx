@@ -7,6 +7,9 @@ public struct TitleCrumb: Equatable, Sendable {
         case folder(path: String)
         /// The open note: stay here (the existing action is copy-wikilink).
         case note
+        /// A `partOf` ancestor: open it. `others` lists the note's other direct parents
+        /// (only on the last ancestor crumb).
+        case ancestor(path: String, others: [String])
     }
     public var name: String
     public var kind: Kind
@@ -34,5 +37,18 @@ public enum TitlePath {
         }
         crumbs.append(TitleCrumb(name: name, kind: .note))
         return crumbs
+    }
+
+    /// With a `partOf` ancestry (root-most first, ending at the direct parent) the path reads
+    /// `Grandparent › Parent › Note` instead of the folders, so the two never repeat each other.
+    /// Without one it is the folder path above.
+    public static func crumbs(folder: String, name: String, ancestry: [String], otherParents: [String] = []) -> [TitleCrumb] {
+        guard !ancestry.isEmpty else { return crumbs(folder: folder, name: name) }
+        func stem(_ p: String) -> String { ((p as NSString).lastPathComponent as NSString).deletingPathExtension }
+        var out = ancestry.enumerated().map { i, p in
+            TitleCrumb(name: stem(p), kind: .ancestor(path: p, others: i == ancestry.count - 1 ? otherParents : []))
+        }
+        out.append(TitleCrumb(name: name, kind: .note))
+        return out
     }
 }

@@ -5,7 +5,10 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 
 ## Chrome
 
-- **Title path** (always visible, quiet): `Knowledge / Hebrew Letters / Aleph`.
+- **Title path** (always visible, quiet): `Knowledge / Hebrew Letters / Aleph`, or the `partOf` ancestry
+  `Medication › SSRI › Sertraline` when the note has a parent (`Ancestry.chain`: first parent at each step, cycle-safe,
+  12 deep; other direct parents behind a faint +N menu), so folders and hierarchy never repeat each other. A frontmatter
+  `class:` is a hairline tag after the name.
   Folder segments are links (hover underline, pointer cursor): a click docks the Files
   sidebar, expands down to that folder, selects and scrolls to it, and opens its folder
   note (`Folder/Folder.md`, the folder-notes convention) when one exists. The last segment

@@ -84,10 +84,13 @@ struct RootView: View {
             HStack(spacing: 5) {
                 if let n = ws.titleParts {
                     NavChevrons(ws: ws, only: .back).padding(.trailing, 3)
-                    let crumbs = TitlePath.crumbs(folder: n.folder, name: n.name)
+                    let crumbs = ws.titleCrumbs(n)
                     ForEach(Array(crumbs.enumerated()), id: \.offset) { i, c in
-                        if i > 0 { Text("/").foregroundStyle(Color.faint.opacity(0.55)) }
+                        if i > 0 { Text(crumbs[i - 1].isAncestor ? "›" : "/").foregroundStyle(Color.faint.opacity(0.55)) }
                         switch c.kind {
+                        case .ancestor(let path, let others):
+                            PathSegment(text: c.name, color: Color.faint.opacity(0.85), help: "Part of \(c.name)") { ws.openNote(path) }
+                            if !others.isEmpty { OtherParentsMenu(ws: ws, paths: others) }
                         case .folder(let path):
                             PathSegment(text: c.name, color: Color.faint.opacity(0.85), help: "Reveal \(c.name) in the sidebar") {
                                 ws.revealFolder(path)
@@ -98,6 +101,7 @@ struct RootView: View {
                             }
                         }
                     }
+                    if let cls = ws.currentPath.flatMap({ ws.snapshot?.noteClass($0) }) { ClassBadge(ws: ws, name: cls) }
                     if copied {
                         Text("copied").foregroundStyle(Color.faint).transition(.opacity)
                     } else if ws.isDirty {
@@ -794,6 +798,45 @@ struct NavChevronButton: View {
         .buttonStyle(.plain)
         .disabled(!enabled)
         .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+    }
+}
+
+extension TitleCrumb {
+    var isAncestor: Bool { if case .ancestor = kind { return true }; return false }
+}
+
+/// "+1" after the direct parent when a note is part of several: a quiet menu of the others.
+struct OtherParentsMenu: View {
+    @Bindable var ws: Workspace
+    let paths: [String]
+    var body: some View {
+        Menu {
+            Section("Also part of") {
+                ForEach(paths, id: \.self) { p in Button(((p as NSString).lastPathComponent as NSString).deletingPathExtension) { ws.openNote(p) } }
+            }
+        } label: { Text("+\(paths.count)").foregroundStyle(Color.faint) }
+        .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+        .help("Also part of " + paths.map { (($0 as NSString).lastPathComponent as NSString).deletingPathExtension }.joined(separator: ", "))
+    }
+}
+
+/// The note's frontmatter `class:` as a small quiet tag; opens the class note when there is one.
+struct ClassBadge: View {
+    @Bindable var ws: Workspace
+    let name: String
+    @State private var hover = false
+    var body: some View {
+        let target = ws.snapshot?.resolve(name, from: ws.currentPath)
+        Text(name)
+            .font(.system(size: 10, weight: .medium)).tracking(0.3)
+            .foregroundStyle(hover && target != nil ? Color.ink.opacity(0.75) : Color.faint)
+            .padding(.horizontal, 6).padding(.vertical, 1.5)
+            .background(Capsule().strokeBorder(Color.hairline))
+            .padding(.leading, 3)
+            .contentShape(Capsule())
+            .onHover { hover = $0 }
+            .onTapGesture { if let target { ws.openNote(target) } }
+            .help(target != nil ? "class: \(name) — open \(name)" : "class: \(name)")
     }
 }
 
