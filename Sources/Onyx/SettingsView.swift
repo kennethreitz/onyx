@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import AVFoundation
 import OnyxCore
 
 enum Prefs {
@@ -75,7 +76,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch raw {
         case "", "general", "appearance", "vault", "focus": return .general
         case "editor": return .editor
-        case "reading", "typesetting", "typeset", "typography": return .reading
+        case "reading", "typesetting", "typeset", "typography", "speech": return .reading
         case "graph", "atlas", "startup": return .graph
         case "sync", "obsidian": return .sync
         case "updates", "update", "advanced": return .updates
@@ -257,9 +258,39 @@ struct ReadingSettingsPage: View {
                 Text("Smart quotes and dashes, ties, true small caps, hanging punctuation and a baseline rhythm. Off is the plain Reitz LaTeX page. Code is never touched.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { settingsHeader("Typesetting") }
+
+            SpeechSettingsSection()
         }
         .settingsPage()
         .onChange(of: sidenotes) { ws.sidenotes = sidenotes }
+    }
+}
+
+
+private struct SpeechSettingsSection: View {
+    @AppStorage(SpeechPrefs.voice) private var voice = ""
+    @AppStorage(SpeechPrefs.rate) private var rate = Double(AVSpeechUtteranceDefaultSpeechRate)
+    private let voices = SpeechReader.voices()
+
+    var body: some View {
+        Section {
+            Picker("Voice", selection: $voice) {
+                Text("System default").tag("")
+                ForEach(voices, id: \.identifier) { v in
+                    Text("\(v.name) (\(SpeechReader.languageName(v.language)))").tag(v.identifier)
+                }
+            }
+            LabeledContent("Rate") {
+                HStack(spacing: 8) {
+                    Text("Slow").font(.system(size: 11)).foregroundStyle(Color.faint)
+                    Slider(value: $rate,
+                           in: Double(AVSpeechUtteranceMinimumSpeechRate)...Double(AVSpeechUtteranceMaximumSpeechRate))
+                    Text("Fast").font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+            }
+            Text("Read Aloud in the command palette or the Note menu speaks the selection, or the whole note. It uses the Mac’s voices and works offline.")
+                .font(.system(size: 11)).foregroundStyle(Color.faint)
+        } header: { settingsHeader("Speech") }
     }
 }
 

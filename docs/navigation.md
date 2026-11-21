@@ -1,6 +1,6 @@
 # Getting around
 
-<kbd>⌘O</kbd> is the quick switcher. It ranks exact matches first, then prefix, initials, substring, and fuzzy; it ignores accents, matches folders and aliases (“hebrew aleph”, “hl”, “resume” → Résumé), and highlights what matched. <kbd>⌘↩</kbd> opens in a split; <kbd>⇧↩</kbd> creates a note. <kbd>⌘P</kbd> (or <kbd>⇧⌘P</kbd>) is every command.
+<kbd>⌘O</kbd> is the quick switcher. It ranks exact matches first, then prefix, initials, substring, and fuzzy; it ignores accents, matches folders and aliases (“hebrew aleph”, “hl”, “resume” → Résumé), and highlights what matched. <kbd>⌘↩</kbd> opens in a split; <kbd>⇧↩</kbd> creates a note. <kbd>⌘P</kbd> (or <kbd>⇧⌘P</kbd>) is every command, including Read Aloud, which speaks the note or your selection with the Mac’s voices (Settings ▸ Reading).
 
 <kbd>⌘D</kbd> splits side by side and <kbd>⇧⌘D</kbd> stacks, up to four panes. The axis, divider positions, and the note in each pane are remembered per vault and come back when you reopen it.
 

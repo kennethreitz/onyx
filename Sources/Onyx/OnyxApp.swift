@@ -290,6 +290,10 @@ struct OnyxApp: App {
             Button("Reveal in Finder") { ws.revealInFinder() }.keyboardShortcut("r", modifiers: [.command, .option, .shift])
             Button("Open in Obsidian") { ws.openInObsidian() }
             Divider()
+            Button("Read Aloud") { ws.readAloud() }.disabled(ws.currentPath == nil || ws.isCanvas || ws.isBase)
+            Button(ws.speech.state == .paused ? "Resume Reading" : "Pause Reading") { ws.toggleSpeechPause() }.disabled(!ws.speech.isActive)
+            Button("Stop Reading") { ws.stopSpeech() }.disabled(!ws.speech.isActive)
+            Divider()
             Button("Rebuild Index") { ws.reindex() }
             Button("Show Shortcut Hints") { withAnimation { ws.showHints = true } }
         }

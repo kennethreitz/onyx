@@ -113,6 +113,7 @@ final class Workspace {
     var externalPulse: Date? = nil
     var lastExternalChange: Date? = nil
     var toast: String? = nil
+    let speech = SpeechReader()
     var editorJump: Int? = nil           // line to reveal in the editor
     var readerJump: Int? = nil           // heading index to reveal in the reader
     var expanded: Set<String> = []
@@ -150,6 +151,7 @@ final class Workspace {
         let next = url.standardizedFileURL
         if root != nil, root != next {
             persistSplitLayout()
+            speech.stop()
             currentPath = nil
             text = ""; lastSaved = ""
             history = []; historyIndex = -1
@@ -266,7 +268,10 @@ final class Workspace {
         if !selectionIncludes(path) { treeSelection.clear() }   // opened from elsewhere
         if recordHistory { pushHistory(.note(path)) }
         let alreadyOpen = currentPath == path
-        if !alreadyOpen { liveTop = 0 }
+        if !alreadyOpen {
+            liveTop = 0
+            speech.stop()
+        }
         currentPath = path
         conflict = nil
         suppressTextChange = true
@@ -701,6 +706,7 @@ final class Workspace {
         // the focused pane
         purge(&history, &historyIndex)
         if let c = currentPath, gone(c) {
+            speech.stop()
             currentPath = nil
             suppressTextChange = true; text = ""; lastSaved = ""; suppressTextChange = false
             if history.indices.contains(historyIndex), case .note = history[historyIndex].place { go(0) } else { openHome() }
@@ -1380,6 +1386,61 @@ final class Workspace {
         if bookmarks.contains(p) { bookmarks.removeAll { $0 == p } } else { bookmarks.append(p) }
         UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
     }
+
+    // MARK: Read aloud
+
+    /// Speaks the current selection, or the whole note if there isn't one.
+    func readAloud() {
+        guard currentPath != nil, !isCanvas, !isBase else {
+            toast = "Nothing to read"
+            return
+        }
+        if let sel = selectedEditorText() {
+            startSpeaking(sel)
+            return
+        }
+        if mode == .read, let reader = liveReader {
+            reader.selectedText { [weak self] raw in
+                Task { @MainActor in
+                    guard let self else { return }
+                    let sel = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !sel.isEmpty { self.startSpeaking(sel) }
+                    else { self.speakCurrentNote() }
+                }
+            }
+            return
+        }
+        speakCurrentNote()
+    }
+
+    func toggleSpeechPause() { if speech.isActive { speech.togglePause() } }
+
+    func stopSpeech() { speech.stop() }
+
+    private func selectedEditorText() -> String? {
+        let tv = (MainWindow.current?.firstResponder as? OnyxTextView) ?? liveEditor
+        guard let tv else { return nil }
+        let r = tv.selectedRange()
+        guard r.length > 0, r.location != NSNotFound else { return nil }
+        let ns = tv.string as NSString
+        guard NSMaxRange(r) <= ns.length else { return nil }
+        let sel = ns.substring(with: r).trimmingCharacters(in: .whitespacesAndNewlines)
+        return sel.isEmpty ? nil : sel
+    }
+
+    private func speakCurrentNote() {
+        startSpeaking(text)
+    }
+
+    private func startSpeaking(_ markdown: String) {
+        let prose = SpeechText.clean(markdown)
+        if prose.isEmpty {
+            toast = "Nothing to read"
+            return
+        }
+        speech.speak(prose)
+    }
+
     func revealInFinder() { if let p = currentPath { revealInFinder(p) } }
     func revealInFinder(_ p: String) { if let root { NSWorkspace.shared.activateFileViewerSelecting([root.appendingPathComponent(p)]) } }
     func openInObsidian() { if let p = currentPath { openInObsidian(p) } }

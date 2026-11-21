@@ -149,6 +149,9 @@ struct RootView: View {
                         .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } }
                     Spacer()
                 }
+                if ws.speech.isActive {
+                    SpeechBadge(speech: ws.speech).padding(.trailing, 6)
+                }
                 syncDot.padding(.trailing, 6)
                 if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.padding(.trailing, 6) }
                 if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.padding(.trailing, 6) }
@@ -178,9 +181,21 @@ struct RootView: View {
     }
 
     var toastLayer: some View {
-        VStack { Spacer(); if let t = ws.toast { Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).padding(.horizontal, 12).padding(.vertical, 6).panelChrome().padding(.bottom, 14)
-            .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } } } }
-            .frame(maxWidth: .infinity).allowsHitTesting(false)
+        VStack {
+            Spacer()
+            if ws.speech.isActive {
+                SpeechBadge(speech: ws.speech)
+                    .padding(.horizontal, 10).padding(.vertical, 4)
+                    .background(Color.secondaryPaper)
+                    .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 0.8) }
+                    .padding(.bottom, 14)
+            } else if let t = ws.toast {
+                Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).padding(.horizontal, 12).padding(.vertical, 6).panelChrome().padding(.bottom, 14)
+                    .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(ws.speech.isActive)
     }
 
     // MARK: First-run hints

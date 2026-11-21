@@ -32,4 +32,6 @@
 | <kbd>⌘,</kbd> | Settings |
 | <kbd>Esc</kbd> | Put away whatever’s on top. In the editor, when nothing else would consume it, also saves and returns to reading view (Settings ▸ Editor; on by default). Never the other way |
 
+Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading.
+
 Every command is also in the menu bar with its shortcut. The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.

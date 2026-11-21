@@ -259,6 +259,9 @@ enum PaletteCommands {
                 } else { NSSound.beep() }
             },
             PaletteItem(id: "print", title: "Print…", symbol: "printer") { NotePrinter.run("print", ws: ws) },
+            PaletteItem(id: "readaloud", title: "Read Aloud", symbol: "speaker.wave.2") { ws.readAloud() },
+            PaletteItem(id: "readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", symbol: ws.speech.state == .paused ? "play.fill" : "pause.fill") { ws.toggleSpeechPause() },
+            PaletteItem(id: "readstop", title: "Stop Reading", symbol: "stop.fill") { ws.stopSpeech() },
             PaletteItem(id: "sidenotes", title: ws.sidenotes ? "Footnotes at the end" : "Footnotes as sidenotes", symbol: "text.append") { ws.sidenotes.toggle() },
             PaletteItem(id: "light", title: "Appearance: light", symbol: "sun.max") { appearance("light") },
             PaletteItem(id: "dark", title: "Appearance: dark", symbol: "moon") { appearance("dark") },

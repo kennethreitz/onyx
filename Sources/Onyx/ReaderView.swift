@@ -150,8 +150,15 @@ struct ReaderView: NSViewRepresentable {
         }
 
         func evalResult(_ js: String, _ done: @escaping (Any?) -> Void) {
-            guard ready, let webView else { return }
+            guard ready, let webView else { done(nil); return }
             webView.evaluateJavaScript(js) { v, _ in done(v) }
+        }
+
+        /// The current reader selection, or "" if there isn't one (or the view isn't ready).
+        func selectedText(_ done: @escaping (String) -> Void) {
+            evalResult("(window.getSelection && window.getSelection().toString()) || ''") { v in
+                done((v as? String) ?? "")
+            }
         }
 
         func render(keepScroll: Bool) {

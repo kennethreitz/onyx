@@ -14,6 +14,8 @@ File ▸ Export as PDF… (<kbd>⇧⌘E</kbd>) and Print… (<kbd>⌥⌘P</kbd>)
 
 Frontmatter, `%%comments%%`, embeds, images, PDFs, audio and video all render in the reader. Preliminary Dataview support runs `dataview` blocks in the reader: TABLE (including WITHOUT ID) with AS columns, and LIST; FROM a folder or `#tag` with OR and `-` exclusion; WHERE with comparisons, AND/OR, `contains()`, `choice()`, `default()`; SORT; LIMIT. Inline queries, DataviewJS, TASK, CALENDAR, and GROUP BY are not supported yet; those queries show an error box.
 
+Read Aloud (command palette or Note ▸ Read Aloud) speaks the current selection, or the whole note if you haven’t selected anything, using the Mac’s voices. Frontmatter, `%%comments%%`, code blocks, URLs, and Markdown markup are stripped first; wikilinks are read as their alias or name. Pause/Resume Reading and Stop Reading are in the same menu; a quiet chip in the footer shows while it’s speaking and has a stop control. It stops when you switch notes. Voice and Rate are in Settings ▸ Reading.
+
 Saves are atomic and conflict-aware: if the file changed on disk, Onyx offers to keep yours, take theirs, or keep both. Light, dark, or auto, text size, and line measure live in <kbd>⌘,</kbd>. <kbd>⌃⌘F</kbd> is focus mode — just the text.
 
 Split with <kbd>⌘D</kbd> (side by side) or <kbd>⇧⌘D</kbd> (stacked), up to four panes. Drag the divider to resize (240pt minimum); double-click it to equalize. Each pane keeps its own note, its own history, and its own read/edit mode. <kbd>⌘W</kbd> closes the focused pane, or the window when there is only one.
