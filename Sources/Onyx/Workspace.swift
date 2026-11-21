@@ -62,7 +62,8 @@ final class Workspace {
 
     // Chrome — quiet by default; focus mode (⌃⌘F) takes it all away.
     var sidebarVisible = UserDefaults.standard.object(forKey: "onyx.sidebarOpen") as? Bool ?? true { didSet { if sidebarVisible != oldValue { chromeLog("sidebarVisible=\(sidebarVisible)") } } }
-    var sidebarPinned = UserDefaults.standard.object(forKey: "onyx.sidebarOpen") as? Bool ?? true
+    /// The left sidebar is always docked. Older unpinned state is treated as pinned; `onyx.sidebarOpen` now means visibility only.
+    var sidebarPinned = true
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
     var sidebarTab: SidebarTab = .files
@@ -285,7 +286,6 @@ final class Workspace {
         if let heading, let note = snap.notes[path], let idx = note.summary.headings.firstIndex(where: { $0.text.lowercased() == heading.lowercased() }) {
             readerJump = idx; editorJump = note.summary.headings[idx].line
         }
-        if !sidebarPinned { sidebarVisible = false }
         if overlay != .none { navigating = true; overlay = .none; navigating = false }
         if isSplit { persistSplitLayout() }
     }
@@ -1100,8 +1100,10 @@ final class Workspace {
             if let tab, sidebarVisible, sidebarTab != tab { sidebarTab = tab; return }
             if let tab { sidebarTab = tab }
             sidebarVisible.toggle()
-            if !sidebarVisible { sidebarPinned = false }
+            sidebarPinned = true
+            if sidebarVisible { focusMode = false }
         }
+        UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
     }
     /// ⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
@@ -1188,16 +1190,16 @@ final class Workspace {
         return false
     }
 
-    /// ⌘K: the docked file sidebar, remembered across launches.
+    /// ⌘K: show or hide the file sidebar, remembered across launches. Always docked.
     func toggleDockedSidebar(_ tab: SidebarTab? = nil) {
         withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
             if let tab, sidebarVisible, sidebarTab != tab { sidebarTab = tab; return }
             if let tab { sidebarTab = tab }
-            let open = !(sidebarVisible && sidebarPinned)
-            sidebarVisible = open; sidebarPinned = open
-            if open { focusMode = false }
+            sidebarVisible.toggle()
+            sidebarPinned = true
+            if sidebarVisible { focusMode = false }
         }
-        UserDefaults.standard.set(sidebarPinned, forKey: "onyx.sidebarOpen")
+        UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
     }
 
     private var preFocus: (Bool, Bool, Bool, Bool)?
@@ -1206,9 +1208,9 @@ final class Workspace {
         withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
             if focusMode {
                 focusMode = false
-                if let p = preFocus { sidebarVisible = p.0; sidebarPinned = p.1; inspectorVisible = p.2; inspectorPinned = p.3 }
+                if let p = preFocus { sidebarVisible = p.0; sidebarPinned = true; inspectorVisible = p.2; inspectorPinned = p.3 }
             } else {
-                preFocus = (sidebarVisible, sidebarPinned, inspectorVisible, inspectorPinned)
+                preFocus = (sidebarVisible, true, inspectorVisible, inspectorPinned)
                 focusMode = true
                 sidebarVisible = false; inspectorVisible = false; overlay = .none
             }
@@ -1218,11 +1220,14 @@ final class Workspace {
     func dismissHints() { withAnimation(.easeOut(duration: 0.2)) { showHints = false }; UserDefaults.standard.set(true, forKey: "onyx.hintsDismissed") }
     func toggleWorkspaceLayout() {
         withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
-            let on = !(sidebarPinned && inspectorPinned && sidebarVisible && inspectorVisible)
-            sidebarPinned = on; inspectorPinned = on; sidebarVisible = on; inspectorVisible = on
+            let on = !(sidebarVisible && inspectorPinned && inspectorVisible)
+            sidebarVisible = on
+            sidebarPinned = true
+            inspectorPinned = on
+            inspectorVisible = on
             if on { focusMode = false }
         }
-        UserDefaults.standard.set(sidebarPinned, forKey: "onyx.sidebarOpen")
+        UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
         persistInspector()
     }
     func toggleMode() {

@@ -12,8 +12,8 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   copies `[[Note]]`.
 - **Footer** (auto-dims to ~40%, full on hover): files, switcher, graph, three-pane,
   read/edit, focus mode · word count · inspector.
-- **Sidebar** remembers whether it was docked; first launch shows it. Left-edge hover peeks
-  it, and won't re-peek until the pointer leaves the edge after a hide.
+- **Sidebar** is always docked. First launch shows it; ⌘K shows or hides it. Visibility is
+  remembered (`onyx.sidebarOpen`). There is no pin button, floating overlay, or left-edge peek.
 - **Resizable panels**: drag the inner edge of the sidebar or inspector (a hairline that shows
   a small grip and a resize cursor on hover). Sidebar 140–560pt (default 270), inspector
   150–600pt (default 300); widths persist (`onyx.sidebarWidth`, `onyx.inspectorWidth`), and a
@@ -49,7 +49,7 @@ The page is the interface; everything else is summoned, and Esc puts it away.
 | --- | --- |
 | ⌘O | Quick switcher (find or create) |
 | ⌘P, ⇧⌘P | Command palette (⇧⌘P for VS Code hands) |
-| ⌘K | Show or hide the sidebar (docks it on Files; from another tab, switches to Files) |
+| ⌘K | Show or hide the sidebar (always docked; from another tab, switches to Files) |
 | ⇧⌘F | Search the vault |
 | ⌘I | Inspector |
 | ⌘G / ⇧⌘G | Focus graph / Atlas |

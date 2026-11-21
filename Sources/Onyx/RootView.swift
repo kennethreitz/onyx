@@ -4,7 +4,7 @@ import OnyxCore
 
 /// Calm by default: the typeset page, a quiet title line, a footer that dims
 /// itself, and a docked file list you can put away. Everything else is
-/// summoned (⌘O ⌘P ⌘K ⌘I ⌘G, or the window edges); ⌃⌘F is pure text.
+/// summoned (⌘O ⌘P ⌘K ⌘I ⌘G); ⌃⌘F is pure text.
 struct RootView: View {
     @State private var copied = false
     @Bindable var ws: Workspace
@@ -12,10 +12,7 @@ struct RootView: View {
     @AppStorage(Prefs.readerSize) private var readerSize = 19.0
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.measure) private var measure = 41.0
-    @State private var leftEdgeHover = false
     @State private var rightEdgeHover = false
-    @State private var leftEdgeArmed = true   // disarmed by a hide until the pointer leaves the edge
-    @State private var hoverSummonedSidebar = false
     @State private var hoverSummonedInspector = false
     @State private var footerHover = false
     @State private var showLights = false
@@ -32,7 +29,7 @@ struct RootView: View {
     @State private var resizing = false
     var sidebarWidth: CGFloat { CGFloat(min(max(sidebarW, Self.sidebarRange.lowerBound), Self.sidebarRange.upperBound)) }
     var inspectorWidth: CGFloat { CGFloat(min(max(inspectorW, Self.inspectorRange.lowerBound), Self.inspectorRange.upperBound)) }
-    var leftInset: CGFloat { ws.sidebarPinned && ws.sidebarVisible ? sidebarWidth : 0 }
+    var leftInset: CGFloat { ws.sidebarVisible ? sidebarWidth : 0 }
     var rightInset: CGFloat { ws.inspectorPinned && ws.inspectorVisible ? inspectorWidth : 0 }
 
     var body: some View {
@@ -57,7 +54,6 @@ struct RootView: View {
                 } else {
                     toastLayer
                 }
-                edges
                 panels
                 if ws.showHints && !ws.focusMode && ws.overlay == .none { hints.padding(.trailing, rightInset) }
                 overlays
@@ -141,7 +137,7 @@ struct RootView: View {
                     FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
                     FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
                     FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
-                    FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarPinned && ws.inspectorPinned && ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
+                    FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarVisible && ws.inspectorPinned && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
                     FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
                     FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
                 }
@@ -348,24 +344,6 @@ struct RootView: View {
         }.frame(maxWidth: .infinity).transition(.move(edge: .top).combined(with: .opacity))
     }
 
-    // MARK: Hover edges
-
-    var edges: some View {
-        HStack(spacing: 0) {
-            Color.clear.frame(width: 8).contentShape(Rectangle())
-                .onHover { inside in
-                    leftEdgeHover = inside
-                    if !inside { leftEdgeArmed = true }
-                    guard inside, leftEdgeArmed, !ws.sidebarVisible else { return }
-                    Task { try? await Task.sleep(nanoseconds: 220_000_000); if leftEdgeHover && !ws.sidebarVisible { hoverSummonedSidebar = true; ws.toggleSidebar(.files) } }
-                }
-            // No right-edge hover: a pointer parked at the window's right edge kept
-            // re-summoning the inspector the moment it was hidden. ⌘I / the footer button own it.
-            Spacer()
-        }
-        .padding(.top, 40).padding(.bottom, 40)
-    }
-
     // MARK: Panels
 
     @ViewBuilder var panels: some View {
@@ -373,18 +351,11 @@ struct RootView: View {
             if ws.sidebarVisible {
                 SidebarView(ws: ws)
                     .frame(width: sidebarWidth)
-                    .padding(.top, ws.sidebarPinned ? 28 : 0)
-                    .panelChrome(pinned: ws.sidebarPinned)
+                    .padding(.top, 28)
+                    .panelChrome(pinned: true)
                     .overlay(alignment: .trailing) {
                         ResizeHandle(width: $sidebarW, range: Self.sidebarRange, defaultWidth: Self.sidebarDefault, growsRight: true,
-                                     showLine: ws.sidebarPinned, dragging: $resizing).offset(x: 4.5)
-                    }
-                    .padding(ws.sidebarPinned ? 0 : 10)
-                    .padding(.top, ws.sidebarPinned ? 0 : 28)
-                    .onHover { inside in
-                        if !inside && hoverSummonedSidebar && !ws.sidebarPinned {
-                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedSidebar && !ws.sidebarPinned && !leftEdgeHover && !resizing { hoverSummonedSidebar = false; if ws.sidebarVisible { ws.toggleSidebar() } } }
-                        } else if inside { hoverSummonedSidebar = hoverSummonedSidebar && true }
+                                     showLine: true, dragging: $resizing).offset(x: 4.5)
                     }
                     .transition(.move(edge: .leading).combined(with: .opacity))
             }
@@ -409,7 +380,6 @@ struct RootView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .onChange(of: ws.sidebarVisible) { if !ws.sidebarVisible { hoverSummonedSidebar = false; if leftEdgeHover { leftEdgeArmed = false } } }
         .onChange(of: ws.inspectorVisible) { if !ws.inspectorVisible { hoverSummonedInspector = false } }
     }
 

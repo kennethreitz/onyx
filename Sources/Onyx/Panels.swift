@@ -21,6 +21,7 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
     var label: (Tab) -> String
     @Binding var pinned: Bool
     var onPin: ((Bool) -> Void)? = nil
+    var showsPin: Bool = true
     var accessory: AnyView? = nil
     var body: some View {
         // tabs compress (28pt → 17pt each) so the header still fits a 140pt sidebar
@@ -39,9 +40,11 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
             }
             Spacer(minLength: 0)
             if let accessory { accessory }
-            Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { pinned.toggle() }; onPin?(pinned) } label: {
-                Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 20, height: 24)
-            }.buttonStyle(.plain).help(pinned ? "Unpin" : "Pin (three-pane layout)")
+            if showsPin {
+                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { pinned.toggle() }; onPin?(pinned) } label: {
+                    Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 20, height: 24)
+                }.buttonStyle(.plain).help(pinned ? "Unpin" : "Pin (three-pane layout)")
+            }
         }
         .padding(.horizontal, 6).padding(.top, 8).padding(.bottom, 4)
     }
@@ -53,8 +56,9 @@ struct SidebarView: View {
     @Bindable var ws: Workspace
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(tabs: SidebarTab.allCases, selection: $ws.sidebarTab, symbol: \.symbol, label: \.title, pinned: $ws.sidebarPinned, onPin: { UserDefaults.standard.set($0, forKey: "onyx.sidebarOpen") },
-                        accessory: ws.sidebarTab == .files ? AnyView(SortMenu(ws: ws)) : nil)
+            PanelHeader(tabs: SidebarTab.allCases, selection: $ws.sidebarTab, symbol: \.symbol, label: \.title, pinned: $ws.sidebarPinned,
+                        showsPin: false, accessory: ws.sidebarTab == .files ? AnyView(SortMenu(ws: ws)) : nil)
+
             Divider().overlay(Color.hairline)
             Group {
                 switch ws.sidebarTab {

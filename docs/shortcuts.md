@@ -5,7 +5,7 @@
 | <kbd>⌘O</kbd> | Quick switcher: find or create a note (<kbd>⌘↩</kbd> opens in a split, <kbd>⇧↩</kbd> creates) |
 | <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> | Command palette |
 | <kbd>⇧⌘O</kbd> | Open vault… |
-| <kbd>⌘K</kbd> | Show or hide the sidebar (opens on Files) |
+| <kbd>⌘K</kbd> | Show or hide the sidebar (always docked; opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
 | <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline · backlinks · properties |

@@ -156,7 +156,7 @@ struct OnyxApp: App {
         guard let url = options.vault ?? OnyxApp.defaultVault() else { return }
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         if let m = options.mode { ws.mode = m }
-        if let sb = options.sidebar { ws.sidebarVisible = sb; ws.sidebarPinned = sb }
+        if let sb = options.sidebar { ws.sidebarVisible = sb; ws.sidebarPinned = true }
         ws.sidenotes = UserDefaults.standard.object(forKey: Prefs.sidenotes) as? Bool ?? true
         if UserDefaults.standard.bool(forKey: Prefs.startFocus) { ws.toggleFocusMode() }
         // --open / --split are test and screenshot hooks: don't restore a saved layout over them.
@@ -256,7 +256,7 @@ struct OnyxApp: App {
             Button(ws.mode == .read ? "Edit Note and Save" : "Save and Read") { ws.toggleMode() }.keyboardShortcut(.return, modifiers: .command)
             Button(ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }.keyboardShortcut("f", modifiers: [.command, .control])
             Divider()
-            Button(ws.sidebarVisible && ws.sidebarPinned ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }.keyboardShortcut("k")
+            Button(ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }.keyboardShortcut("k")
             Button("Search Vault") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }.keyboardShortcut("f", modifiers: [.command, .shift])
             Button("Recent Files") { ws.toggleSidebar(.recent) }.keyboardShortcut("r", modifiers: [.command, .shift])
             Button("Bookmarks") { ws.toggleSidebar(.bookmarks) }.keyboardShortcut("b", modifiers: [.command, .shift])

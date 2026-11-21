@@ -14,7 +14,7 @@ The title path whispers the folder above the page; click a segment to reveal it 
 
 ## Files and the sidebar
 
-<kbd>⌘K</kbd> shows or hides the file list. The sidebar can be dragged as narrow as 140pt, the inspector as narrow as 150pt; double-click the edge to reset. Tabs cover files, vault search (<kbd>⇧⌘F</kbd>), recent files, bookmarks, tags, and source control.
+<kbd>⌘K</kbd> shows or hides the file list. The sidebar is always docked — it does not float or auto-hide. It can be dragged as narrow as 140pt, the inspector as narrow as 150pt; double-click the edge to reset. Tabs cover files, vault search (<kbd>⇧⌘F</kbd>), recent files, bookmarks, tags, and source control.
 
 Sort the sidebar by name (natural order, so “Note 2” precedes “Note 10”), modified, or created, ascending or descending, with folders on top if you want. The choice is remembered per vault. Right-click a folder to override the sort for just that folder, or to create a new note or folder there. Right-click the empty area below the file list for a new note or folder in the vault root. <kbd>⇧⌘N</kbd> or New Folder in the command palette does the same for the selected folder.
 
