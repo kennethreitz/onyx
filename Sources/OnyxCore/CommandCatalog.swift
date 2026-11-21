@@ -148,6 +148,8 @@ public enum CommandCatalog {
         cmd("copy", "Copy Wikilink", .note, [.command("l", shift: true)], "link"),
         cmd("finder", "Reveal in Finder", .note, [.command("r", shift: true, option: true)], "folder.badge.gearshape"),
         cmd("obsidian", "Open in Obsidian", .note, [], "arrow.up.forward.app"),
+        cmd("lint", "Lint Current Note", .note, [], "checkmark.seal"),
+        cmd("lintfolder", "Lint All Notes in Folder…", .note, [], "folder.badge.gearshape"),
         cmd("readaloud", "Read Aloud", .note, [], "speaker.wave.2"),
         cmd("readpause", "Pause Reading", .note, [], "pause.fill"),
         cmd("readstop", "Stop Reading", .note, [], "stop.fill"),

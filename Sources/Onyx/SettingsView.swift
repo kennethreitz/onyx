@@ -45,12 +45,13 @@ enum Typeset {
 
 /// Pages in the Settings window. `ONYX_SETTINGS_TAB` opens one at launch (screenshots).
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
-    case general, editor, shortcuts, reading, graph, sync, updates
+    case general, editor, linter, shortcuts, reading, graph, sync, updates
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .general: "General"
+        case .linter: "Linter"
         case .editor: "Editor"
         case .shortcuts: "Shortcuts"
         case .reading: "Reading"
@@ -62,6 +63,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .linter: "checkmark.seal"
         case .editor: "character.cursor.ibeam"
         case .shortcuts: "keyboard"
         case .reading: "book"
@@ -77,6 +79,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         switch raw {
         case "", "general", "appearance", "vault", "focus": return .general
+        case "linter", "lint": return .linter
         case "editor": return .editor
         case "shortcuts", "keys", "keyboard", "hotkeys", "hotkey": return .shortcuts
         case "reading", "typesetting", "typeset", "typography", "speech": return .reading
@@ -100,6 +103,9 @@ struct SettingsView: View {
             EditorSettingsPage()
                 .tabItem { Label(SettingsTab.editor.title, systemImage: SettingsTab.editor.symbol) }
                 .tag(SettingsTab.editor)
+            LinterSettingsPage()
+                .tabItem { Label(SettingsTab.linter.title, systemImage: SettingsTab.linter.symbol) }
+                .tag(SettingsTab.linter)
             ShortcutsSettingsPage()
                 .tabItem { Label(SettingsTab.shortcuts.title, systemImage: SettingsTab.shortcuts.symbol) }
                 .tag(SettingsTab.shortcuts)

@@ -270,6 +270,8 @@ enum PaletteCommands {
                 } else { NSSound.beep() }
             },
             item("print") { NotePrinter.run("print", ws: ws) },
+            item("lint") { ws.lintCurrentNote() },
+            item("lintfolder") { DispatchQueue.main.async { ws.chooseLintFolder() } },
             item("readaloud") { ws.readAloud() },
             item("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", symbol: ws.speech.state == .paused ? "play.fill" : "pause.fill") { ws.toggleSpeechPause() },
             item("readstop") { ws.stopSpeech() },

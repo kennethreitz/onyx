@@ -14,6 +14,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 ---
 
 - **Typeset reading** — small caps, collision-free sidenotes, hyphenation, `$` / `$$` math, the page as a book
+- **Linter** — tidy Markdown like Obsidian Linter: one undoable edit for the current note, a preview before linting a folder, and optional lint on save ([docs](docs/linter.md))
 - **Read Aloud** — the current note or your selection, from the command palette, with macOS voices
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
 - **Custom shortcuts** — every bindable command in Settings ▸ Shortcuts; click a row to record a new combination
@@ -48,6 +49,7 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 - [Canvas and Kanban](docs/boards.md)
 - [Getting around](docs/navigation.md)
 - [Sync](docs/sync.md)
+- [Linter](docs/linter.md)
 - [Keyboard shortcuts](docs/shortcuts.md)
 - [Commands](docs/commands.md)
 - [Compatibility and privacy](docs/compatibility.md)

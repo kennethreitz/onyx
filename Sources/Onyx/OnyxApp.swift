@@ -217,7 +217,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("palette") { ws.show(.palette) }
         }
         CommandGroup(after: .saveItem) {
-            ShortcutMenus.button("save") { ws.flushSave() }
+            ShortcutMenus.button("save") { ws.lintOnSave(); ws.flushSave() }
             Divider()
             // Delete is disabled while a palette is open, so text fields there keep ⌘⌫
             ShortcutMenus.button("rename", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmRenameCurrent() }
@@ -321,6 +321,8 @@ struct OnyxApp: App {
             ShortcutMenus.button("finder") { ws.revealInFinder() }
             ShortcutMenus.button("obsidian") { ws.openInObsidian() }
             Divider()
+            ShortcutMenus.button("lint", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true) { ws.lintCurrentNote() }
+            ShortcutMenus.button("lintfolder", disabled: ws.root == nil) { ws.chooseLintFolder() }
             ShortcutMenus.button("readaloud", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.readAloud() }
             ShortcutMenus.button("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", disabled: !ws.speech.isActive) { ws.toggleSpeechPause() }
             ShortcutMenus.button("readstop", disabled: !ws.speech.isActive) { ws.stopSpeech() }

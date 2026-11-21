@@ -57,6 +57,8 @@ final class Workspace {
     @ObservationIgnored private var navigating = false
     var recent: [String] = []
     var bookmarks: [String] = []
+    /// The open note was typed in since it was opened or last linted (lint on save).
+    @ObservationIgnored var editedSinceLint = false
     var conflict: String? = nil          // disk content that differs from both buffer and last save
     var renderToken = 0                  // bump to make the reader re-render
 
@@ -287,6 +289,7 @@ final class Workspace {
         } else if path.isBasePath, snap.bases[path] != nil, let root {
             content = snap.bases[path] ?? (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? ""
         } else { return }
+        if currentPath != path { lintOnSave() }
         flushSave()
         if let c = currentPath, c != path { git?.commitNow() }   // switching notes commits at once
         if !selectionIncludes(path) { treeSelection.clear() }   // opened from elsewhere
@@ -295,6 +298,7 @@ final class Workspace {
         if !alreadyOpen {
             liveTop = 0
             speech.stop()
+            editedSinceLint = false
         }
         currentPath = path
         conflict = nil
@@ -1096,6 +1100,7 @@ final class Workspace {
 
     private func textDidChange() {
         guard !suppressTextChange, currentPath != nil else { return }
+        editedSinceLint = true
         saveTask?.cancel()
         saveTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: 700_000_000)
@@ -1437,12 +1442,14 @@ final class Workspace {
         persistInspector()
     }
     func toggleMode() {
+        if mode == .edit { lintOnSave() }
         flushSave()
         withAnimation(.easeInOut(duration: 0.18)) { mode = mode == .read ? .edit : .read }
     }
     /// Esc (when nothing else is open): save and show the reader. Never the other way.
     func returnToReading() {
         guard mode == .edit else { return }
+        lintOnSave()
         flushSave()
         withAnimation(.easeInOut(duration: 0.18)) { mode = .read }
     }

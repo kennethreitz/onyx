@@ -503,6 +503,7 @@ struct FileMenu: View {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
             Button("New Folder") { ws.newFolder(in: path) }
             Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
+            Button("Lint Notes in Folder…") { DispatchQueue.main.async { ws.previewLintFolder(path) } }
             Button("Export Folder as PDF…") { NoteBookPrinter.run([path], ws: ws) }
         }
         Divider()
