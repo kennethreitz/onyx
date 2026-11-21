@@ -92,6 +92,7 @@ struct LaunchOptions {
 struct OnyxApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @State private var ws = Workspace()
+    @State private var shortcutRevision = 0
     @AppStorage("onyx.appearance") private var appearance = "system"
     private let options = LaunchOptions.parse()
 
@@ -122,10 +123,11 @@ struct OnyxApp: App {
                 .frame(minWidth: 640, minHeight: 420)
                 .onAppear(perform: boot)
                 .onChange(of: appearance) { apply(appearance) }
+                .onReceive(NotificationCenter.default.publisher(for: ShortcutStore.didChange)) { _ in shortcutRevision += 1 }
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: options.size?.width ?? 1180, height: options.size?.height ?? 820)
-        .commands { menus }
+        .commands { let _ = shortcutRevision; menus }
 
         Settings {
             SettingsView(ws: ws)
@@ -207,98 +209,103 @@ struct OnyxApp: App {
             Button("Check for Updates…") { UpdateController.shared.check(interactive: true) }
         }
         CommandGroup(replacing: .newItem) {
-            Button("New Note") { ws.newNote() }.keyboardShortcut("n")
-            Button("New Folder") { ws.newFolder() }.keyboardShortcut("n", modifiers: [.command, .shift])
-            Button("Open Vault…") { openVault() }.keyboardShortcut("o", modifiers: [.command, .shift])
+            ShortcutMenus.button("new") { ws.newNote() }
+            ShortcutMenus.button("newfolder") { ws.newFolder() }
+            ShortcutMenus.button("openvault") { openVault() }
             Divider()
-            Button("Quick Switcher…") { ws.show(.switcher) }.keyboardShortcut("o")
-            Button("Command Palette…  (also ⇧⌘P)") { ws.show(.palette) }.keyboardShortcut("p")
+            ShortcutMenus.button("switcher") { ws.show(.switcher) }
+            ShortcutMenus.button("palette") { ws.show(.palette) }
         }
         CommandGroup(after: .saveItem) {
-            Button("Save") { ws.flushSave() }.keyboardShortcut("s")
+            ShortcutMenus.button("save") { ws.flushSave() }
             Divider()
-            // ⌘⌫ (disabled while a palette is open, so text fields there keep it)
-            Button("Rename Note…") { ws.confirmRenameCurrent() }.disabled(ws.currentPath == nil || ws.overlay != .none)
-            Button("Move Note to…") { ws.beginMoveCurrent() }.keyboardShortcut("m", modifiers: [.command, .shift]).disabled(ws.currentPath == nil || ws.overlay != .none)
-            Button("Delete Note…") { ws.confirmTrashCurrent() }.keyboardShortcut(.delete).disabled(ws.currentPath == nil || ws.overlay != .none)
+            // Delete is disabled while a palette is open, so text fields there keep ⌘⌫
+            ShortcutMenus.button("rename", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmRenameCurrent() }
+            ShortcutMenus.button("move", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.beginMoveCurrent() }
+            ShortcutMenus.button("delete", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmTrashCurrent() }
         }
-        // ⌘P is the command palette here (Obsidian's habit), so Print takes ⌥⌘P.
+        // The command palette takes ⌘P by default (Obsidian's habit), so Print defaults to ⌥⌘P.
         CommandGroup(replacing: .printItem) {
-            Button("Export as PDF…") { NotePrinter.run("export", ws: ws) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(ws.currentPath == nil)
-            Button("Export Selection as PDF…") { NoteBookPrinter.run(Array(ws.treeSelection.selected), ws: ws) }.disabled(!ws.treeSelection.isMulti)
-            Button("Print…") { NotePrinter.run("print", ws: ws) }.keyboardShortcut("p", modifiers: [.command, .option]).disabled(ws.currentPath == nil)
+            ShortcutMenus.button("exportpdf", disabled: ws.currentPath == nil) { NotePrinter.run("export", ws: ws) }
+            ShortcutMenus.button("exportsel", disabled: !ws.treeSelection.isMulti) { NoteBookPrinter.run(Array(ws.treeSelection.selected), ws: ws) }
+            ShortcutMenus.button("exportfolder", disabled: (ws.treeSelection.selected.count == 1 ? ws.treeSelection.selected.first : ws.selectedFolder) == nil) {
+                if let f = ws.treeSelection.selected.count == 1 ? ws.treeSelection.selected.first : ws.selectedFolder {
+                    NoteBookPrinter.run([f], ws: ws)
+                }
+            }
+            ShortcutMenus.button("print", disabled: ws.currentPath == nil) { NotePrinter.run("print", ws: ws) }
         }
         CommandMenu("Go") {
-            Button("Today’s Daily Note") { ws.openDaily() }.keyboardShortcut("t")
-            Button("Today’s Daily Note ") { ws.openDaily() }.keyboardShortcut("\\")
-            Button("Previous Daily Note") { ws.openDaily(offset: -1) }.keyboardShortcut("[", modifiers: [.command, .option])
-            Button("Next Daily Note") { ws.openDaily(offset: 1) }.keyboardShortcut("]", modifiers: [.command, .option])
+            ShortcutMenus.button("daily") { ws.openDaily() }
+            ShortcutMenus.button("daily-prev") { ws.openDaily(offset: -1) }
+            ShortcutMenus.button("daily-next") { ws.openDaily(offset: 1) }
             Divider()
-            Button("Back") { ws.goBack() }.keyboardShortcut("[").disabled(!ws.canGoBack)
-            Button("Forward") { ws.goForward() }.keyboardShortcut("]").disabled(!ws.canGoForward)
-            Button("Homepage") { ws.openHome() }.keyboardShortcut("h", modifiers: [.command, .shift])
+            ShortcutMenus.button("back", disabled: !ws.canGoBack) { ws.goBack() }
+            ShortcutMenus.button("forward", disabled: !ws.canGoForward) { ws.goForward() }
+            ShortcutMenus.button("home") { ws.openHome() }
             Divider()
-            Button("Focus Graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }.keyboardShortcut("g")
-            Button("Atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }.keyboardShortcut("g", modifiers: [.command, .shift])
-            Button(ws.graphPaneIndex == nil ? "Graph in a Pane" : "Close Graph Pane") { ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane() }
-                .keyboardShortcut("g", modifiers: [.command, .option])
+            ShortcutMenus.button("graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }
+            ShortcutMenus.button("atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }
+            ShortcutMenus.button("graphpane", title: ws.graphPaneIndex == nil ? "Graph in a Pane" : "Close Graph Pane") {
+                ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane()
+            }
         }
         CommandMenu("Pane") {
-            Button("Split Side by Side") { ws.split(.vertical) }.keyboardShortcut("d")
-            Button("Split Stacked") { ws.split(.horizontal) }.keyboardShortcut("d", modifiers: [.command, .shift])
-            Button("Close Pane  (⌘W)") { ws.closePane() }.disabled(!ws.isSplit)
+            ShortcutMenus.button("split") { ws.split(.vertical) }
+            ShortcutMenus.button("splitdown") { ws.split(.horizontal) }
+            ShortcutMenus.button("closepane", disabled: !ws.isSplit) { ws.closePane() }
             Divider()
-            Button("Next Pane") { ws.focusNextPane() }.keyboardShortcut(.tab, modifiers: .control).disabled(!ws.isSplit)
-            Button("Previous Pane") { ws.focusNextPane(-1) }.keyboardShortcut(.tab, modifiers: [.control, .shift]).disabled(!ws.isSplit)
+            ShortcutMenus.button("nextpane", disabled: !ws.isSplit) { ws.focusNextPane() }
+            ShortcutMenus.button("prevpane", disabled: !ws.isSplit) { ws.focusNextPane(-1) }
         }
         CommandGroup(after: .toolbar) {
-            Button(ws.mode == .read ? "Edit Note" : "Read Note") { ws.toggleMode() }.keyboardShortcut("e")
-            Button(ws.mode == .read ? "Edit Note and Save" : "Save and Read") { ws.toggleMode() }.keyboardShortcut(.return, modifiers: .command)
-            Button(ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }.keyboardShortcut("f", modifiers: [.command, .control])
+            ShortcutMenus.button("modetoggle", title: ws.mode == .read ? "Edit Note" : "Read Note") { ws.toggleMode() }
+            ShortcutMenus.button("mode", title: ws.mode == .read ? "Edit Note and Save" : "Save and Read") { ws.toggleMode() }
+            ShortcutMenus.button("focus", title: ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }
             Divider()
-            Button(ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }.keyboardShortcut("k")
-            Button("Search Vault") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }.keyboardShortcut("f", modifiers: [.command, .shift])
-            Button("Recent Files") { ws.toggleSidebar(.recent) }.keyboardShortcut("r", modifiers: [.command, .shift])
-            Button("Bookmarks") { ws.toggleSidebar(.bookmarks) }.keyboardShortcut("b", modifiers: [.command, .shift])
-            Button("Tags") { ws.toggleSidebar(.tags) }.keyboardShortcut("t", modifiers: [.command, .shift])
-            Button("Source Control") { ws.toggleSidebar(.git) }.keyboardShortcut("y", modifiers: [.command, .shift])
+            ShortcutMenus.button("files", title: ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }
+            ShortcutMenus.button("search") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }
+            ShortcutMenus.button("recent") { ws.toggleSidebar(.recent) }
+            ShortcutMenus.button("bookmarks") { ws.toggleSidebar(.bookmarks) }
+            ShortcutMenus.button("tags") { ws.toggleSidebar(.tags) }
+            ShortcutMenus.button("git") { ws.toggleSidebar(.git) }
             Divider()
-            Button("Inspector") { ws.toggleInspector() }.keyboardShortcut("i")
-            Button("Outline") { ws.toggleInspector(.outline) }.keyboardShortcut("1", modifiers: [.command, .option])
-            Button("Backlinks") { ws.toggleInspector(.backlinks) }.keyboardShortcut("2", modifiers: [.command, .option])
-            Button("Properties") { ws.toggleInspector(.properties) }.keyboardShortcut("3", modifiers: [.command, .option])
-            Button("Three-Pane Workspace") { ws.toggleWorkspaceLayout() }.keyboardShortcut("0", modifiers: [.command, .option])
+            ShortcutMenus.button("inspector") { ws.toggleInspector() }
+            ShortcutMenus.button("outline") { ws.toggleInspector(.outline) }
+            ShortcutMenus.button("backlinks") { ws.toggleInspector(.backlinks) }
+            ShortcutMenus.button("props") { ws.toggleInspector(.properties) }
+            ShortcutMenus.button("layout") { ws.toggleWorkspaceLayout() }
             Divider()
-            Button(ws.sidenotes ? "Footnotes at End" : "Footnotes as Sidenotes") { ws.sidenotes.toggle() }
+            ShortcutMenus.button("sidenotes", title: ws.sidenotes ? "Footnotes at End" : "Footnotes as Sidenotes") { ws.sidenotes.toggle() }
             Menu("Appearance") {
-                Button("Light") { appearance = "light"; apply("light") }
-                Button("Dark") { appearance = "dark"; apply("dark") }
-                Button("Auto (Match System)") { appearance = "system"; apply("system") }
+                ShortcutMenus.button("light", title: "Light") { appearance = "light"; apply("light") }
+                ShortcutMenus.button("dark", title: "Dark") { appearance = "dark"; apply("dark") }
+                ShortcutMenus.button("system", title: "Auto (Match System)") { appearance = "system"; apply("system") }
             }
+            ShortcutMenus.button("synclog") { ws.show(.syncLog) }
             Divider()
         }
         CommandGroup(after: .pasteboard) {
             Divider()
-            Button("Find in Note…") { ws.openFind() }.keyboardShortcut("f")
-            Button("Find and Replace…") { ws.openFind(replace: true) }.keyboardShortcut("f", modifiers: [.command, .option])
+            ShortcutMenus.button("find") { ws.openFind() }
+            ShortcutMenus.button("findreplace") { ws.openFind(replace: true) }
             Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)
             Button("Find Previous (⇧⌘G while finding)") { ws.findStep(-1) }.disabled(!ws.finder.visible)
         }
         CommandMenu("Note") {
-            Button(ws.currentPath.map { ws.bookmarks.contains($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }.keyboardShortcut("d", modifiers: [.command, .option])
-            Button("Copy Wikilink") { ws.copyWikilink() }.keyboardShortcut("l", modifiers: [.command, .shift])
-            Button("Reveal in Finder") { ws.revealInFinder() }.keyboardShortcut("r", modifiers: [.command, .option, .shift])
-            Button("Open in Obsidian") { ws.openInObsidian() }
+            ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.bookmarks.contains($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
+            ShortcutMenus.button("copy") { ws.copyWikilink() }
+            ShortcutMenus.button("finder") { ws.revealInFinder() }
+            ShortcutMenus.button("obsidian") { ws.openInObsidian() }
             Divider()
-            Button("Read Aloud") { ws.readAloud() }.disabled(ws.currentPath == nil || ws.isCanvas || ws.isBase)
-            Button(ws.speech.state == .paused ? "Resume Reading" : "Pause Reading") { ws.toggleSpeechPause() }.disabled(!ws.speech.isActive)
-            Button("Stop Reading") { ws.stopSpeech() }.disabled(!ws.speech.isActive)
+            ShortcutMenus.button("readaloud", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.readAloud() }
+            ShortcutMenus.button("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", disabled: !ws.speech.isActive) { ws.toggleSpeechPause() }
+            ShortcutMenus.button("readstop", disabled: !ws.speech.isActive) { ws.stopSpeech() }
             Divider()
-            Button("Rebuild Index") { ws.reindex() }
-            Button("Show Shortcut Hints") { withAnimation { ws.showHints = true } }
+            ShortcutMenus.button("reindex") { ws.reindex() }
+            ShortcutMenus.button("hints") { withAnimation { ws.showHints = true } }
         }
     }
-
     func openVault() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"

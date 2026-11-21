@@ -481,44 +481,42 @@ struct RootView: View {
                     fflush(stdout)
                 }
             }
-            // ⇧⌘P: the command palette too, for VS Code hands (⌘P is the menu item)
             let mods = e.modifierFlags.intersection([.command, .shift, .option, .control])
-            // ⌘F find in the note · ⌥⌘F with replace (editor). While the find bar is open,
-            // ⌘G/⇧⌘G and ↩/⇧↩ (in its field) step through matches and Esc closes it;
-            // otherwise ⌘G is Focus graph.
+            // While the find bar is open, ⌘G/⇧⌘G and ↩/⇧↩ (in its field) step through matches
+            // and Esc closes it, even if Focus Graph (or something else) owns ⌘G.
             if e.window != nil, e.window === MainWindow.current, ws.overlay == .none, ws.currentPath != nil {
-                let key = e.charactersIgnoringModifiers?.lowercased()
-                if key == "f", mods == [.command] || mods == [.command, .option] {
-                    ws.openFind(replace: mods.contains(.option)); return nil
-                }
                 if ws.finder.visible {
+                    let key = e.charactersIgnoringModifiers?.lowercased()
                     if key == "g", mods == [.command] || mods == [.command, .shift] { ws.findStep(mods.contains(.shift) ? -1 : 1); return nil }
                     if e.keyCode == 36 || e.keyCode == 76, ws.finder.fieldFocused, !(e.window?.firstResponder is OnyxTextView),
                        mods == [.shift] || (mods.isEmpty && ws.finder.findFieldActive) {
                         ws.findStep(mods == [.shift] ? -1 : 1); return nil
                     }
                 }
+                if KeyChord.matches(e, command: "find") { ws.openFind(); return nil }
+                if KeyChord.matches(e, command: "findreplace") { ws.openFind(replace: true); return nil }
             }
-            if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
+            // Palette chords also toggle the overlay closed, and fire even when the palette field has focus.
+            if KeyChord.matches(e, command: "palette") {
                 ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
             }
-            // ⌘W: close the focused pane when split; otherwise let the window close
-            // (keyed to the main Onyx window, so ⌘W in Settings still closes Settings)
-            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "w", ws.isSplit,
+            // Close pane when split; otherwise let the event through so ⌘W (the default) can close the window.
+            // Keyed to the main Onyx window, so the same chord in Settings still closes Settings.
+            if KeyChord.matches(e, command: "closepane"), ws.isSplit,
                e.window != nil, e.window === MainWindow.current, ws.overlay == .none {
                 ws.closePane(); return nil
             }
-            // ⌘I: the inspector, even while the editor has focus (NSTextView otherwise
-            // swallows ⌘I before the menu sees it, so a docked inspector couldn't be put away).
-            if mods == [.command], e.charactersIgnoringModifiers?.lowercased() == "i",
+            // Inspector, even while the editor has focus (NSTextView otherwise swallows the
+            // default ⌘I before the menu sees it, so a docked inspector couldn't be put away).
+            if KeyChord.matches(e, command: "inspector"),
                e.window != nil, e.window === MainWindow.current {
                 ws.toggleInspector(); return nil
             }
-            // ⌘[ / ⌘]: back/forward. Here as well as in the Go menu so the web view and the
-            // text view can never claim them first; not while a palette or sheet is up.
-            if mods == [.command], let ch = e.charactersIgnoringModifiers, ch == "[" || ch == "]",
-               e.window != nil, e.window === MainWindow.current, ws.overlay == .none || ws.overlay == .graph {
-                ch == "[" ? ws.goBack() : ws.goForward(); return nil
+            // Back / forward, here as well as in the Go menu so the web view and the text view
+            // can never claim them first; not while a palette or sheet is up.
+            if e.window != nil, e.window === MainWindow.current, ws.overlay == .none || ws.overlay == .graph {
+                if KeyChord.matches(e, command: "back") { ws.goBack(); return nil }
+                if KeyChord.matches(e, command: "forward") { ws.goForward(); return nil }
             }
             // ⌘⌫ right after clicking in the file tree deletes the tree selection (one confirm)
             if mods == [.command], e.keyCode == 51, ws.treeFocused, ws.sidebarVisible, ws.sidebarTab == .files,

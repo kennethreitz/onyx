@@ -45,13 +45,14 @@ enum Typeset {
 
 /// Pages in the Settings window. `ONYX_SETTINGS_TAB` opens one at launch (screenshots).
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
-    case general, editor, reading, graph, sync, updates
+    case general, editor, shortcuts, reading, graph, sync, updates
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .general: "General"
         case .editor: "Editor"
+        case .shortcuts: "Shortcuts"
         case .reading: "Reading"
         case .graph: "Graph"
         case .sync: "Sync"
@@ -62,6 +63,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch self {
         case .general: "gearshape"
         case .editor: "character.cursor.ibeam"
+        case .shortcuts: "keyboard"
         case .reading: "book"
         case .graph: "point.3.connected.trianglepath"
         case .sync: "arrow.triangle.2.circlepath.icloud"
@@ -76,6 +78,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch raw {
         case "", "general", "appearance", "vault", "focus": return .general
         case "editor": return .editor
+        case "shortcuts", "keys", "keyboard", "hotkeys", "hotkey": return .shortcuts
         case "reading", "typesetting", "typeset", "typography", "speech": return .reading
         case "graph", "atlas", "startup": return .graph
         case "sync", "obsidian": return .sync
@@ -97,6 +100,9 @@ struct SettingsView: View {
             EditorSettingsPage()
                 .tabItem { Label(SettingsTab.editor.title, systemImage: SettingsTab.editor.symbol) }
                 .tag(SettingsTab.editor)
+            ShortcutsSettingsPage()
+                .tabItem { Label(SettingsTab.shortcuts.title, systemImage: SettingsTab.shortcuts.symbol) }
+                .tag(SettingsTab.shortcuts)
             ReadingSettingsPage(ws: ws)
                 .tabItem { Label(SettingsTab.reading.title, systemImage: SettingsTab.reading.symbol) }
                 .tag(SettingsTab.reading)
@@ -115,11 +121,11 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsPage {
+enum SettingsPage {
     static let width: CGFloat = 560
 }
 
-private func settingsHeader(_ s: String) -> some View {
+func settingsHeader(_ s: String) -> some View {
     Text(s).font(Theme.serif(14, bold: true)).foregroundStyle(Color.ink).textCase(nil)
 }
 

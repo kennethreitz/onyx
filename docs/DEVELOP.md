@@ -65,7 +65,7 @@ These are for development and screenshots. Don’t set them in normal use unless
 | `ONYX_GIT_INTERVAL=<seconds>` | Git poll interval (default 30; tests use 5 or 600). |
 | `ONYX_NO_STARTUP_GRAPH=1` | Skip opening the atlas on startup, even if that setting is on. |
 | `ONYX_OPEN_SETTINGS=1` | Open Settings at launch (screenshots / UI checks). |
-| `ONYX_SETTINGS_TAB=<name>` | Open a given Settings tab: `general`, `editor`, `reading`, `graph`, `sync`, `updates`. Aliases: `typography`, `typesetting`, `atlas`, `advanced`. |
+| `ONYX_SETTINGS_TAB=<name>` | Open a given Settings tab: `general`, `editor`, `shortcuts`, `reading`, `graph`, `sync`, `updates`. Aliases: `typography`, `typesetting`, `atlas`, `advanced`, `keys`, `keyboard`, `hotkeys`. |
 | `ONYX_SHOT_QUIET=1` | Park the window off-screen and deaf to the pointer, so a screenshot run doesn’t cover someone’s work or sprout hover cards. Never autosaves or restores that frame (the shot app shares the real app’s defaults). Also skips writing per-vault session state such as the split layout. |
 | `ONYX_SYNC_LOG_DEMO=1` | Seed a short demo Sync Log if this vault’s log is empty. For screenshots; use with `ONYX_SHOT_QUIET=1`. |
 | `ONYX_SCROLL_TEST=<seconds>` | Scroll every scroll view and the reader in small steps for that long (values `≤ 1` become 4). |
