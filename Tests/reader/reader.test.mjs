@@ -167,9 +167,14 @@ test('==highlight== becomes a mark, including across a line break', () => {
 
 test('mark CSS clones decoration on each line so a wrap does not paint a full-width band', () => {
   const css = fs.readFileSync(path.join(web, 'reader.css'), 'utf8');
-  assert.match(css, /mark,\s*\.highlight\s*\{[^}]*-webkit-box-decoration-break:\s*clone/);
-  assert.match(css, /mark,\s*\.highlight\s*\{[^}]*box-decoration-break:\s*clone/);
+  const rule = css.match(/mark,\s*\.highlight\s*\{[^}]*\}/);
+  assert.ok(rule, 'mark, .highlight rule');
+  assert.match(rule[0], /-webkit-box-decoration-break:\s*clone/);
+  assert.match(rule[0], /box-decoration-break:\s*clone/);
+  // border-radius makes WKWebView paint the unbroken box as well as the fragments
+  assert.doesNotMatch(rule[0], /border-radius/);
 });
+
 
 // --- Typeset reading (typeset.js) ---------------------------------------------
 const T = () => ctx.window.OnyxTypeset;

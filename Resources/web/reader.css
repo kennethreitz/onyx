@@ -96,11 +96,12 @@ a.is-unresolved { text-decoration-style: dotted; color: var(--text-muted); }
 a.external-link::after { content: "\2009\2197"; font-size: 0.7em; color: var(--text-faint); vertical-align: super; }
 
 strong { font-weight: 700; } em { font-style: italic; }
-/* clone: each line fragment keeps its own background. Without it, WKWebView
-   treats border-radius as one box around the whole mark — a yellow band the
-   width of the pane that starts and ends mid-line, and runs into the margins. */
+/* clone: each line fragment keeps its own background. WKWebView still paints
+   one unbroken box around the whole mark if border-radius is set — a band the
+   width of the pane that starts and ends mid-line and runs into the margins —
+   in addition to the per-word tint. No radius, so only the fragments paint. */
 mark, .highlight {
-  background: var(--highlight); color: inherit; padding: 0 0.08em; border-radius: 2px;
+  background: var(--highlight); color: inherit; padding: 0 0.08em;
   -webkit-box-decoration-break: clone; box-decoration-break: clone;
 }
 mark.hltr-pink { background: #FFB8EBA6; } mark.hltr-red { background: #FF5582A6; } mark.hltr-orange { background: #FFB86CA6; }
@@ -281,7 +282,7 @@ body.preview .markdown-preview-view { padding: 4px 18px 28px; max-width: none; o
 body.preview .fallback-title { display: none; }
 
 /* ⌘F matches */
-mark.onyx-find { background: rgba(255, 176, 32, .28); color: inherit; border-radius: 2px; padding: 0; }
+mark.onyx-find { background: rgba(255, 176, 32, .28); color: inherit; padding: 0; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 mark.onyx-find.current { background: rgba(255, 138, 0, .62); box-shadow: 0 0 0 1px rgba(255, 138, 0, .5); }
 
 /* Kanban: collapsed lanes are thin strips (state lives in the board's list-collapse setting) */
