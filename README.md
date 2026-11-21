@@ -36,7 +36,8 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 - [Sync](docs/sync.md)
 - [Keyboard shortcuts](docs/shortcuts.md)
 - [Compatibility and privacy](docs/compatibility.md)
-- [Building from source](DEVELOP.md)
+- [Building from source](docs/DEVELOP.md)
+- [Changelog](CHANGELOG.md)
 
 ## License
 
