@@ -150,6 +150,7 @@ final class VaultSync {
 
 /// Footer badge beside git's.
 /// ONYX_OPEN_SETTINGS=1 opens Settings at launch (screenshots / UI checks).
+/// ONYX_SETTINGS_TAB=<name> selects a tab (general, editor, reading, graph, sync, updates).
 struct SettingsOpener: View {
     @Environment(\.openSettings) private var openSettings
     var body: some View {

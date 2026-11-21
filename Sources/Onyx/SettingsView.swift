@@ -16,7 +16,7 @@ enum Prefs {
     static var editorMeasure: CGFloat { (measureRem / 41 * 760).rounded() }
 }
 
-/// Typeset reading (Settings ▸ Typography). Read fresh at every render, so a toggle applies at once.
+/// Typeset reading (Settings ▸ Reading). Read fresh at every render, so a toggle applies at once.
 enum Typeset {
     static let on = "onyx.typeset"                 // the whole pass; off = plain Reitz LaTeX
     static let oldstyle = "onyx.oldstyleFigures"
@@ -40,22 +40,99 @@ enum Typeset {
     static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(bool(justify, dflt: false))\(faceName)\(openingName)" }
 }
 
+/// Pages in the Settings window. `ONYX_SETTINGS_TAB` opens one at launch (screenshots).
+enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
+    case general, editor, reading, graph, sync, updates
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .editor: "Editor"
+        case .reading: "Reading"
+        case .graph: "Graph"
+        case .sync: "Sync"
+        case .updates: "Updates"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .editor: "character.cursor.ibeam"
+        case .reading: "book"
+        case .graph: "point.3.connected.trianglepath"
+        case .sync: "arrow.triangle.2.circlepath.icloud"
+        case .updates: "arrow.down.app"
+        }
+    }
+
+    /// Accepts the tab id plus a few aliases (typography, typesetting, atlas, advanced, …).
+    static func fromEnvironment() -> SettingsTab {
+        let raw = ProcessInfo.processInfo.environment["ONYX_SETTINGS_TAB"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+        switch raw {
+        case "", "general", "appearance", "vault", "focus": return .general
+        case "editor": return .editor
+        case "reading", "typesetting", "typeset", "typography": return .reading
+        case "graph", "atlas", "startup": return .graph
+        case "sync", "obsidian": return .sync
+        case "updates", "update", "advanced": return .updates
+        default: return .general
+        }
+    }
+}
+
 struct SettingsView: View {
     @Bindable var ws: Workspace
+    @State private var tab: SettingsTab = .fromEnvironment()
+
+    var body: some View {
+        TabView(selection: $tab) {
+            GeneralSettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.symbol) }
+                .tag(SettingsTab.general)
+            EditorSettingsPage()
+                .tabItem { Label(SettingsTab.editor.title, systemImage: SettingsTab.editor.symbol) }
+                .tag(SettingsTab.editor)
+            ReadingSettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.reading.title, systemImage: SettingsTab.reading.symbol) }
+                .tag(SettingsTab.reading)
+            GraphSettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.graph.title, systemImage: SettingsTab.graph.symbol) }
+                .tag(SettingsTab.graph)
+            SyncSettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.sync.title, systemImage: SettingsTab.sync.symbol) }
+                .tag(SettingsTab.sync)
+            UpdatesSettingsPage()
+                .tabItem { Label(SettingsTab.updates.title, systemImage: SettingsTab.updates.symbol) }
+                .tag(SettingsTab.updates)
+        }
+        .frame(width: SettingsPage.width)
+        .background(SettingsWindowHook(tab: tab))
+    }
+}
+
+private enum SettingsPage {
+    static let width: CGFloat = 560
+}
+
+private func settingsHeader(_ s: String) -> some View {
+    Text(s).font(Theme.serif(14, bold: true)).foregroundStyle(Color.ink).textCase(nil)
+}
+
+private extension View {
+    func settingsPage() -> some View {
+        self
+            .formStyle(.grouped)
+            .frame(width: SettingsPage.width)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+struct GeneralSettingsPage: View {
+    @Bindable var ws: Workspace
     @AppStorage(Prefs.appearance) private var appearance = "system"
-    @AppStorage(Prefs.readerSize) private var readerSize = 19.0
-    @AppStorage(Prefs.editorSize) private var editorSize = 14.0
-    @AppStorage(Prefs.measure) private var measure = 41.0
     @AppStorage(Prefs.startFocus) private var startFocus = false
-    @AppStorage(Prefs.sidenotes) private var sidenotes = true
-    @AppStorage(Typeset.on) private var typeset = true
-    @AppStorage(Typeset.oldstyle) private var oldstyle = true
-    @AppStorage(Typeset.hyphens) private var hyphens = true
-    @AppStorage(Typeset.smallCaps) private var smallCaps = true
-    @AppStorage(Typeset.face) private var face = "lm"
-    @AppStorage(Typeset.opening) private var opening = "smallcaps"
-    @AppStorage(UpdatePrefs.automatic) private var autoUpdates = true
-    @AppStorage(Typeset.justify) private var justify = false
 
     var body: some View {
         Form {
@@ -67,7 +144,7 @@ struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
                 Text("Auto follows the system’s light and dark setting.").font(.system(size: 11)).foregroundStyle(Color.faint)
-            } header: { header("Appearance") }
+            } header: { settingsHeader("Appearance") }
 
             Section {
                 HStack {
@@ -82,14 +159,61 @@ struct SettingsView: View {
                     Text("\(snap.notes.count) notes · \(snap.attachments.count) attachments · indexed in \(ws.indexMillis) ms")
                         .font(.system(size: 11)).foregroundStyle(Color.faint)
                 }
-            } header: { header("Vault") }
+            } header: { settingsHeader("Vault") }
 
+            Section {
+                Toggle("Open in focus mode (just the text)", isOn: $startFocus)
+                Text("⌃⌘F toggles focus mode any time; Esc leaves it.").font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { settingsHeader("Focus") }
+        }
+        .settingsPage()
+        .onChange(of: appearance) { OnyxApp.applyAppearance(appearance) }
+    }
+
+    func chooseVault() {
+        let p = NSOpenPanel()
+        p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"
+        p.directoryURL = ws.root
+        if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
+    }
+}
+
+struct EditorSettingsPage: View {
+    @AppStorage(Prefs.editorSize) private var editorSize = 14.0
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Editing size") {
+                    HStack { Slider(value: $editorSize, in: 11...22, step: 1); Text("\(Int(editorSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing) }
+                }
+                Text("Line width is under Reading; the editor follows the same measure.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { settingsHeader("Editor") }
+        }
+        .settingsPage()
+    }
+}
+
+struct ReadingSettingsPage: View {
+    @Bindable var ws: Workspace
+    @AppStorage(Prefs.readerSize) private var readerSize = 19.0
+    @AppStorage(Prefs.editorSize) private var editorSize = 14.0
+    @AppStorage(Prefs.measure) private var measure = 41.0
+    @AppStorage(Prefs.sidenotes) private var sidenotes = true
+    @AppStorage(Typeset.on) private var typeset = true
+    @AppStorage(Typeset.oldstyle) private var oldstyle = true
+    @AppStorage(Typeset.hyphens) private var hyphens = true
+    @AppStorage(Typeset.smallCaps) private var smallCaps = true
+    @AppStorage(Typeset.face) private var face = "lm"
+    @AppStorage(Typeset.opening) private var opening = "smallcaps"
+    @AppStorage(Typeset.justify) private var justify = false
+
+    var body: some View {
+        Form {
             Section {
                 LabeledContent("Reading size") {
                     HStack { Slider(value: $readerSize, in: 15...26, step: 1); Text("\(Int(readerSize)) px").monospacedDigit().frame(width: 44, alignment: .trailing) }
-                }
-                LabeledContent("Editing size") {
-                    HStack { Slider(value: $editorSize, in: 11...22, step: 1); Text("\(Int(editorSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing) }
                 }
                 LabeledContent("Line width") {
                     HStack { Slider(value: $measure, in: 30...60, step: 1); Text("\(Int(measure)) rem").monospacedDigit().frame(width: 52, alignment: .trailing) }
@@ -100,7 +224,7 @@ struct SettingsView: View {
                     typeset = true; oldstyle = true; hyphens = true; smallCaps = true; justify = false; face = "lm"; opening = "smallcaps"
                 }
                     .buttonStyle(.link).font(.system(size: 11.5))
-            } header: { header("Typography") }
+            } header: { settingsHeader("Typography") }
 
             Section {
                 Toggle("Typeset reading", isOn: $typeset)
@@ -122,44 +246,102 @@ struct SettingsView: View {
                 .disabled(!typeset)
                 Text("Smart quotes and dashes, ties, true small caps, hanging punctuation and a baseline rhythm. Off is the plain Reitz LaTeX page. Code is never touched.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
-            } header: { header("Typesetting") }
+            } header: { settingsHeader("Typesetting") }
+        }
+        .settingsPage()
+        .onChange(of: sidenotes) { ws.sidenotes = sidenotes }
+    }
+}
 
+struct GraphSettingsPage: View {
+    @Bindable var ws: Workspace
+
+    var body: some View {
+        Form {
             Section {
-                Toggle("Open in focus mode (just the text)", isOn: $startFocus)
-                Text("⌃⌘F toggles focus mode any time; Esc leaves it.").font(.system(size: 11)).foregroundStyle(Color.faint)
-            } header: { header("Focus") }
+                if ws.root != nil {
+                    Toggle("Open the atlas on startup", isOn: Binding(get: { ws.atlasOnStartup }, set: { ws.atlasOnStartup = $0 }))
+                    Text(ws.obsidianHomeIsGraph ? "On by default here: this vault's Obsidian Homepage opens the graph." : "The graph opens over your notes at launch; click a note to start.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                } else {
+                    Text("Open a vault to choose whether the atlas opens at launch.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+            } header: { settingsHeader("Startup (this vault)") }
+        }
+        .settingsPage()
+    }
+}
 
+struct SyncSettingsPage: View {
+    @Bindable var ws: Workspace
+
+    var body: some View {
+        Form {
+            ObsidianSyncSettings(ws: ws)
+        }
+        .settingsPage()
+    }
+}
+
+struct UpdatesSettingsPage: View {
+    @AppStorage(UpdatePrefs.automatic) private var autoUpdates = true
+
+    var body: some View {
+        Form {
             Section {
                 Toggle("Automatically check for updates", isOn: $autoUpdates)
                 Text("Onyx looks for a new GitHub release on launch and every six hours. You can also check from the Onyx menu.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
-            } header: { header("Updates") }
-
-            if ws.root != nil {
-                Section {
-                    Toggle("Open the atlas on startup", isOn: Binding(get: { ws.atlasOnStartup }, set: { ws.atlasOnStartup = $0 }))
-                    Text(ws.obsidianHomeIsGraph ? "On by default here: this vault's Obsidian Homepage opens the graph." : "The graph opens over your notes at launch; click a note to start.")
-                        .font(.system(size: 11)).foregroundStyle(Color.faint)
-                } header: { header("Startup (this vault)") }
-            }
-
-            ObsidianSyncSettings(ws: ws)
+            } header: { settingsHeader("Updates") }
         }
-        .formStyle(.grouped)
-        .frame(width: 480)
-        .fixedSize(horizontal: false, vertical: true)
-        .onChange(of: appearance) { OnyxApp.applyAppearance(appearance) }
-        .onChange(of: sidenotes) { ws.sidenotes = sidenotes }
+        .settingsPage()
+    }
+}
+
+/// Fits the Settings window to the current tab. Under `ONYX_SHOT_QUIET`, never
+/// persist the frame (the shot app shares defaults with the installed Onyx) and
+/// park the window off screen. When `ONYX_OPEN_SETTINGS` is set, the window-id
+/// file is updated to this window so screenshots capture Settings.
+private struct SettingsWindowHook: NSViewRepresentable {
+    var tab: SettingsTab
+
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView(frame: .zero)
+        DispatchQueue.main.async { Self.apply(v.window, first: true) }
+        return v
     }
 
-    func header(_ s: String) -> some View {
-        Text(s).font(Theme.serif(14, bold: true)).foregroundStyle(Color.ink).textCase(nil)
+    func updateNSView(_ v: NSView, context: Context) {
+        DispatchQueue.main.async { Self.apply(v.window, first: false) }
     }
 
-    func chooseVault() {
-        let p = NSOpenPanel()
-        p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"
-        p.directoryURL = ws.root
-        if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
+    static func apply(_ w: NSWindow?, first: Bool) {
+        guard let w, w !== MainWindow.current else { return }
+        let quiet = ProcessInfo.processInfo.environment["ONYX_SHOT_QUIET"] == "1"
+        if quiet {
+            w.setFrameAutosaveName("")
+            w.isRestorable = false
+            w.ignoresMouseEvents = true
+        }
+        let fitting = w.contentView?.fittingSize ?? .zero
+        if fitting.width > 0, fitting.height > 0 {
+            let content = NSSize(width: max(fitting.width, SettingsPage.width), height: fitting.height)
+            let target = w.frameRect(forContentRect: NSRect(origin: .zero, size: content)).size
+            if abs(w.frame.width - target.width) > 1 || abs(w.frame.height - target.height) > 1 {
+                var f = w.frame
+                f.origin.y += f.height - target.height
+                f.size = target
+                if quiet { f.origin = NSPoint(x: -f.width - 3000, y: 0) }
+                w.setFrame(f, display: true, animate: !quiet && !first)
+            } else if quiet, w.frame.origin.x > -1000 {
+                w.setFrameOrigin(NSPoint(x: -w.frame.width - 3000, y: 0))
+            }
+        } else if quiet, w.frame.origin.x > -1000 {
+            w.setFrameOrigin(NSPoint(x: -w.frame.width - 3000, y: 0))
+        }
+        if ProcessInfo.processInfo.environment["ONYX_OPEN_SETTINGS"] != nil, let file = WindowConfigurator.idFile {
+            try? String(w.windowNumber).write(toFile: file, atomically: true, encoding: .utf8)
+        }
     }
 }
