@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-21
+
 ### Changed
 - The left sidebar is always docked. The pin button, left-edge hover peek, and auto-hide overlay are gone; ⌘K still shows or hides it.
 - The bottom bar has a quiet sidebar-toned fill and a hairline, with smaller icons that settle until you hover. Word count and sync status stay put.
@@ -84,7 +86,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/kennethreitz/onyx/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/kennethreitz/onyx/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/kennethreitz/onyx/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/kennethreitz/onyx/compare/v0.1.0...v0.1.1
