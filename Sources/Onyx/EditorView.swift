@@ -127,6 +127,11 @@ final class OnyxTextView: NSTextView {
     // After `#` it lists that note's headings; after `|` (alias) and `#^` (block) it stays away.
 
     var suggest: (LinkCompletion.Part, String) -> [LinkSuggestion] = { _, _ in [] }
+    // The same list for `key::` lines (FieldCompletion): keys after `word:`, notes after `key:: `.
+    var fieldSuggest: (FieldCompletion.Part, String) -> [LinkSuggestion] = { _, _ in [] }
+    private var fieldCtx: FieldCompletion.Context?
+    private var fieldLineStart = 0
+    private var dismissedFieldLine: Int?
     private lazy var panel = LinkSuggestPanel()
     private var linkCtx: LinkCompletion.Context?
     private var linkLineStart = 0
@@ -144,7 +149,7 @@ final class OnyxTextView: NSTextView {
         setSelectedRange(NSRange(location: NSMaxRange(r), length: 0))
     }
 
-    func hideSuggestions() { panel.hide(); linkCtx = nil; lastQuery = nil }
+    func hideSuggestions() { panel.hide(); linkCtx = nil; fieldCtx = nil; lastQuery = nil }
 
     func refreshSuggestions() {
         guard !refreshing else { return }
@@ -155,8 +160,11 @@ final class OnyxTextView: NSTextView {
         let lr = ns.lineRange(for: NSRange(location: sel.location, length: 0))
         let line = ns.substring(with: NSRange(location: lr.location, length: max(0, NSMaxRange(lr) - lr.location)))
         guard let c = LinkCompletion.context(line: line, caret: sel.location - lr.location) else {
-            dismissedOpen = nil; hideSuggestions(); return
+            dismissedOpen = nil
+            refreshFieldSuggestions(line: line, lineStart: lr.location, caret: sel.location - lr.location)
+            return
         }
+        fieldCtx = nil
         let absOpen = lr.location + c.open
         if let d = dismissedOpen, d != absOpen { dismissedOpen = nil }
         guard dismissedOpen == nil else { hideSuggestions(); return }
@@ -178,7 +186,41 @@ final class OnyxTextView: NSTextView {
         }
     }
 
+    private func refreshFieldSuggestions(line: String, lineStart: Int, caret: Int) {
+        guard let fc = FieldCompletion.context(line: line, caret: caret),
+              lineStart >= Frontmatter.parse(string).bodyOffset else {
+            dismissedFieldLine = nil; hideSuggestions(); return
+        }
+        if let d = dismissedFieldLine {
+            if d == lineStart { hideSuggestions(); return }
+            dismissedFieldLine = nil
+        }
+        let items = fieldSuggest(fc.part, fc.query)
+        guard !items.isEmpty else { hideSuggestions(); return }
+        let m = panel.model
+        let queryChanged = fc.query != lastQuery || fieldCtx?.part != fc.part || fieldLineStart != lineStart
+        m.items = items
+        if queryChanged || (m.highlighted ?? 0) >= items.count {
+            m.highlighted = LinkCompletion.defaultHighlight(topIsExact: items[0].exact)
+        }
+        m.onPick = { [weak self] i in self?.acceptSuggestion(i) }
+        linkCtx = nil; fieldCtx = fc; fieldLineStart = lineStart; lastQuery = fc.query
+        let at = lineStart + max(0, fc.queryStart - (fc.query.isEmpty ? 1 : 0))
+        let anchor = firstRect(forCharacterRange: NSRange(location: at, length: 1), actualRange: nil)
+        if let w = window, anchor != .zero { panel.show(below: anchor, parent: w) }
+    }
+
+    private func acceptField(_ i: Int) {
+        guard let fc = fieldCtx, panel.model.items.indices.contains(i) else { return }
+        let item = panel.model.items[i]
+        let from = fieldLineStart + fc.queryStart
+        let to = max(from, selectedRange().location)
+        hideSuggestions()
+        insertText(item.insert, replacementRange: NSRange(location: from, length: to - from))
+    }
+
     func acceptSuggestion(_ i: Int) {
+        if linkCtx == nil, fieldCtx != nil { acceptField(i); return }
         guard let c = linkCtx, panel.model.items.indices.contains(i) else { return }
         let item = panel.model.items[i]
         let ns = string as NSString
@@ -231,7 +273,7 @@ final class OnyxTextView: NSTextView {
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         needsDisplay = true
-        if !stillSelecting, panel.isVisible || linkCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
+        if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
     }
 
     override func keyDown(with event: NSEvent) {
@@ -260,9 +302,12 @@ final class OnyxTextView: NSTextView {
             }
             switch LinkCompletion.action(for: key, highlighted: m.highlighted) {
             case .accept(let i): acceptSuggestion(i); return
-            case .leave: leaveLink(); return
+            case .leave:
+                if fieldCtx != nil { hideSuggestions(); break }   // a field line: the key does its usual thing
+                leaveLink(); return
             case .dismiss:
-                if let c = linkCtx { dismissedOpen = linkLineStart + c.open }
+                if fieldCtx != nil { dismissedFieldLine = fieldLineStart }
+                else if let c = linkCtx { dismissedOpen = linkLineStart + c.open }
                 hideSuggestions(); return
             case .pass: break
             }
@@ -358,6 +403,7 @@ struct EditorView: NSViewRepresentable {
         tv.textContainerInset = NSSize(width: 80, height: 96)
         tv.delegate = context.coordinator
         tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
+        tv.fieldSuggest = { [weak ws] part, q in ws?.fieldSuggestions(part, q) ?? [] }
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
         tv.onPreview = { [weak ws, weak tv] t, rect in
             guard let ws, let tv else { return }

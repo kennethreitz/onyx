@@ -151,6 +151,10 @@ logs workspace state after each key press.
 ## Quick switcher (⌘O)
 
 One matcher (`OnyxCore/QuickMatch.swift`) serves ⌘O, the command palette and `[[` completion.
+`key::` lines use the same popup through `FieldCompletion`: `word:` at line start (text after the caret blank, outside
+frontmatter) offers known keys by prefix (`VaultSnapshot.fieldKeys()`, most used first); `key:: ` on a link-valued key
+(`linkValuedKinds()`) offers notes for the current comma segment and inserts `[[Note]]`. ↩ with nothing highlighted keeps
+its normal meaning there; Esc dismisses for that line.
 
 - **Tiers, per query token:** exact > prefix (or a whole later word, so "20" finds 2026-11-20) >
   word boundary / initials ("hl" → Hebrew Letters, "heblet", "js" → JavaScript via camelCase) >

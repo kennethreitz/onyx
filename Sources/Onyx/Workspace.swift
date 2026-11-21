@@ -361,6 +361,29 @@ final class Workspace {
         }
     }
 
+    /// `key::` completion (FieldCompletion): known keys after `word:`, notes after a link-valued `key:: `.
+    @ObservationIgnored private var fieldCache: (gen: Int, keys: [(key: String, count: Int)], linkKinds: Set<String>)?
+    func fieldSuggestions(_ part: FieldCompletion.Part, _ q: String) -> [LinkSuggestion] {
+        guard let snap = snapshot else { return [] }
+        if fieldCache?.gen != snapshotGen { fieldCache = (snapshotGen, snap.fieldKeys(), snap.linkValuedKinds()) }
+        guard let cache = fieldCache else { return [] }
+        switch part {
+        case .key:
+            return FieldCompletion.keySuggestions(q, keys: cache.keys).enumerated().map { i, k in
+                let n = cache.keys.first { $0.key == k.key }?.count ?? 0
+                return LinkSuggestion(id: i, title: k.key + "::", detail: n == 1 ? "1 use" : "\(n) uses", titleHits: Array(0..<min(q.count, k.key.count)), insert: FieldCompletion.keyInsert(k.key), exact: k.exact)
+            }
+        case .value(let key):
+            guard cache.linkKinds.contains(InlineField.kind(key)) else { return [] }
+            return linkSuggestions(.note, q).filter { s in
+                guard let p = currentPath else { return true }
+                return s.insert != ((p as NSString).lastPathComponent as NSString).deletingPathExtension
+            }.enumerated().map { i, s in
+                var s = s; s = LinkSuggestion(id: i, title: s.title, detail: s.detail, titleHits: s.titleHits, insert: "[[" + s.insert + "]]", exact: s.exact); return s
+            }
+        }
+    }
+
     // MARK: Back / forward (⌘[ ⌘], mouse buttons, swipe)
 
     var canGoBack: Bool { historyIndex > 0 }
