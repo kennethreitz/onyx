@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Universal release builds for Apple silicon and Intel (`make release`). `make app` still builds just for your Mac.
 
 ### Changed
-- README trimmed; guides moved into `docs/`, including `DEVELOP.md`.
+- README trimmed; guides moved into `docs/`, including `DEVELOP.md` and `DESIGN.md`.
 
 ### Removed
 - Rhymepad support.
