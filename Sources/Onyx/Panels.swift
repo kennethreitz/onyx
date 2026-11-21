@@ -101,6 +101,7 @@ struct TreeClickCatcher: NSViewRepresentable {
     var onChevron: (() -> Void)? = nil
     var onClick: (NSEvent.ModifierFlags) -> Void
     var onCommandDrag: ((String) -> [String])? = nil
+    var isFolderPath: ((String) -> Bool)? = nil
     var onDragHover: ((String, Bool) -> Bool)? = nil
     var onDrop: ((String, Bool) -> Void)? = nil
     var onDragEnded: (() -> Void)? = nil
@@ -124,6 +125,7 @@ struct TreeClickCatcher: NSViewRepresentable {
         var onChevron: (() -> Void)?
         var chevronWidth: CGFloat = 0
         var onCommandDrag: ((String) -> [String])?
+        var isFolderPath: ((String) -> Bool)?
         var onDragHover: ((String, Bool) -> Bool)?
         var onDrop: ((String, Bool) -> Void)?
         var onDragEnded: (() -> Void)?
@@ -139,6 +141,7 @@ struct TreeClickCatcher: NSViewRepresentable {
             onChevron = s.onChevron
             chevronWidth = s.chevronWidth
             onCommandDrag = s.onCommandDrag
+            isFolderPath = s.isFolderPath
             onDragHover = s.onDragHover
             onDrop = s.onDrop
             onDragEnded = s.onDragEnded
@@ -202,31 +205,20 @@ struct TreeClickCatcher: NSViewRepresentable {
             let pb = NSPasteboardItem()
             pb.setString(paths.joined(separator: "\n"), forType: .onyxTreePaths)
             let item = NSDraggingItem(pasteboardWriter: pb)
-            let label = TreeSelection.describe(paths)
-            let img = dragImage(label)
-            var frame = bounds
-            frame.size.width = min(max(frame.width, 80), 240)
-            frame.size.height = 22
-            item.setDraggingFrame(frame, contents: img)
+            let img = TreeDragPreview.image(paths: paths, isFolder: isFolderPath ?? { _ in false })
+            let size = img.size
+            let loc = convert(event.locationInWindow, from: nil)
+            // Frame must match the image size. A wider row-sized frame stretches a
+            // short image and leaves a black slab around the name.
+            item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
+            item.imageComponentsProvider = {
+                let c = NSDraggingImageComponent(key: .icon)
+                c.contents = img
+                c.frame = NSRect(origin: .zero, size: size)
+                return [c]
+            }
             Self.moving = true
             beginDraggingSession(with: [item], event: event, source: self)
-        }
-
-        private func dragImage(_ label: String) -> NSImage {
-            let font = NSFont.systemFont(ofSize: 12.5)
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: Theme.ink,
-            ]
-            let text = NSAttributedString(string: label, attributes: attrs)
-            let size = NSSize(width: min(ceil(text.size().width) + 16, 240), height: 22)
-            let image = NSImage(size: size)
-            image.lockFocus()
-            Theme.paper.setFill()
-            NSBezierPath(roundedRect: NSRect(origin: .zero, size: size), xRadius: 5, yRadius: 5).fill()
-            text.draw(at: NSPoint(x: 8, y: (size.height - text.size().height) / 2))
-            image.unlockFocus()
-            return image
         }
 
         func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
@@ -412,6 +404,7 @@ struct TreeNodeView: View {
                             ws.beginTreeDrag(paths)
                             return paths
                         },
+                        isFolderPath: { ws.snapshot?.folders.contains($0) == true },
                         onDragHover: { path, isFolder in ws.treeDragHover(on: path, isFolder: isFolder) },
                         onDrop: { path, isFolder in ws.performTreeDrop(on: path, isFolder: isFolder) },
                         onDragEnded: { ws.endTreeDrag() }

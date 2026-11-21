@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rename is inline in the file tree, like Finder. The context menu, File ▸ Rename Note…, the command palette, Return on a selected row, and New Folder all edit the row name in place (the stem, without `.md`). Enter commits, Esc or an empty or unchanged name cancels, clicking away commits, and a collision or illegal character shows an error without leaving the edit. If the sidebar is hidden, the old prompt still appears. Wikilinks, open tabs, and git still follow the rename.
 
 ### Fixed
+- The ⌘-drag preview is a compact row (icon, name, and a count badge for a multi-selection) in the sidebar’s font and colors, sized for Retina, instead of a stretched black label.
 - A wrapped `==highlight==` no longer leaves a full-width band in the margins. `box-decoration-break: clone` was already set, but a `border-radius` still made WKWebView paint one unbroken box behind the per-word tint, in both light and dark themes.
 
 ## [0.1.4] - 2026-11-21
