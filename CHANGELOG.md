@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Folders can be collapsed again. Clicking the disclosure chevron always toggles expansion; clicking the folder row toggles too, and still opens an index note when there is one. Collapsing a folder that contains the open note no longer snaps it back open.
+- Opening a folder note no longer doubles the last breadcrumb (e.g. Life / Family / Projects / Projects). The folder and its index note merge into one final crumb; earlier crumbs and ordinary notes are unchanged.
 - A new Untitled note is named from its first heading (or first line) when you save (⌘S) or leave it, and ⌘N uses the folder selected in the file tree. The file was already written as `Untitled.md`, so the note appeared in the editor but didn't land under a real name in the sidebar.
 - The atlas graph can no longer be zoomed out to a speck. Pinch, scroll, and fit zoom are clamped at half the fitted view; the existing maximum is unchanged.
 - ⌘-click and ⇧-click in the file tree actually change the selection. The earlier multi-select code never saw the modifier keys: SwiftUI's tap gesture often skips a ⌘-click, and the handler read `NSEvent.modifierFlags` after the event had ended.

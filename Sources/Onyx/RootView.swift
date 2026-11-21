@@ -88,15 +88,19 @@ struct RootView: View {
             HStack(spacing: 5) {
                 if let n = ws.titleParts {
                     NavChevrons(ws: ws, only: .back).padding(.trailing, 3)
-                    let parts = n.folder.isEmpty ? [] : n.folder.split(separator: "/").map(String.init)
-                    ForEach(Array(parts.enumerated()), id: \.offset) { i, name in
-                        PathSegment(text: name, color: Color.faint.opacity(0.85), help: "Reveal \(name) in the sidebar") {
-                            ws.revealFolder(parts[0...i].joined(separator: "/"))
+                    let crumbs = TitlePath.crumbs(folder: n.folder, name: n.name)
+                    ForEach(Array(crumbs.enumerated()), id: \.offset) { i, c in
+                        if i > 0 { Text("/").foregroundStyle(Color.faint.opacity(0.55)) }
+                        switch c.kind {
+                        case .folder(let path):
+                            PathSegment(text: c.name, color: Color.faint.opacity(0.85), help: "Reveal \(c.name) in the sidebar") {
+                                ws.revealFolder(path)
+                            }
+                        case .note:
+                            PathSegment(text: c.name, color: Color.muted, help: "Copy [[\(c.name)]]") {
+                                ws.copyWikilink(); ws.copiedFlash += 1
+                            }
                         }
-                        Text("/").foregroundStyle(Color.faint.opacity(0.55))
-                    }
-                    PathSegment(text: n.name, color: Color.muted, help: "Copy [[\(n.name)]]") {
-                        ws.copyWikilink(); ws.copiedFlash += 1
                     }
                     if copied {
                         Text("copied").foregroundStyle(Color.faint).transition(.opacity)
