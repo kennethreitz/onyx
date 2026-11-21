@@ -3,7 +3,27 @@
 set -euo pipefail
 CONFIG="${1:-release}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN="$ROOT/.build/$CONFIG/Onyx"
+UNIVERSAL="${UNIVERSAL:-0}"
+if [ "$UNIVERSAL" = 1 ]; then
+  BIN="$ROOT/.build/universal/Onyx"
+else
+  BIN="$ROOT/.build/$CONFIG/Onyx"
+fi
+if [ ! -x "$BIN" ]; then
+  echo "error: missing binary at $BIN" >&2
+  exit 1
+fi
+if [ "$UNIVERSAL" = 1 ]; then
+  info=$(lipo -info "$BIN" 2>/dev/null || true)
+  case "$info" in
+    *arm64*) ;;
+    *) echo "error: universal build is missing arm64 ($info)" >&2; exit 1 ;;
+  esac
+  case "$info" in
+    *x86_64*) ;;
+    *) echo "error: universal build is missing x86_64 ($info)" >&2; exit 1 ;;
+  esac
+fi
 APP="$ROOT/build/Onyx.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -53,3 +73,5 @@ else
   echo "Signed ad hoc (run scripts/make-signing-cert.sh once for a stable signature)"
 fi
 echo "Built $APP"
+echo "Binary: $(lipo -info "$APP/Contents/MacOS/Onyx")"
+file "$APP/Contents/MacOS/Onyx"

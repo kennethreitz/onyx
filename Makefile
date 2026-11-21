@@ -3,14 +3,26 @@
 VAULT ?=
 TEST_VAULT ?= /tmp/onyx-vault
 ARGS ?=
+# UNIVERSAL=1 (or `make release`) builds an arm64 + x86_64 binary.
+# `make app` stays native so everyday rebuilds stay fast.
+UNIVERSAL ?= 0
 
-.PHONY: build app run dev test icon demo-vault clean install
+.PHONY: build app run dev test icon demo-vault clean install release
 
 build:
-	swift build -c release
+	UNIVERSAL=$(UNIVERSAL) ./scripts/build-binary.sh release
 
 app: build icon
-	./scripts/bundle.sh release
+	UNIVERSAL=$(UNIVERSAL) ./scripts/bundle.sh release
+
+# Universal (Apple silicon + Intel) app, plus the GitHub Releases zip.
+# Asset name must stay Onyx-<version>-macOS.zip; the auto-updater looks for it.
+release:
+	$(MAKE) app UNIVERSAL=1
+	ditto -c -k --keepParent build/Onyx.app "build/Onyx-$$(cat VERSION)-macOS.zip"
+	@echo "Universal app: build/Onyx.app"
+	@lipo -info build/Onyx.app/Contents/MacOS/Onyx
+	@echo "Release zip: build/Onyx-$$(cat VERSION)-macOS.zip"
 
 # Open the built app on your vault (remembered, else ~/Notes). With VAULT set, it opens that
 # folder without changing the vault Onyx remembers (handy for test copies).

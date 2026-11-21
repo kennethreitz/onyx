@@ -14,7 +14,7 @@ Starting with v0.1.1, Onyx checks GitHub for a newer release when it launches an
 
 ## Requirements
 
-macOS 14 (Sonoma) or later. The official download is Apple silicon.
+macOS 14 (Sonoma) or later, Apple silicon or Intel. The official download is a universal binary.
 
 ## Obsidian compatibility
 

@@ -10,9 +10,11 @@ Requires macOS 14+ and Swift 5.10 (Xcode 15.3 or newer). There is no Xcode proje
 make run                       # build Onyx.app and open your vault
 make run VAULT=~/path/to/vault # any folder of Markdown; does not change the remembered vault
 make run-test                  # the disposable test copy (/tmp/onyx-vault), never ~/Notes
-make app                       # build Onyx.app in build/
+make app                       # native Onyx.app in build/ (this machine’s architecture; fast)
+make release                   # universal (arm64 + x86_64) Onyx.app, plus the GitHub zip
+UNIVERSAL=1 make app           # universal app, no zip
 make test                      # Swift tests, then the reader tests
-make install                   # copy Onyx.app to /Applications
+make install                   # copy the native Onyx.app to /Applications
 make dev                       # debug binary, pointed at a test vault
 make open                      # open the built app on the remembered vault
 make demo-vault                # a disposable copy under /tmp/onyx-vault
@@ -121,7 +123,7 @@ There are more workspace commands for tree selection, previews, and relations; s
 
 ## Signing
 
-After a rebuild, macOS may ask for Keychain access if the app was signed ad hoc (the signature changes every build). `make app` (via `scripts/bundle.sh`) signs with an Apple Development or Developer ID identity if you have one, otherwise with a stable local “Onyx Local Signing” identity. Create that once with `scripts/make-signing-cert.sh`. Then “Always Allow” lasts across rebuilds.
+After a rebuild, macOS may ask for Keychain access if the app was signed ad hoc (the signature changes every build). `make app` and `make release` (via `scripts/bundle.sh`) sign with an Apple Development or Developer ID identity if you have one, otherwise with a stable local “Onyx Local Signing” identity. Create that once with `scripts/make-signing-cert.sh`. Then “Always Allow” lasts across rebuilds.
 
 `SIGN_IDENTITY` and `SIGN_KEYCHAIN` override the identity and keychain `bundle.sh` uses. If nothing is available, the app is signed ad hoc, and Keychain will prompt again after each rebuild.
 
@@ -140,16 +142,17 @@ Add a test when you’re touching parsing, typography, sync, or link rewriting.
 ## Release process
 
 1. Bump `VERSION` (this is the short version the auto-updater compares to the GitHub tag).
-2. From a clean tree: `make app`.
-3. Zip the bundle:
+2. From a clean tree: `make release`. This builds a universal binary (Apple silicon + Intel) and writes `build/Onyx-<version>-macOS.zip`. Everyday `make app` stays native so rebuilds stay fast; `UNIVERSAL=1 make app` builds the same universal app without the zip.
+3. Confirm both slices are present:
 
    ```sh
-   ditto -c -k --keepParent build/Onyx.app "Onyx-$(cat VERSION)-macOS.zip"
+   lipo -info build/Onyx.app/Contents/MacOS/Onyx
+   # Architectures in the fat file: … are: x86_64 arm64
    ```
 
-4. Publish with `gh release create` (or `gh release upload --clobber` if you’re replacing an asset on an existing tag). Don’t move a tag unless you mean to.
+4. Publish with `gh release create` (or `gh release upload --clobber` if you’re replacing an asset on an existing tag), uploading `build/Onyx-<version>-macOS.zip`. The auto-updater looks for that exact asset name (`Onyx-<ver>-macOS.zip`); don’t rename it. Don’t move a tag unless you mean to.
 
-The official zip is Apple silicon. Include the Gatekeeper first-open note in the release text; [docs/compatibility.md](docs/compatibility.md) has the full copy.
+The official zip is a universal binary (Apple silicon and Intel). Include the Gatekeeper first-open note in the release text; [docs/compatibility.md](docs/compatibility.md) has the full copy.
 
 ## Contributing
 
