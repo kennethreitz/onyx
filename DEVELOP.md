@@ -34,12 +34,12 @@ ONYX_NO_SYNC=1 make run        # don’t start Obsidian Sync, even if this vault
 
 ```
 Sources/OnyxCore     vault index, parsing, link resolution, Dataview-lite, graph layout, updater
-                     canvas, kanban, daily notes
+                     canvas, bases, kanban, daily notes
 Sources/Onyx         the macOS app (SwiftUI + AppKit, WKWebView reader)
 Sources/OnyxSync     Obsidian Sync protocol
 Sources/OnyxSyncPOC  a small command-line client for the same protocol
 Resources/web        reader.html + reader.js/css (the Reitz LaTeX page) and
-                     typeset.js/css (book typography); canvas.html/js/css for .canvas boards
+                     typeset.js/css (book typography); canvas.html/js/css for .canvas boards; BasesView for .base files
 Tests/               OnyxCore and OnyxSync tests; Tests/reader for the typography
 ```
 
@@ -76,6 +76,7 @@ These are for development and screenshots. Don’t set them in normal use unless
 | `ONYX_KANBAN_FILE=/tmp/…/Ideas.md` | Optional test: a real board (a copy) must round-trip byte for byte. Skipped if unset. |
 | `ONYX_CANVAS_FIXTURES=<folder>` | Optional canvas fixture tests; defaults to `/tmp/onyx-canvas-vault`, skipped when the folder isn’t there. |
 | `ONYX_BENCH_VAULT=~/Notes` | Optional read-only smoke check against a real vault: `ONYX_BENCH_VAULT=~/Notes swift test --filter RealVault`. Skipped if unset. Never write to this vault. |
+| `ONYX_BASES_VAULT=~/Notes` | Optional read-only check of `.base` files: `ONYX_BASES_VAULT=~/Notes swift test --filter testRealBasesReadOnly`. Skipped if unset. Never write to this vault. |
 
 ### Launch arguments
 
@@ -128,7 +129,7 @@ The official release builds are not notarized, which is why first launch needs t
 
 `make test` runs `swift test`, then `node --test Tests/reader`.
 
-- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, find, git text, fuzzy matching, auto-update from GitHub Releases, and the optional fixture / bench tests above.
+- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, Obsidian Bases (`.base` parse/filter/formula), find, git text, fuzzy matching, auto-update from GitHub Releases, and the optional fixture / bench tests above.
 - `Tests/OnyxSyncTests` — crypto, the sync engine, a mock server, and protocol vectors in `Tests/OnyxSyncTests/Resources/`.
 - `Tests/reader` — typography and sidenote layout in Node, with fixtures in `Tests/reader/fixtures/` (`typeset-specimen.md`, `named-sidenotes.md`).
 

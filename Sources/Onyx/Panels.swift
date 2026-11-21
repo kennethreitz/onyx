@@ -138,7 +138,7 @@ struct TreeNodeView: View {
                 }
                 Text(node.displayName)
                     .font(.system(size: 12.5, weight: node.isFolder ? .medium : .regular))
-                    .foregroundStyle(node.isNote || node.isFolder || node.path.isCanvasPath ? Color.ink : Color.faint)
+                    .foregroundStyle(node.isNote || node.isFolder || node.path.isCanvasPath || node.path.isBasePath ? Color.ink : Color.faint)
                     .underline(node.folderNote != nil, color: Color.faint.opacity(0.45))
                     .lineLimit(1).truncationMode(.middle)
                 if !node.isFolder && !node.isNote {
@@ -174,7 +174,7 @@ struct TreeNodeView: View {
     func activate() {
         if node.isFolder {
             if let fn = node.folderNote { ws.expanded.insert(node.path); ws.openNote(fn) } else { toggle() }
-        } else if node.isNote || node.path.isCanvasPath { ws.openNote(node.path) }
+        } else if node.isNote || node.path.isCanvasPath || node.path.isBasePath { ws.openNote(node.path) }
         else if let r = ws.root { NSWorkspace.shared.open(r.appendingPathComponent(node.path)) }
     }
 }
@@ -219,7 +219,7 @@ struct FileMenu: View {
     var isFolder = false
     var folderNote: String? = nil
     var body: some View {
-        let note = isFolder ? folderNote : (path.lowercased().hasSuffix(".md") || path.isCanvasPath ? path : nil)
+        let note = isFolder ? folderNote : (path.lowercased().hasSuffix(".md") || path.isCanvasPath || path.isBasePath ? path : nil)
         if let note {
             Button("Open") { ws.openNote(note) }
             Button("Open in Split") { ws.split(.vertical); ws.openNote(note) }

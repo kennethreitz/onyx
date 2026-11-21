@@ -242,6 +242,8 @@ struct RootView: View {
     @ViewBuilder var soloNote: some View {
         if ws.isCanvas {
             CanvasView(ws: ws).transition(.opacity)
+        } else if ws.isBase {
+            BasesView(ws: ws).transition(.opacity)
         } else if ws.mode == .edit {
             EditorView(ws: ws, fontSize: editorSize, measure: measure).transition(.opacity)
         } else {
@@ -312,6 +314,8 @@ struct RootView: View {
         let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
         if (focused ? ws.currentPath : pane.path)?.isCanvasPath == true {
             CanvasView(ws: ws, source: src).id("\(pane.id)-c")
+        } else if (focused ? ws.currentPath : pane.path)?.isBasePath == true {
+            BasesView(ws: ws, source: src).id("\(pane.id)-b")
         } else if mode == .edit {
             EditorView(ws: ws, fontSize: editorSize, measure: measure, source: src, paneID: focused ? nil : pane.id).id("\(pane.id)-e")
         } else {

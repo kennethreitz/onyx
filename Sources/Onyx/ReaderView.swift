@@ -31,7 +31,7 @@ final class OnyxSchemeHandler: NSObject, WKURLSchemeHandler {
 
 /// Reading view: the note typeset like a LaTeX article (Reitz LaTeX), with
 /// wikilinks, embeds, callouts, highlights, footnotes as Tufte sidenotes,
-/// Mermaid as TikZ-ish figures, dataview-lite tables and kanban boards.
+/// Mermaid as TikZ-ish figures, dataview-lite tables, embedded Bases, and kanban boards.
 struct ReaderView: NSViewRepresentable {
     @Bindable var ws: Workspace
     var fontSize: Double = 19
@@ -217,7 +217,7 @@ struct ReaderView: NSViewRepresentable {
 
 /// Everything the page needs, resolved Swift-side so JS never touches the disk.
 enum ReaderPayload {
-    static let fence = try! NSRegularExpression(pattern: #"(?m)^```dataview[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
+    static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
     static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true) -> String {
         let fm = Frontmatter.parse(text)
@@ -232,7 +232,9 @@ enum ReaderPayload {
             // Same number of lines as the fence it replaces, so source-line anchors stay true.
             let fenceLines = ns.substring(with: m.range).filter { $0 == "\n" }.count
             out += "<div class=\"onyx-dataview\" data-i=\"\(dv.count)\"></div>" + String(repeating: "\n", count: fenceLines)
-            dv.append(dataviewHTML(ns.substring(with: m.range(at: 1)), snap: snap, path: path))
+            let lang = ns.substring(with: m.range(at: 1))
+            let query = ns.substring(with: m.range(at: 2))
+            dv.append(lang == "base" ? baseHTML(query, snap: snap, path: path) : dataviewHTML(query, snap: snap, path: path))
             last = NSMaxRange(m.range)
         }
         out += ns.substring(from: last)
@@ -376,5 +378,52 @@ enum ReaderPayload {
         } catch {
             return "<div class=\"dataview-error\"><span>dataview</span> \(esc(String(describing: error)))<pre>\(esc(query))</pre></div>"
         }
+    }
+
+    static func baseHTML(_ yaml: String, snap: VaultSnapshot, path: String) -> String {
+        let file = Bases.parse(yaml)
+        let r = file.views.isEmpty ? nil : Bases.run(file, view: 0, in: snap, from: path)
+        var html = ""
+        let warnings = file.warnings + (r?.warnings ?? [])
+        if !warnings.isEmpty {
+            html += "<div class=\"dataview-error\"><span>base</span> \(esc(warnings.joined(separator: " ")))</div>"
+        }
+        guard let r else { return html + "<p class=\"dataview-empty\">This base has no views.</p>" }
+        if file.views.count > 1 {
+            html += "<p class=\"dataview-empty\">\(esc(r.view.name)) · \(file.views.count) views</p>"
+        }
+        if r.rows.isEmpty { return html + "<p class=\"dataview-empty\">No results.</p>" }
+        if r.view.type == "cards" {
+            let cards = r.rows.map { row -> String in
+                let title = "<a class=\"internal-link\" data-path=\"\(esc(row.path))\">\(esc(row.name))</a>"
+                let props = r.columns.filter { $0.key != "file.name" && $0.key != "note.name" }.compactMap { c -> String? in
+                    let t = row.cells[c.key]?.text ?? ""
+                    return t.isEmpty ? nil : "<div>\(esc(t))</div>"
+                }.joined()
+                var cover = ""
+                if let p = row.coverPath {
+                    let url = "onyx://vault/" + (p.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? p)
+                    cover = "<img src=\"\(url)\" alt=\"\">"
+                }
+                return "<div class=\"base-card\">\(cover)<div>\(title)\(props)</div></div>"
+            }.joined()
+            return html + "<div class=\"base-cards\">\(cards)</div>"
+        }
+        if r.view.type == "list" {
+            let items = r.rows.map { "<li><a class=\"internal-link\" data-path=\"\(esc($0.path))\">\(esc($0.name))</a></li>" }.joined()
+            return html + "<ul class=\"dataview-list\">\(items)</ul>"
+        }
+        let head = "<thead><tr>" + r.columns.map { "<th>\(esc($0.displayName))</th>" }.joined() + "</tr></thead>"
+        let rows = r.rows.map { row in
+            "<tr>" + r.columns.map { c in
+                let v = row.cells[c.key] ?? .null
+                let label = v.text.isEmpty ? row.name : v.text
+                if c.key == "file.name" || c.key == "note.name" || c.key == r.columns.first?.key {
+                    return "<td><a class=\"internal-link\" data-path=\"\(esc(row.path))\">\(esc(label))</a></td>"
+                }
+                return "<td>\(esc(v.text))</td>"
+            }.joined() + "</tr>"
+        }.joined()
+        return html + "<div class=\"table-wrap\"><table class=\"dataview\">\(head)<tbody>\(rows)</tbody></table></div>"
     }
 }
