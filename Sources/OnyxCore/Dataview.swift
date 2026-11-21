@@ -797,6 +797,59 @@ public enum Dataview {
         return eval(try parseExpr(source), Env(snap: snap, page: page, now: now, currentPath: path))
     }
 
+    /// Replace `` `= expr` `` (and `` `$= js` ``) inline code with placeholders. Code fences are left alone.
+    /// `html[i]` is the rendered value (or a small error) for `data-i="i"`.
+    public static func rewriteInlineQueries(_ body: String, in snap: VaultSnapshot, from path: String, now: Date = Date()) -> (text: String, html: [String]) {
+        let re = try! NSRegularExpression(pattern: #"`(\$?=\s*[^`]+)`"#)
+        let ns = body as NSString
+        let code = NoteParser.codeRanges(body)
+        func inFence(_ r: NSRange) -> Bool { code.contains { NSIntersectionRange($0, r).length > 0 } }
+        var html: [String] = []
+        var out = ""
+        var last = 0
+        for m in re.matches(in: body, range: NSRange(location: 0, length: ns.length)) {
+            if inFence(m.range) { continue }
+            out += ns.substring(with: NSRange(location: last, length: m.range.location - last))
+            let raw = ns.substring(with: m.range(at: 1))
+            html.append(inlineHTML(raw, snap: snap, path: path, now: now))
+            out += "<span class=\"onyx-dv-inline\" data-i=\"\(html.count - 1)\"></span>"
+            last = NSMaxRange(m.range)
+        }
+        out += ns.substring(from: last)
+        return (out, html)
+    }
+
+    static func inlineHTML(_ raw: String, snap: VaultSnapshot, path: String, now: Date) -> String {
+        let s = raw.trimmingCharacters(in: .whitespaces)
+        if s.hasPrefix("$=") {
+            return "<span class=\"dataview-inline-error\">DataviewJS isn’t supported yet</span>"
+        }
+        let expr = String(s.drop(while: { $0 == "=" || $0.isWhitespace }))
+        do {
+            let v = display(try evalExpr(expr, in: snap, from: path, now: now), snap)
+            return inlineCell(v)
+        } catch {
+            return "<span class=\"dataview-inline-error\">\(esc(String(describing: error)))</span>"
+        }
+    }
+
+    static func inlineCell(_ v: DVValue) -> String {
+        switch v {
+        case .link(let p, let n):
+            return "<a class=\"internal-link\" data-path=\"\(esc(p))\">\(esc(n))</a>"
+        case .list(let l):
+            return l.map(inlineCell).joined(separator: ", ")
+        case .null:
+            return "<span class=\"dataview-empty\">null</span>"
+        default:
+            return esc(v.text)
+        }
+    }
+
+    static func esc(_ s: String) -> String {
+        s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+    }
+
     static func matchesFrom(_ from: [(String, Bool)], _ n: NoteRecord, snap: VaultSnapshot, current: String?) -> Bool {
         if from.isEmpty { return true }
         var anyPositive = false, matchedPositive = false
@@ -820,6 +873,11 @@ public enum Dataview {
 
     static func lookup(_ name: String, _ env: Env) -> DVValue {
         let parts = name.split(separator: ".", omittingEmptySubsequences: false).map(String.init)
+        if parts.first?.lowercased() == "this" {
+            guard let page = env.page else { return .null }
+            if parts.count == 1 { return .page(page.path) }
+            return field(parts.dropFirst().joined(separator: "."), page, env.snap)
+        }
         if let first = parts.first, let bound = binding(first, env) {
             if parts.count == 1 { return bound }
             return swizzle(bound, Array(parts.dropFirst()), env)

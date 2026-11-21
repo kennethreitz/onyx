@@ -542,6 +542,7 @@
         try { html = parseWithLines(md, payload.lineBase || 0); }
         catch (e) { try { html = withMath(md, s => mainMarked.parse(s)); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
         html = html.replace(/<div class="onyx-dataview" data-i="(\d+)"><\/div>/g, (_, i) => payload.dataview[+i] || '');
+        html = html.replace(/<span class="onyx-dv-inline" data-i="(\d+)"><\/span>/g, (_, i) => payload.dvinline?.[+i] || '');
         if (!/<h1[\s>]/.test(html)) html = `<h1 class="fallback-title">${esc(payload.name)}</h1>` + html;
       }
       page.classList.add('instant');

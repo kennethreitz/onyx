@@ -263,6 +263,9 @@ enum ReaderPayload {
         }
         out += ns.substring(from: last)
         body = out
+        let inline = Dataview.rewriteInlineQueries(body, in: snap, from: path)
+        body = inline.text
+        let dvinline = inline.html
 
         var links: [String: [String: String]] = [:]
         var embeds: [String: [String: String]] = [:]
@@ -310,7 +313,7 @@ enum ReaderPayload {
         let obj: [String: Any] = [
             "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
-            "links": links, "embeds": embeds, "dataview": dv, "props": props, "kanban": kanban,
+            "links": links, "embeds": embeds, "dataview": dv, "dvinline": dvinline, "props": props, "kanban": kanban,
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
             "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,

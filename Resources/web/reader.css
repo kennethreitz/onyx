@@ -213,6 +213,8 @@ audio, video { display: block; margin: 1em auto; max-width: 100%; }
 .dataview-task-group { margin: 0.55em 0 0.8em; }
 .dataview-task-title { font-family: var(--font-interface); font-size: 0.95em; font-weight: 600; margin: 0 0 0.2em; }
 .dataview-task-title .internal-link { text-decoration: none; }
+.onyx-dv-inline { font: inherit; }
+.dataview-inline-error { font-family: var(--font-interface); font-size: 0.9em; color: var(--text-faint); }
 
 /* Kanban — lanes as columns of a typeset table */
 .kanban { display: flex; gap: 1.4rem; overflow-x: auto; margin: 1em -8rem 2em; padding: 0 0 1em; align-items: flex-start; }

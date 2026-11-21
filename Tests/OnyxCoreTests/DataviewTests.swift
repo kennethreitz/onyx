@@ -252,4 +252,29 @@ final class DataviewTests: XCTestCase {
         let c = try run("TABLE choice(metal, metal, \"—\") AS M FROM \"Knowledge\" SORT file.name ASC")
         XCTAssertEqual(c.rows.map { $0[1].text }, ["Silver", "—", "Gold"])
     }
+
+    func testThisField() throws {
+        XCTAssertEqual(try ev("this.file.name").text, "Sun")
+        XCTAssertEqual(try ev("this.metal").text, "Gold")
+        XCTAssertEqual(try ev("this").text, "Sun")
+        if case .page(let p) = try ev("this") { XCTAssertTrue(p.hasSuffix("Sun.md")) } else { XCTFail("this should be a page") }
+    }
+
+    func testInlineQueries() throws {
+        let s = planets()
+        let path = "Knowledge/Astrology/Planets/Sun.md"
+        let src = "Hello `= this.file.name` — metal is `= metal` and `= 2 + 2`.\n\n```\n`= this.file.name`\n```\n\nAnd `$= dv.current().file.name` plus `= 1 +`."
+        let r = Dataview.rewriteInlineQueries(src, in: s, from: path, now: now)
+        XCTAssertTrue(r.text.hasPrefix("Hello <span class=\"onyx-dv-inline\" data-i=\"0\"></span>"))
+        XCTAssertTrue(r.text.contains("<span class=\"onyx-dv-inline\" data-i=\"0\"></span>"))
+        // The fenced copy stays as source
+        XCTAssertTrue(r.text.contains("```\n`= this.file.name`\n```"))
+        XCTAssertEqual(r.html.count, 5)
+        XCTAssertEqual(r.html[0], "Sun")
+        XCTAssertEqual(r.html[1], "Gold")
+        XCTAssertEqual(r.html[2], "4")
+        XCTAssertTrue(r.html[3].contains("DataviewJS"))
+        XCTAssertTrue(r.html[4].contains("dataview-inline-error"), r.html[4])
+    }
+
 }
