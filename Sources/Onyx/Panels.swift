@@ -164,8 +164,9 @@ struct FileTreeView: View {
             }
             .onAppear { if let p = ws.selectedFolder ?? ws.currentPath { DispatchQueue.main.async { proxy.scrollTo(p, anchor: .center) } } }
             .onChange(of: ws.revealToken) {
-                guard let f = ws.selectedFolder else { return }
-                // let the expansion lay out first, then glide to the folder
+                let target = ws.renamingPath ?? ws.selectedFolder
+                guard let f = target else { return }
+                // let the expansion lay out first, then glide to the row
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(f, anchor: .center) } }
             }
         }
@@ -204,40 +205,67 @@ struct TreeNodeView: View {
                 } else {
                     Spacer().frame(width: 12)
                 }
-                Text(node.displayName)
-                    .font(.system(size: 12.5, weight: node.isFolder ? .medium : .regular))
-                    .foregroundStyle(node.isNote || node.isFolder || node.path.isCanvasPath || node.path.isBasePath ? Color.ink : Color.faint)
-                    .underline(node.folderNote != nil, color: Color.faint.opacity(0.45))
-                    .lineLimit(1).truncationMode(.middle)
-                if !node.isFolder && !node.isNote {
-                    Text((node.name as NSString).pathExtension.uppercased()).font(.system(size: 8.5, weight: .medium)).foregroundStyle(Color.faint)
+                if ws.renamingPath == node.path {
+                    InlineRenameField(
+                        text: Binding(
+                            get: { ws.renameDraft },
+                            set: { ws.renameDraft = $0; if ws.renameError != nil { ws.renameError = nil } }
+                        ),
+                        wholeName: node.isNote || node.isFolder,
+                        onCommit: { ws.commitInlineRename() },
+                        onCancel: { ws.cancelInlineRename() }
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 22)
+                } else {
+                    Text(node.displayName)
+                        .font(.system(size: 12.5, weight: node.isFolder ? .medium : .regular))
+                        .foregroundStyle(node.isNote || node.isFolder || node.path.isCanvasPath || node.path.isBasePath ? Color.ink : Color.faint)
+                        .underline(node.folderNote != nil, color: Color.faint.opacity(0.45))
+                        .lineLimit(1).truncationMode(.middle)
+                    if !node.isFolder && !node.isNote {
+                        Text((node.name as NSString).pathExtension.uppercased()).font(.system(size: 8.5, weight: .medium)).foregroundStyle(Color.faint)
+                    }
                 }
                 Spacer(minLength: 0)
             }
             .padding(.leading, CGFloat(depth) * 13 + 8).padding(.trailing, 8)
-            .frame(height: 24)
+            .frame(minHeight: 24, maxHeight: ws.renamingPath == node.path ? 26 : 24)
             .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(fill)).padding(.horizontal, 5))
             .overlay(alignment: .leading) {
-                if isSelected {
+                if isSelected && ws.renamingPath != node.path {
                     RoundedRectangle(cornerRadius: 1).fill(Color.ink.opacity(0.5)).frame(width: 2, height: 14).padding(.leading, 8)
                 }
             }
             .contentShape(Rectangle())
             .onHover { hover = $0 }
-            .overlay(TreeClickCatcher(
-                path: node.path,
-                chevronWidth: node.isFolder ? CGFloat(depth) * 13 + 8 + 12 : 0,
-                onChevron: node.isFolder ? { handleChevron() } : nil
-            ) { flags in
-                ws.treeClick(node.path, modifiers: flags) { activate() }
-            })
+            .overlay {
+                if ws.renamingPath != node.path {
+                    TreeClickCatcher(
+                        path: node.path,
+                        chevronWidth: node.isFolder ? CGFloat(depth) * 13 + 8 + 12 : 0,
+                        onChevron: node.isFolder ? { handleChevron() } : nil
+                    ) { flags in
+                        ws.treeClick(node.path, modifiers: flags) { activate() }
+                    }
+                }
+            }
             .id(node.path)
             .contextMenu {
-                if ws.treeSelection.isMulti && isSelected {
+                if ws.renamingPath == node.path {
+                    // Keep the menu off the field while editing.
+                } else if ws.treeSelection.isMulti && isSelected {
                     SelectionMenu(ws: ws, paths: ws.targets(for: node.path))
                 } else {
                     FileMenu(ws: ws, path: node.path, isFolder: node.isFolder, folderNote: node.folderNote)
                 }
+            }
+            if ws.renamingPath == node.path, let err = ws.renameError, !err.isEmpty {
+                Text(err)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Color.orange.opacity(0.95))
+                    .padding(.leading, CGFloat(depth) * 13 + 24)
+                    .padding(.trailing, 8)
+                    .padding(.bottom, 3)
             }
             if node.isFolder && isOpen {
                 ForEach(ws.treeChildren(node)) { c in TreeNodeView(ws: ws, node: c, depth: depth + 1) }

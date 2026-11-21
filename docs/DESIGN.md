@@ -234,8 +234,11 @@ same-line conflict (kept both), and offline → backoff → recovery.
 
 ## Rename and Move to…
 
-Rename… (File menu, palette, right-click) asks for the new name; Move to… (⇧⌘M, palette,
-right-click; never drag and drop) opens a folder picker on the ⌘O matcher: type to filter,
+Rename… (File menu, palette, right-click, or Return on a focused file-tree row) edits the
+row name in place, Finder-style: the stem is selected (without `.md`), ↩ commits, Esc or an
+empty or unchanged name cancels, clicking away commits, and a collision or illegal character
+keeps the edit and shows an error. If the sidebar is hidden, the old name prompt is used.
+Move to… (⇧⌘M, palette, right-click; never drag and drop) opens a folder picker on the ⌘O matcher: type to filter,
 ↩ moves, ⇧↩ or the Create row makes the typed folder (nested paths fine) and moves there.
 Folders get both. Links across the vault follow: path links (`[[Folder/Note]]`, with or without
 `.md`) are rewritten to the new path, name links (`[[Note]]`) only when the name changed (or

@@ -41,6 +41,7 @@ final class EscPrecedenceTests: XCTestCase {
             sheetOrAlert: true,
             hasMarkedText: true,
             suggestionsVisible: true,
+            renaming: true,
             findVisible: true,
             overlayOpen: true,
             treeSelectionConsumes: true,
@@ -57,6 +58,7 @@ final class EscPrecedenceTests: XCTestCase {
             (.passToSheet, { $0.sheetOrAlert = false }),
             (.passToIME, { $0.hasMarkedText = false }),
             (.dismissSuggestions, { $0.suggestionsVisible = false }),
+            (.cancelInlineRename, { $0.renaming = false }),
             (.closeFind, { $0.findVisible = false }),
             (.dismissOverlay, { $0.overlayOpen = false }),
             (.clearTreeSelection, { $0.treeSelectionConsumes = false }),
@@ -86,6 +88,9 @@ final class EscPrecedenceTests: XCTestCase {
 
         var suggest = base; suggest.suggestionsVisible = true
         XCTAssertEqual(EscPrecedence.action(suggest), .dismissSuggestions)
+
+        var rename = base; rename.renaming = true
+        XCTAssertEqual(EscPrecedence.action(rename), .cancelInlineRename)
 
         var find = base; find.findVisible = true
         XCTAssertEqual(EscPrecedence.action(find), .closeFind)

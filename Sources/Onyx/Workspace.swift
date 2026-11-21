@@ -492,8 +492,8 @@ final class Workspace {
         return currentPath.map { ($0 as NSString).deletingLastPathComponent } ?? ""
     }
 
-    /// Create an empty folder, refresh the tree, reveal it, and offer a name (the sidebar
-    /// has no inline rename; `confirmRename` is the same prompt used for existing folders).
+    /// Create an empty folder, refresh the tree, reveal it, and offer a name
+    /// (inline in the file tree, or the name prompt if the sidebar is hidden).
     @discardableResult
     func createFolder(named rawName: String? = nil, in explicit: String? = nil, prompt: Bool = true) -> String? {
         guard let root else { return nil }
@@ -526,8 +526,12 @@ final class Workspace {
     /// Rows selected in the file tree. Click selects one (and opens it); ⇧-click spans from the
     /// anchor over visible rows; ⌘-click toggles one without changing the open note.
     var treeSelection = TreeSelection()
-    /// The tree was the last thing clicked, so ⌘⌫ and Esc act on its selection.
+    /// The tree was the last thing clicked, so ⌘⌫, Return (rename), and Esc act on its selection.
     @ObservationIgnored var treeFocused = false
+    /// The file-tree row currently being renamed in place, if any.
+    var renamingPath: String? = nil
+    var renameDraft = ""
+    var renameError: String? = nil
 
 
     /// True if this path is selected, or it's the folder note of a selected folder
@@ -755,6 +759,48 @@ final class Workspace {
     }
 
     func confirmRename(_ path: String) {
+        if sidebarVisible { startInlineRename(path) } else { promptRename(path) }
+    }
+    func confirmRenameCurrent() { if let p = currentPath { confirmRename(p) } }
+
+    /// Finder-style in-row rename when the sidebar is showing.
+    func startInlineRename(_ path: String) {
+        if renamingPath != nil, renamingPath != path { cancelInlineRename() }
+        if sidebarTab != .files { sidebarTab = .files }
+        var parent = (path as NSString).deletingLastPathComponent
+        while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
+        treeSelection.click(path)
+        treeFocused = true
+        renameDraft = InlineRename.fieldValue(path: path)
+        renameError = nil
+        renamingPath = path
+        revealToken += 1
+    }
+
+    func commitInlineRename() {
+        guard let path = renamingPath, let root else { return }
+        let taken = { (dest: String) in
+            FileManager.default.fileExists(atPath: root.appendingPathComponent(dest).path)
+        }
+        switch InlineRename.evaluate(path: path, typed: renameDraft, occupied: taken) {
+        case .cancel:
+            cancelInlineRename()
+        case .invalid(let message), .collision(let message):
+            renameError = message
+        case .commit(let dest, let from, let to):
+            cancelInlineRename()
+            relocate(path, to: dest, reason: "Rename \(from) → \(to)")
+        }
+    }
+
+    func cancelInlineRename() {
+        renamingPath = nil
+        renameDraft = ""
+        renameError = nil
+    }
+
+    /// Used when the sidebar is hidden, so there's no row to edit in place.
+    func promptRename(_ path: String) {
         guard let root else { return }
         let isDir = (try? root.appendingPathComponent(path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
         let last = (path as NSString).lastPathComponent
@@ -762,22 +808,23 @@ final class Workspace {
         let a = NSAlert()
         a.messageText = isDir ? "Rename folder" : "Rename"
         a.informativeText = isNote ? "Links to it are updated across the vault." : ""
-        let field = NSTextField(string: isNote ? String(last.dropLast(3)) : last)
+        let field = NSTextField(string: InlineRename.fieldValue(path: path))
         field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         a.accessoryView = field
         a.addButton(withTitle: "Rename"); a.addButton(withTitle: "Cancel")
         a.window.initialFirstResponder = field
         guard a.runModal() == .alertFirstButtonReturn else { return }
-        var new = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
-        guard !new.isEmpty else { return }
-        if isNote && !new.lowercased().hasSuffix(".md") { new += ".md" }
-        let dir = (path as NSString).deletingLastPathComponent
-        let dest = dir.isEmpty ? new : dir + "/" + new
-        guard dest != path else { return }
-        let from = isNote ? String(last.dropLast(3)) : last, to = isNote ? String(new.dropLast(3)) : new
-        relocate(path, to: dest, reason: "Rename \(from) → \(to)")
+        switch InlineRename.evaluate(path: path, typed: field.stringValue, occupied: {
+            FileManager.default.fileExists(atPath: root.appendingPathComponent($0).path)
+        }) {
+        case .cancel:
+            return
+        case .invalid(let message), .collision(let message):
+            toast = message
+        case .commit(let dest, let from, let to):
+            relocate(path, to: dest, reason: "Rename \(from) → \(to)")
+        }
     }
-    func confirmRenameCurrent() { if let p = currentPath { confirmRename(p) } }
 
     /// Move or rename a note, file or folder. Wikilinks elsewhere that point at a moved note or
     /// attachment are rewritten: path links ([[Folder/Note]]) always, name links ([[Note]]) when the
@@ -1135,6 +1182,9 @@ final class Workspace {
             return true
         case .dismissOverlay, .dismissUnpinnedInspector, .dismissUnpinnedSidebar, .dismissInspector, .leaveFocusMode:
             return dismissTop()
+        case .cancelInlineRename:
+            cancelInlineRename()
+            return true
         case .clearTreeSelection:
             return clearTreeSelection()
         case .collapseSelection:
@@ -1156,6 +1206,7 @@ final class Workspace {
             sheetOrAlert: escapeIsBlockedBySheet(eventWindow),
             hasMarkedText: anyTV?.hasMarkedText() == true,
             suggestionsVisible: tv?.suggestionsVisible == true,
+            renaming: renamingPath != nil,
             findVisible: finder.visible,
             overlayOpen: overlay != .none,
             treeSelectionConsumes: sidebarVisible && treeSelection.isMulti,

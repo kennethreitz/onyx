@@ -9,6 +9,8 @@ public enum EscAction: String, Equatable, Sendable {
     case passToIME
     /// The wikilink / autocomplete list is open; the text view dismisses it.
     case dismissSuggestions
+    /// An inline rename in the file tree.
+    case cancelInlineRename
     /// The in-note find bar is open.
     case closeFind
     /// Quick switcher, command palette, graph/atlas overlay, sync log, or move-to picker.
@@ -32,6 +34,7 @@ public struct EscSituation: Equatable, Sendable {
     public var sheetOrAlert: Bool
     public var hasMarkedText: Bool
     public var suggestionsVisible: Bool
+    public var renaming: Bool
     public var findVisible: Bool
     public var overlayOpen: Bool
     public var treeSelectionConsumes: Bool
@@ -48,6 +51,7 @@ public struct EscSituation: Equatable, Sendable {
         sheetOrAlert: Bool = false,
         hasMarkedText: Bool = false,
         suggestionsVisible: Bool = false,
+        renaming: Bool = false,
         findVisible: Bool = false,
         overlayOpen: Bool = false,
         treeSelectionConsumes: Bool = false,
@@ -63,6 +67,7 @@ public struct EscSituation: Equatable, Sendable {
         self.sheetOrAlert = sheetOrAlert
         self.hasMarkedText = hasMarkedText
         self.suggestionsVisible = suggestionsVisible
+        self.renaming = renaming
         self.findVisible = findVisible
         self.overlayOpen = overlayOpen
         self.treeSelectionConsumes = treeSelectionConsumes
@@ -78,7 +83,7 @@ public struct EscSituation: Equatable, Sendable {
 }
 
 /// Precedence for Esc, highest first:
-/// sheet/alert → IME → autocomplete → find bar → overlay (switcher, palette, graph, sync log, move-to)
+/// sheet/alert → IME → autocomplete → inline rename → find bar → overlay (switcher, palette, graph, sync log, move-to)
 /// → tree multi-selection → unpinned inspector → unpinned sidebar → docked inspector
 /// → focus mode → collapse selection/multi-cursor → return to reading (editor only, setting on).
 /// Esc in reading view never switches to editing.
@@ -87,6 +92,7 @@ public enum EscPrecedence {
         if s.sheetOrAlert { return .passToSheet }
         if s.hasMarkedText { return .passToIME }
         if s.suggestionsVisible { return .dismissSuggestions }
+        if s.renaming { return .cancelInlineRename }
         if s.findVisible { return .closeFind }
         if s.overlayOpen { return .dismissOverlay }
         if s.treeSelectionConsumes { return .clearTreeSelection }

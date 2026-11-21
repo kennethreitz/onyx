@@ -512,6 +512,19 @@ struct RootView: View {
                 DispatchQueue.main.async { ws.confirmTrash(sel) }
                 return nil
             }
+            // Return on a focused file-tree row starts an inline rename, like Finder, as long as
+            // a text view or field is not already editing (⌘↩ is still Read ⇄ edit).
+            if (e.keyCode == 36 || e.keyCode == 76), mods.isEmpty,
+               ws.treeFocused, ws.sidebarVisible, ws.sidebarTab == .files,
+               ws.renamingPath == nil, ws.treeSelection.count == 1,
+               ws.overlay == .none, e.window != nil, e.window === MainWindow.current,
+               !(NSApp.keyWindow?.firstResponder is NSTextView),
+               !(NSApp.keyWindow?.firstResponder is NSTextField) {
+                if let p = ws.treeSelection.selected.first {
+                    DispatchQueue.main.async { ws.confirmRename(p) }
+                    return nil
+                }
+            }
             if e.keyCode == 53, mods.isEmpty || mods == [.shift] { // Esc (Shift-Esc is the same)
                 return ws.handleEscape(eventWindow: e.window) ? nil : e
             }
