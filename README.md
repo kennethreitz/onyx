@@ -33,7 +33,7 @@ This build is not notarized, so macOS will block the first launch. Open Onyx onc
 xattr -dr com.apple.quarantine /Applications/Onyx.app
 ```
 
-Starting with v0.1.1, Onyx checks GitHub for a newer release when it launches and every few hours. There’s also a **Check for Updates…** menu item, and you can turn the checks off in Settings. v0.1.0 has to be updated by hand; after that, updates come in on their own.
+Starting with v0.1.1, Onyx checks GitHub for a newer release when it launches and every six hours. There’s also a **Check for Updates…** menu item, and you can turn the checks off in Settings. v0.1.0 has to be updated by hand; after that, updates install in place and relaunch on their own.
 
 Requires macOS 14 (Sonoma) or later. The official download is Apple silicon.
 

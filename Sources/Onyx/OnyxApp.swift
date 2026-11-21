@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.5) { Self.dumpMenus() }
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in Self.freeControlCommandF() }
+        UpdateController.shared.start()
     }
     /// Debug: every menu item that has a key equivalent, to audit for double bindings.
     static func dumpMenus() {
@@ -168,6 +169,9 @@ struct OnyxApp: App {
     }
 
     @CommandsBuilder var menus: some Commands {
+        CommandGroup(after: .appInfo) {
+            Button("Check for Updates…") { UpdateController.shared.check(interactive: true) }
+        }
         CommandGroup(replacing: .newItem) {
             Button("New Note") { ws.newNote() }.keyboardShortcut("n")
             Button("Open Vault…") { openVault() }.keyboardShortcut("o", modifiers: [.command, .shift])

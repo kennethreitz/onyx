@@ -33,7 +33,7 @@ ONYX_NO_SYNC=1 make run        # don’t start Obsidian Sync, even if this vault
 ## Architecture
 
 ```
-Sources/OnyxCore     vault index, parsing, link resolution, Dataview-lite, graph layout,
+Sources/OnyxCore     vault index, parsing, link resolution, Dataview-lite, graph layout, updater
                      canvas, kanban, daily notes
 Sources/Onyx         the macOS app (SwiftUI + AppKit, WKWebView reader)
 Sources/OnyxSync     Obsidian Sync protocol
@@ -43,7 +43,7 @@ Resources/web        reader.html + reader.js/css (the Reitz LaTeX page) and
 Tests/               OnyxCore and OnyxSync tests; Tests/reader for the typography
 ```
 
-The reader is a WKWebView. `reader.js` / `reader.css` render the page; `typeset.js` / `typeset.css` add the book typography (small caps, old-style figures, hyphenation, drop caps, sidenote layout) when Typeset reading is on. Graph layout lives in OnyxCore (`Graph.swift`, `GraphIndex.swift`, `RelationGraph.swift`) and is drawn by `GraphView.swift`. Git autosync is `GitSync.swift`. Obsidian Sync is the `OnyxSync` package plus `ObsidianSync.swift`. Protocol notes are in [docs/obsidian-sync-protocol.md](docs/obsidian-sync-protocol.md).
+The reader is a WKWebView. `reader.js` / `reader.css` render the page; `typeset.js` / `typeset.css` add the book typography (small caps, old-style figures, hyphenation, drop caps, sidenote layout) when Typeset reading is on. Graph layout lives in OnyxCore (`Graph.swift`, `GraphIndex.swift`, `RelationGraph.swift`) and is drawn by `GraphView.swift`. Git autosync is `GitSync.swift`. Auto-update from GitHub Releases is `Updater.swift` (OnyxCore) plus `UpdateUI.swift`. Obsidian Sync is the `OnyxSync` package plus `ObsidianSync.swift`. Protocol notes are in [docs/obsidian-sync-protocol.md](docs/obsidian-sync-protocol.md).
 
 `scripts/bundle.sh` wraps the SwiftPM binary into `build/Onyx.app` and signs it.
 
@@ -56,6 +56,10 @@ These are for development and screenshots. Don’t set them in normal use unless
 | `ONYX_NO_DEFAULT_VAULT=1` | Don’t fall back to the remembered vault or `~/Notes`. Used by `make run-test` and `make dev`. |
 | `ONYX_NO_GIT=1` | Don’t auto-commit, pull, or push for this session. |
 | `ONYX_NO_SYNC=1` | Don’t start Obsidian Sync, even if this vault is connected. |
+| `ONYX_UPDATE_DISABLE=1` | Don’t check for GitHub updates automatically. Manual **Check for Updates…** still works. Screenshot and self-test hooks also skip automatic checks. |
+| `ONYX_UPDATE_API_URL=<url>` | Override the GitHub Releases API endpoint (tests point this at a local fake release). |
+| `ONYX_UPDATE_VERSION=<semver>` | Pretend the running app is this version. |
+| `ONYX_UPDATE_APP=<path>` | Install the update at this `.app` path instead of the running bundle. Tests use a copy under `/tmp`, never the real app. |
 | `ONYX_GIT_INTERVAL=<seconds>` | Git poll interval (default 30; tests use 5 or 600). |
 | `ONYX_NO_STARTUP_GRAPH=1` | Skip opening the atlas on startup, even if that setting is on. |
 | `ONYX_OPEN_SETTINGS=1` | Open Settings at launch (screenshots / UI checks). |
@@ -123,7 +127,7 @@ The official release builds are not notarized, which is why first launch needs t
 
 `make test` runs `swift test`, then `node --test Tests/reader`.
 
-- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, find, git text, fuzzy matching, and the optional fixture / bench tests above.
+- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, find, git text, fuzzy matching, auto-update from GitHub Releases, and the optional fixture / bench tests above.
 - `Tests/OnyxSyncTests` — crypto, the sync engine, a mock server, and protocol vectors in `Tests/OnyxSyncTests/Resources/`.
 - `Tests/reader` — typography and sidenote layout in Node, with fixtures in `Tests/reader/fixtures/` (`typeset-specimen.md`, `named-sidenotes.md`).
 
@@ -131,7 +135,7 @@ Add a test when you’re touching parsing, typography, sync, or link rewriting.
 
 ## Release process
 
-1. Bump `VERSION`.
+1. Bump `VERSION` (this is the short version the auto-updater compares to the GitHub tag).
 2. From a clean tree: `make app`.
 3. Zip the bundle:
 

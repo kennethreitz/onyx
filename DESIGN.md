@@ -332,3 +332,21 @@ The relative links inside a moved note are re-expressed from its new folder. Mov
 of them) updates both `![[path]]` wikilinks and Markdown embeds. Links are resolved the way Obsidian does: relative to the
 note, then from the vault root, then by name. External URLs, same-note `#anchors`, code and comments are left alone. All
 edits and the move land in one git commit. The logic is in `MarkdownLinks` (OnyxCore), with tests in MarkdownLinksTests.
+
+
+## Updates from GitHub Releases
+
+On launch (after a short delay) and every six hours, and from **Onyx ▸ Check for Updates…**, the app asks
+`https://api.github.com/repos/kennethreitz/onyx/releases/latest` for a later semver tag than
+`CFBundleShortVersionString`. A non-modal prompt shows the release notes and **Install and Relaunch**,
+**Later**, or **Skip This Version**. Skip is remembered for automatic checks only; a manual check still
+offers that version. Settings ▸ Updates can turn automatic checks off (`onyx.updates.automatic`; default on).
+
+Install downloads the `Onyx-<ver>-macOS.zip` asset, unpacks it with `ditto`, checks that the bundle id is
+`org.kennethreitz.onyx` and that its short version is newer, strips `com.apple.quarantine`, replaces the
+running `.app` atomically (the outgoing bundle is moved to the Trash), and relaunches through a detached
+`/bin/sh` helper that waits for this process to exit. Unpackaged `swift run` builds are left alone.
+`ONYX_UPDATE_API_URL`, `ONYX_UPDATE_VERSION`, and `ONYX_UPDATE_APP` override the endpoint, current version,
+and destination for tests; `ONYX_UPDATE_DISABLE` and the screenshot/self-test hooks skip automatic checks.
+If the app is translocated (opened from Downloads), the install is refused until it is moved to Applications
+and opened from there. Logic lives in `Updater` (OnyxCore), with tests against a fake local release in `/tmp`.

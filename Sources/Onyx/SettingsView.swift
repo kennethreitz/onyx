@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import OnyxCore
 
 enum Prefs {
     static let appearance = "onyx.appearance"     // "system" | "light" | "dark"
@@ -53,6 +54,7 @@ struct SettingsView: View {
     @AppStorage(Typeset.smallCaps) private var smallCaps = true
     @AppStorage(Typeset.face) private var face = "lm"
     @AppStorage(Typeset.opening) private var opening = "smallcaps"
+    @AppStorage(UpdatePrefs.automatic) private var autoUpdates = true
     @AppStorage(Typeset.justify) private var justify = false
 
     var body: some View {
@@ -126,6 +128,12 @@ struct SettingsView: View {
                 Toggle("Open in focus mode (just the text)", isOn: $startFocus)
                 Text("⌃⌘F toggles focus mode any time; Esc leaves it.").font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { header("Focus") }
+
+            Section {
+                Toggle("Automatically check for updates", isOn: $autoUpdates)
+                Text("Onyx looks for a new GitHub release on launch and every six hours. You can also check from the Onyx menu.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { header("Updates") }
 
             if ws.root != nil {
                 Section {
