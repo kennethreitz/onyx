@@ -1027,6 +1027,62 @@ final class Workspace {
     func show(_ o: Overlay) {
         withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = overlay == o ? .none : o }
     }
+    /// Apply Esc according to `EscPrecedence`. Returns true if the event should be swallowed.
+    @discardableResult
+    func handleEscape(eventWindow: NSWindow?) -> Bool {
+        let action = EscPrecedence.action(escapeSituation(eventWindow: eventWindow))
+        switch action {
+        case .passToSheet, .passToIME, .dismissSuggestions, .none:
+            return false
+        case .closeFind:
+            closeFind()
+            return true
+        case .dismissOverlay, .dismissUnpinnedInspector, .dismissUnpinnedSidebar, .dismissInspector, .leaveFocusMode:
+            return dismissTop()
+        case .clearTreeSelection:
+            return clearTreeSelection()
+        case .collapseSelection:
+            let tv = (MainWindow.current?.firstResponder as? OnyxTextView) ?? liveEditor
+            tv?.collapseSelectionOrCursors()
+            return true
+        case .returnToReading:
+            returnToReading()
+            return true
+        }
+    }
+
+    func escapeSituation(eventWindow: NSWindow?) -> EscSituation {
+        let tv = MainWindow.current?.firstResponder as? OnyxTextView
+        let anyTV = (NSApp.keyWindow?.firstResponder as? NSTextView)
+            ?? (eventWindow?.firstResponder as? NSTextView)
+        let ranges = tv?.selectedRanges.map { $0.rangeValue } ?? []
+        return EscSituation(
+            sheetOrAlert: escapeIsBlockedBySheet(eventWindow),
+            hasMarkedText: anyTV?.hasMarkedText() == true,
+            suggestionsVisible: tv?.suggestionsVisible == true,
+            findVisible: finder.visible,
+            overlayOpen: overlay != .none,
+            treeSelectionConsumes: sidebarVisible && treeSelection.isMulti,
+            unpinnedInspector: inspectorVisible && !inspectorPinned,
+            unpinnedSidebar: sidebarVisible && !sidebarPinned,
+            inspectorVisible: inspectorVisible,
+            focusMode: focusMode,
+            editorFocused: tv != nil,
+            hasSelectionOrMultiCursor: ranges.count > 1 || ranges.contains(where: { $0.length > 0 }),
+            modeIsEdit: mode == .edit,
+            escReturnsToReading: Prefs.escReturnsToReading
+        )
+    }
+
+    /// A confirm, Settings, or other window that's not the main Onyx window owns Esc.
+    private func escapeIsBlockedBySheet(_ eventWindow: NSWindow?) -> Bool {
+        if NSApp.modalWindow != nil { return true }
+        if let w = NSApp.keyWindow, w !== MainWindow.current { return true }
+        if let w = eventWindow, w !== MainWindow.current { return true }
+        if MainWindow.current?.attachedSheet != nil { return true }
+        return false
+    }
+
     /// Esc: peel back one floating layer (overlays, then summoned panels).
     func dismissTop() -> Bool {
         let anim = Animation.spring(response: 0.3, dampingFraction: 0.9)
@@ -1078,6 +1134,12 @@ final class Workspace {
     func toggleMode() {
         flushSave()
         withAnimation(.easeInOut(duration: 0.18)) { mode = mode == .read ? .edit : .read }
+    }
+    /// Esc (when nothing else is open): save and show the reader. Never the other way.
+    func returnToReading() {
+        guard mode == .edit else { return }
+        flushSave()
+        withAnimation(.easeInOut(duration: 0.18)) { mode = .read }
     }
     func toggleBookmark() {
         guard let p = currentPath else { return }

@@ -111,6 +111,7 @@ exportpdf <path>      # write the book-page PDF quietly
 split
 back
 trash <path>          # no confirm
+escape                # run the same Esc path as the key, print the action
 move <path> -> <folder>
 rename <path> -> <new path>
 ```

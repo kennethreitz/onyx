@@ -137,6 +137,13 @@ final class OnyxTextView: NSTextView {
 
     var suggestionsVisible: Bool { panel.isVisible }
 
+    /// First Esc with a selection or several ranges: one caret at the end of the primary range.
+    func collapseSelectionOrCursors() {
+        let ranges = selectedRanges.map { $0.rangeValue }
+        let r = ranges.first ?? selectedRange()
+        setSelectedRange(NSRange(location: NSMaxRange(r), length: 0))
+    }
+
     func hideSuggestions() { panel.hide(); linkCtx = nil; lastQuery = nil }
 
     func refreshSuggestions() {

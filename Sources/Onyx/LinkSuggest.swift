@@ -148,6 +148,12 @@ enum TypeSelfTest {
         case "expand": ws.expanded.insert(arg)
         case "sel": print("[sel] \(TreeSelection.roots(ws.treeSelection.selected)) anchor=\(ws.treeSelection.anchor ?? "-") current=\(ws.currentPath ?? "-") targets(\(arg))=\(ws.targets(for: arg))")
         case "esc": print("[esc] cleared=\(ws.clearTreeSelection())")
+        case "escape":   // the same path as the Esc key (prints the action, then performs it)
+            let sit = ws.escapeSituation(eventWindow: MainWindow.current)
+            let action = EscPrecedence.action(sit)
+            let consumed = ws.handleEscape(eventWindow: MainWindow.current)
+            print("[escape] action=\(action.rawValue) consumed=\(consumed) mode=\(ws.mode.rawValue)")
+
         case "trashsel": ws.trash(Array(ws.treeSelection.selected))       // what ⌘⌫ does after its confirm
         case "movesel": ws.move(Array(ws.treeSelection.selected), toFolder: arg)
         case "relations":

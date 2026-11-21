@@ -497,9 +497,6 @@ struct RootView: View {
                        mods == [.shift] || (mods.isEmpty && ws.finder.findFieldActive) {
                         ws.findStep(mods == [.shift] ? -1 : 1); return nil
                     }
-                    if e.keyCode == 53, !((e.window?.firstResponder as? OnyxTextView)?.suggestionsVisible ?? false) {
-                        ws.closeFind(); return nil
-                    }
                 }
             }
             if mods == [.command, .shift], e.charactersIgnoringModifiers?.lowercased() == "p" {
@@ -530,11 +527,8 @@ struct RootView: View {
                 DispatchQueue.main.async { ws.confirmTrash(sel) }
                 return nil
             }
-            if e.keyCode == 53 { // Esc
-                if let tv = MainWindow.current?.firstResponder as? OnyxTextView, tv.suggestionsVisible { return e }
-                if ws.sidebarVisible, ws.clearTreeSelection() { return nil }   // Esc drops a multi-selection first
-                if NSApp.keyWindow?.firstResponder is NSTextView, ws.overlay == .none, !ws.sidebarVisible, !ws.inspectorVisible { return e }
-                return ws.dismissTop() ? nil : e
+            if e.keyCode == 53, mods.isEmpty || mods == [.shift] { // Esc (Shift-Esc is the same)
+                return ws.handleEscape(eventWindow: e.window) ? nil : e
             }
             return e
         }
@@ -612,7 +606,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph overlay · ⇧⌘G atlas · Esc closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away"),
+        ("⌘G", "Focus graph overlay · ⇧⌘G atlas · Esc closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
     ]
 }
 

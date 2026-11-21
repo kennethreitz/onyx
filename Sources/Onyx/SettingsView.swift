@@ -9,8 +9,10 @@ enum Prefs {
     static let measure = "onyx.measure"           // rem, the reading measure (editor follows)
     static let startFocus = "onyx.startFocus"
     static let sidenotes = "onyx.sidenotes"
+    static let escToReading = "onyx.escToReading"  // Esc in the editor returns to reading; default on
 
     static var editorPoints: CGFloat { CGFloat(UserDefaults.standard.object(forKey: editorSize) as? Double ?? 14) }
+    static var escReturnsToReading: Bool { UserDefaults.standard.object(forKey: escToReading) as? Bool ?? true }
     static var measureRem: CGFloat { CGFloat(UserDefaults.standard.object(forKey: measure) as? Double ?? 41) }
     /// The editor's 760px measure corresponds to the reader's 41rem; keep them in proportion.
     static var editorMeasure: CGFloat { (measureRem / 41 * 760).rounded() }
@@ -180,6 +182,7 @@ struct GeneralSettingsPage: View {
 
 struct EditorSettingsPage: View {
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
+    @AppStorage(Prefs.escToReading) private var escToReading = true
 
     var body: some View {
         Form {
@@ -190,10 +193,17 @@ struct EditorSettingsPage: View {
                 Text("Line width is under Reading; the editor follows the same measure.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { settingsHeader("Editor") }
+
+            Section {
+                Toggle("Esc returns to reading view", isOn: $escToReading)
+                Text("When nothing else is open, Esc in the editor saves and shows the reader. Esc never leaves reading view.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { settingsHeader("Keys") }
         }
         .settingsPage()
     }
 }
+
 
 struct ReadingSettingsPage: View {
     @Bindable var ws: Workspace
