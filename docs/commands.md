@@ -106,6 +106,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Back | <kbd>⌘[</kbd> |
 | Forward | <kbd>⌘]</kbd> |
 | Homepage | <kbd>⇧⌘H</kbd> |
+| Open Random Note | — |
 | Focus Graph | <kbd>⌘G</kbd> |
 | Atlas | <kbd>⇧⌘G</kbd> |
 | Graph in a Pane | <kbd>⌥⌘G</kbd> |
@@ -136,6 +137,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Read Aloud | — |
 | Pause Reading | — |
 | Stop Reading | — |
+| Record Audio | — |
 | Rebuild Index | — |
 | Show Shortcut Hints | — |
 
