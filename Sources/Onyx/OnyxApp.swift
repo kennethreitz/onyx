@@ -221,6 +221,7 @@ struct OnyxApp: App {
         // ⌘P is the command palette here (Obsidian's habit), so Print takes ⌥⌘P.
         CommandGroup(replacing: .printItem) {
             Button("Export as PDF…") { NotePrinter.run("export", ws: ws) }.keyboardShortcut("e", modifiers: [.command, .shift]).disabled(ws.currentPath == nil)
+            Button("Export Selection as PDF…") { NoteBookPrinter.run(Array(ws.treeSelection.selected), ws: ws) }.disabled(!ws.treeSelection.isMulti)
             Button("Print…") { NotePrinter.run("print", ws: ws) }.keyboardShortcut("p", modifiers: [.command, .option]).disabled(ws.currentPath == nil)
         }
         CommandMenu("Go") {

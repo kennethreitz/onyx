@@ -274,6 +274,7 @@ struct FileMenu: View {
         if isFolder {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
             Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
+            Button("Export Folder as PDF…") { NoteBookPrinter.run([path], ws: ws) }
         }
         Divider()
         Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
@@ -293,6 +294,7 @@ struct SelectionMenu: View {
     var paths: [String]
     var body: some View {
         Button("Open") {}.disabled(true)
+        Button("Export Selection as PDF…") { NoteBookPrinter.run(paths, ws: ws) }
         Divider()
         Button("Rename…") {}.disabled(true)
         Button("Move \(paths.count) Items to…") { ws.beginMove(paths) }

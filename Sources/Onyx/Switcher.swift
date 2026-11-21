@@ -251,6 +251,12 @@ enum PaletteCommands {
             PaletteItem(id: "focus", title: ws.focusMode ? "Leave focus mode" : "Focus mode (just the text)", symbol: "arrow.up.left.and.arrow.down.right", shortcut: "⌃⌘F") { ws.toggleFocusMode() },
             PaletteItem(id: "layout", title: "Toggle three-pane workspace", symbol: "rectangle.split.3x1", shortcut: "⌘⌥0") { ws.toggleWorkspaceLayout() },
             PaletteItem(id: "exportpdf", title: "Export as PDF…", symbol: "doc.richtext") { NotePrinter.run("export", ws: ws) },
+            PaletteItem(id: "exportsel", title: "Export Selection as PDF…", symbol: "doc.on.doc") { NoteBookPrinter.run(Array(ws.treeSelection.selected), ws: ws) },
+            PaletteItem(id: "exportfolder", title: "Export Folder as PDF…", symbol: "folder") {
+                if let f = ws.treeSelection.selected.count == 1 ? ws.treeSelection.selected.first : ws.selectedFolder {
+                    NoteBookPrinter.run([f], ws: ws)
+                } else { NSSound.beep() }
+            },
             PaletteItem(id: "print", title: "Print…", symbol: "printer") { NotePrinter.run("print", ws: ws) },
             PaletteItem(id: "sidenotes", title: ws.sidenotes ? "Footnotes at the end" : "Footnotes as sidenotes", symbol: "text.append") { ws.sidenotes.toggle() },
             PaletteItem(id: "light", title: "Appearance: light", symbol: "sun.max") { appearance("light") },

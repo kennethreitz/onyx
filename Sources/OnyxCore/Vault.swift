@@ -27,6 +27,9 @@ public struct FileNode: Identifiable, Hashable, Sendable {
     public var folderNote: String?
     public var isNote: Bool { !isFolder && path.lowercased().hasSuffix(".md") }
     public var displayName: String { isNote ? String(name.dropLast(3)) : name }
+    public init(name: String, path: String, isFolder: Bool, children: [FileNode]? = nil, folderNote: String? = nil) {
+        self.name = name; self.path = path; self.isFolder = isFolder; self.children = children; self.folderNote = folderNote
+    }
 }
 
 public struct Backlink: Hashable, Sendable {
