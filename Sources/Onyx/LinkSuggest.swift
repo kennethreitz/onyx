@@ -256,6 +256,12 @@ enum TypeSelfTest {
         case "rows": print("[rows] \(ws.visibleTreePaths())")
         case "sortsaved": print("[sortsaved] \(UserDefaults.standard.data(forKey: "onyx.\(ws.root?.path ?? "").treeSort").map { String(decoding: $0, as: UTF8.self) } ?? "-")")
         case "graphpane": ws.openGraphPane(atlas: arg == "atlas")
+        case "graphzoom":
+            if arg == "min" { ws.graphStore.zoomOutToken += 1 }
+            let later = arg == "min"
+            DispatchQueue.main.asyncAfter(deadline: .now() + (later ? 0.2 : 0)) {
+                print("[graphzoom] \(ws.graphStore.zoomReport)"); fflush(stdout)
+            }
         case "closegraph": ws.closeGraphPane()
         case "closepane": print("[closepane] \(ws.closePane())")
         case "nextpane": ws.focusNextPane()

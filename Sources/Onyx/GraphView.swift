@@ -11,6 +11,9 @@ final class GraphStore {
     private var builtGen = -1
     private var atlasKey = ""
     private var building = false
+    /// Test hook: increment to zoom the visible graph out to the floor; `zoomReport` is the last camera.
+    var zoomOutToken = 0
+    var zoomReport = "no graph"
 
     func ensureIndex(_ snap: VaultSnapshot, gen: Int) async {
         guard builtGen != gen, !building else { return }
@@ -103,7 +106,8 @@ struct GraphView: View {
                 setFocus(i)
             }
         }
-        .onDisappear { monitors.forEach { NSEvent.removeMonitor($0) }; monitors = [] }
+        .onDisappear { monitors.forEach { NSEvent.removeMonitor($0) }; monitors = []; store.zoomReport = "no graph" }
+        .onChange(of: store.zoomOutToken) { zoomOutToFloor() }
         .onChange(of: ws.graphAtlas) { refit(animated: true); Task { await loadAtlas() } }
         .onChange(of: filterKey) { Task { await loadAtlas() }; if let f = focus { setFocus(f, record: false) } }
         .onChange(of: grouping) { Task { await loadAtlas() } }
@@ -207,9 +211,12 @@ struct GraphView: View {
     }
 
     func setCamera(_ c: Camera, animated: Bool) {
+        var c = c
+        c.zoom = GraphZoom.clamp(c.zoom, fit: fitZoom)
         camFrom = animated ? camera(Date()) : c
         cam = c
         camStart = animated ? Date() : .distantPast
+        store.zoomReport = "zoom=\(String(format: "%.4f", c.zoom)) fit=\(String(format: "%.4f", fitZoom)) min=\(String(format: "%.4f", GraphZoom.minimum(fit: fitZoom))) max=\(GraphZoom.max)"
         settleLater(animated)
     }
 
@@ -227,12 +234,12 @@ struct GraphView: View {
             for c in a.clusters where c.level == 0 { lo = simd_min(lo, c.center - c.radius); hi = simd_max(hi, c.center + c.radius) }
             let ext = hi - lo
             let z = min(avail.x / ext.x, avail.y / ext.y)
-            fitZoom = z
+            fitZoom = GraphZoom.clamp(z, fit: z)
             setCamera(Camera(zoom: z, pan: -(lo + hi) / 2 * z + SIMD2(0, 10)), animated: animated)
         } else {
             let ext = (layout.map { simd_length($0.pos) }.max() ?? 100) + 90
             let z = min(1.5, max(0.3, min(avail.x, avail.y) / 2 / ext))
-            fitZoom = z
+            fitZoom = GraphZoom.clamp(z, fit: z)
             setCamera(Camera(zoom: z, pan: SIMD2(0, 18)), animated: animated)
         }
     }
@@ -287,8 +294,13 @@ struct GraphView: View {
         .onTapGesture(count: 1, coordinateSpace: .local) { loc in click(loc) }
     }
 
+    func zoomOutToFloor() {
+        let c = camera(Date())
+        zoom(by: 0.001, around: CGPoint(x: size.width / 2, y: size.height / 2), base: c)
+    }
+
     func zoom(by f: Double, around loc: CGPoint, base: Camera) {
-        let nz = max(0.02, min(12, base.zoom * f))
+        let nz = GraphZoom.clamp(base.zoom * f, fit: fitZoom)
         let w = world(loc, base)
         // keep the point under the cursor fixed
         let pan = SIMD2(Double(loc.x) - Double(size.width) / 2 - w.x * nz, Double(loc.y) - Double(size.height) / 2 - w.y * nz)
