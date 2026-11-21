@@ -455,6 +455,13 @@ struct RootView: View {
                 }
                 Spacer()
             }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .headings:
+            dimmer
+            VStack {
+                PaletteView(placeholder: "Jump to heading…", items: { PaletteCommands.headings(ws, $0) }, allowSplit: false, dismiss: { ws.show(.none) })
+                    .padding(.top, 88)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
         case .syncLog:
             dimmer
             VStack {

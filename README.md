@@ -17,6 +17,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Read Aloud** — the current note or your selection, from the command palette, with macOS voices
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
 - **Custom shortcuts** — every bindable command in Settings ▸ Shortcuts; click a row to record a new combination
+- **Obsidian’s core commands** — formatting, headings, lists and checkboxes, move/duplicate/delete line, jump to heading, duplicate note, zoom, spellcheck, and more, all in the command palette ([list](docs/commands.md))
 - **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **`partOf::` relationships** — an ancestry path in the title bar, a parts tree and link-valued fields in the inspector, field and note completion after `key::`, and a hierarchy-only graph
@@ -48,6 +49,7 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 - [Getting around](docs/navigation.md)
 - [Sync](docs/sync.md)
 - [Keyboard shortcuts](docs/shortcuts.md)
+- [Commands](docs/commands.md)
 - [Compatibility and privacy](docs/compatibility.md)
 - [Building from source](docs/DEVELOP.md)
 - [Changelog](CHANGELOG.md)

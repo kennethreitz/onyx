@@ -296,7 +296,7 @@ struct FileTreeView: View {
             }
             .onAppear { if let p = ws.selectedFolder ?? ws.currentPath { DispatchQueue.main.async { proxy.scrollTo(p, anchor: .center) } } }
             .onChange(of: ws.revealToken) {
-                let target = ws.renamingPath ?? ws.selectedFolder
+                let target = ws.renamingPath ?? ws.selectedFolder ?? ws.currentPath
                 guard let f = target else { return }
                 // let the expansion lay out first, then glide to the row
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(f, anchor: .center) } }

@@ -282,7 +282,42 @@ enum PaletteCommands {
             item("finder") { ws.revealInFinder() },
             item("obsidian") { ws.openInObsidian() },
             item("reindex", title: "Rebuild index") { ws.reindex() },
-        ]
+            // Obsidian parity: commands that were only in the menus, then the new ones
+            item("save") { ws.flushSave() },
+            item("openvault") { DispatchQueue.main.async { Workspace.openVaultPanel(ws) } },
+            item("find") { DispatchQueue.main.async { ws.openFind() } },
+            item("findreplace") { DispatchQueue.main.async { ws.openFind(replace: true) } },
+            item("searchsel") { ws.searchSelection() },
+            item("graphpane", title: ws.graphPaneIndex == nil ? "Graph in a pane" : "Close graph pane") {
+                ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane()
+            },
+            item("prevpane") { ws.focusNextPane(-1) },
+            item("newpane") { ws.newNoteInPane() },
+            item("daily-yesterday") { ws.openDaily(days: -1) },
+            item("daily-tomorrow") { ws.openDaily(days: 1) },
+            item("headings") { DispatchQueue.main.async { ws.show(.headings) } },
+            item("revealtree") { ws.revealInSidebar() },
+            item("duplicate") { ws.duplicateCurrent() },
+            item("copypath") { ws.copyFilePath() },
+            item("openexternal") { ws.openInDefaultApp() },
+            item("zoomin") { ws.zoom(1) },
+            item("zoomout") { ws.zoom(-1) },
+            item("zoomreset") { ws.zoom(0) },
+            item("spellcheck", title: EditorPrefs.spellcheckOn ? "Turn spellcheck off" : "Turn spellcheck on") { ws.toggleSpellcheck() },
+            item("settings") { DispatchQueue.main.async { Workspace.openSettings() } },
+            item("hints") { withAnimation { ws.showHints = true } },
+        ] + Workspace.formatMenu.compactMap { $0 }.map { id in item(id) { ws.runEditCommand(id) } }
+    }
+
+    /// Jump to heading…: the open note's headings, indented by level.
+    @MainActor static func headings(_ ws: Workspace, _ q: String) -> [PaletteItem] {
+        let hs = ws.liveHeadings
+        let minLevel = hs.map(\.level).min() ?? 1
+        let items = hs.enumerated().map { i, h in
+            PaletteItem(id: "h:\(i)", title: String(repeating: "  ", count: max(0, h.level - minLevel)) + h.text,
+                        subtitle: String(repeating: "#", count: h.level), symbol: nil) { ws.jumpToHeading(i) }
+        }
+        return filter(items, q)
     }
 
     @MainActor static func filter(_ items: [PaletteItem], _ q: String) -> [PaletteItem] {

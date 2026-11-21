@@ -223,6 +223,10 @@ struct OnyxApp: App {
             ShortcutMenus.button("rename", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmRenameCurrent() }
             ShortcutMenus.button("move", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.beginMoveCurrent() }
             ShortcutMenus.button("delete", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmTrashCurrent() }
+            ShortcutMenus.button("duplicate", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.duplicateCurrent() }
+            Divider()
+            ShortcutMenus.button("copypath", disabled: ws.currentPath == nil) { ws.copyFilePath() }
+            ShortcutMenus.button("openexternal", disabled: ws.currentPath == nil) { ws.openInDefaultApp() }
         }
         // The command palette takes ⌘P by default (Obsidian's habit), so Print defaults to ⌥⌘P.
         CommandGroup(replacing: .printItem) {
@@ -239,11 +243,15 @@ struct OnyxApp: App {
             ShortcutMenus.button("daily") { ws.openDaily() }
             ShortcutMenus.button("daily-prev") { ws.openDaily(offset: -1) }
             ShortcutMenus.button("daily-next") { ws.openDaily(offset: 1) }
+            ShortcutMenus.button("daily-yesterday") { ws.openDaily(days: -1) }
+            ShortcutMenus.button("daily-tomorrow") { ws.openDaily(days: 1) }
             Divider()
             ShortcutMenus.button("back", disabled: !ws.canGoBack) { ws.goBack() }
             ShortcutMenus.button("forward", disabled: !ws.canGoForward) { ws.goForward() }
             ShortcutMenus.button("home") { ws.openHome() }
             ShortcutMenus.button("random") { ws.openRandomNote() }
+            ShortcutMenus.button("headings", disabled: ws.currentPath == nil) { ws.show(.headings) }
+            ShortcutMenus.button("revealtree", disabled: ws.currentPath == nil) { ws.revealInSidebar() }
             Divider()
             ShortcutMenus.button("graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }
             ShortcutMenus.button("atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }
@@ -254,6 +262,7 @@ struct OnyxApp: App {
         CommandMenu("Pane") {
             ShortcutMenus.button("split") { ws.split(.vertical) }
             ShortcutMenus.button("splitdown") { ws.split(.horizontal) }
+            ShortcutMenus.button("newpane") { ws.newNoteInPane() }
             ShortcutMenus.button("closepane", disabled: !ws.isSplit) { ws.closePane() }
             Divider()
             ShortcutMenus.button("nextpane", disabled: !ws.isSplit) { ws.focusNextPane() }
@@ -285,13 +294,26 @@ struct OnyxApp: App {
             }
             ShortcutMenus.button("synclog") { ws.show(.syncLog) }
             Divider()
+            ShortcutMenus.button("zoomin") { ws.zoom(1) }
+            ShortcutMenus.button("zoomout") { ws.zoom(-1) }
+            ShortcutMenus.button("zoomreset") { ws.zoom(0) }
+            Divider()
         }
         CommandGroup(after: .pasteboard) {
             Divider()
             ShortcutMenus.button("find") { ws.openFind() }
             ShortcutMenus.button("findreplace") { ws.openFind(replace: true) }
+            ShortcutMenus.button("searchsel") { ws.searchSelection() }
+            ShortcutMenus.button("spellcheck", title: EditorPrefs.spellcheckOn ? "Turn Spellcheck Off" : "Turn Spellcheck On") { ws.toggleSpellcheck() }
             Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)
             Button("Find Previous (⇧⌘G while finding)") { ws.findStep(-1) }.disabled(!ws.finder.visible)
+        }
+        CommandMenu("Format") {
+            ForEach(Array(Workspace.formatMenu.enumerated()), id: \.offset) { _, id in
+                if let id {
+                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.runEditCommand(id) }
+                } else { Divider() }
+            }
         }
         CommandMenu("Note") {
             ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.bookmarks.contains($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
@@ -307,6 +329,7 @@ struct OnyxApp: App {
             Divider()
             ShortcutMenus.button("reindex") { ws.reindex() }
             ShortcutMenus.button("hints") { withAnimation { ws.showHints = true } }
+            ShortcutMenus.button("settings") { Workspace.openSettings() }
         }
     }
     func openVault() {

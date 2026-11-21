@@ -30,12 +30,14 @@
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
 | <kbd>⌘,</kbd> | Settings |
+| <kbd>⌘B</kbd> · <kbd>⌘/</kbd> · <kbd>⌘L</kbd> | Toggle bold · toggle `%%comment%%` · cycle checkbox (`- [ ]` → `- [x]`). The rest of the Format menu (italic, headings, lists, move line, …) is unbound by default; see [Commands](commands.md) |
+| <kbd>⌘=</kbd> · <kbd>⌘-</kbd> · <kbd>⌘0</kbd> | Zoom text in · out · actual size (editor and reader together) |
 | <kbd>Esc</kbd> | Put away whatever’s on top. In the editor, when nothing else would consume it, also saves and returns to reading view (Settings ▸ Editor; on by default). Never the other way |
 
 Open Random Note is in the command palette and the Go menu; it has no default shortcut.
 
 Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading. Record Audio (Stop Recording while recording) is there too, also without a default shortcut.
 
-Every command is also in the menu bar with its shortcut. The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
+Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
 
 Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, and ⌘Z stay with the editor and are not rebound here.

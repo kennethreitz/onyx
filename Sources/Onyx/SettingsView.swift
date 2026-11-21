@@ -190,6 +190,7 @@ struct GeneralSettingsPage: View {
 struct EditorSettingsPage: View {
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.escToReading) private var escToReading = true
+    @AppStorage(EditorPrefs.spellcheck) private var spellcheck = true
 
     var body: some View {
         Form {
@@ -199,6 +200,8 @@ struct EditorSettingsPage: View {
                 }
                 Text("Line width is under Reading; the editor follows the same measure.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
+                Toggle("Check spelling while typing", isOn: $spellcheck)
+                    .onChange(of: spellcheck) { Workspace.applySpellcheck(spellcheck) }
             } header: { settingsHeader("Editor") }
 
             Section {

@@ -387,7 +387,7 @@ struct EditorView: NSViewRepresentable {
         tv.isAutomaticDashSubstitutionEnabled = false
         tv.isAutomaticTextReplacementEnabled = false
         tv.isAutomaticSpellingCorrectionEnabled = false
-        tv.isContinuousSpellCheckingEnabled = false
+        tv.isContinuousSpellCheckingEnabled = EditorPrefs.spellcheckOn   // Format ▸ Toggle Spellcheck, Settings ▸ Editor
         tv.smartInsertDeleteEnabled = false
         tv.usesFindBar = true
         tv.isIncrementalSearchingEnabled = true

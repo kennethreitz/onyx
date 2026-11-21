@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
