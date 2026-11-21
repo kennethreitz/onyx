@@ -272,7 +272,8 @@ The reader renders a field as a small monospace key plus link chips; the editor 
 The inspector's Links tab (`RelationshipsSection`) lists Part of, Parts and Related above the backlinks. Parts is a tree from
 `Ancestry.partsTree` (cycle-safe: a note that is its own ancestor in a branch shows once more as ↻; depth 6), Siblings fold
 under a count, and `VaultSnapshot.fieldRelations(of:)` groups every other link-valued key both ways (`treats`, `treats · from`). In the focus graph, `partOf`
-spokes are firmer muted stems and related ones blue dotted lines. Hovering any resolved reader link or an inspector
+spokes are firmer muted stems with a small open chevron halfway along, pointing part → parent; Filter ▸ Hierarchy only
+(`onyx.graph.hierarchyOnly`) lays out `FocusLayout.layout(hierarchy:)` from `GraphIndex.partOf`/`parts` alone. Related spokes are blue dotted lines. Hovering any resolved reader link or an inspector
 relation for 400 ms opens a card: the note's parents above, parts below (two staggered lanes, "+N more"),
 siblings faint at the side, related to the right, or its plain links when it has no fields. Click a node
 to open it, the card background for the note itself; leaving the link or the card closes it.

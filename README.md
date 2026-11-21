@@ -19,6 +19,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Custom shortcuts** — every bindable command in Settings ▸ Shortcuts; click a row to record a new combination
 - **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
+- **`partOf::` relationships** — an ancestry path in the title bar, a parts tree and link-valued fields in the inspector, field and note completion after `key::`, and a hierarchy-only graph
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
 - **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N. Open Random Note is in the command palette and the Go menu
 - **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync

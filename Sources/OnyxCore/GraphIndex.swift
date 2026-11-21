@@ -14,6 +14,8 @@ public struct GraphIndex: Sendable {
     public var index: [String: Int] = [:]
     /// Directed `partOf` edges (child -> parents) and symmetric related edges.
     public var partOf: [[Int]] = []
+    /// The inverse of `partOf` (parent -> parts).
+    public var parts: [[Int]] = []
     public var related: [Set<Int>] = []
 
     public init() {}
@@ -53,11 +55,15 @@ public struct GraphIndex: Sendable {
             g.out[i] = seen.sorted()
         }
         for i in g.ids.indices { for j in g.out[i] { g.inn[j].append(i) } }
+        g.parts = Array(repeating: [], count: g.ids.count)
+        for i in g.ids.indices { for j in g.partOf[i] where !g.parts[j].contains(i) { g.parts[j].append(i) } }
         g.degree = g.ids.indices.map { Set(g.out[$0]).union(g.inn[$0]).count }
         return g
     }
 
     public func neighbors(_ i: Int) -> Set<Int> { Set(out[i]).union(inn[i]) }
+    /// `partOf` relatives only: parents and parts.
+    public func hierarchyNeighbors(_ i: Int) -> Set<Int> { Set(partOf[i]).union(parts[i]) }
     public enum EdgeKind: Sendable { case link, partOf, related }
     public func edgeKind(_ a: Int, _ b: Int) -> EdgeKind {
         if partOf[a].contains(b) || partOf[b].contains(a) { return .partOf }
@@ -79,9 +85,11 @@ public struct FocusNode: Sendable, Equatable {
 }
 
 public enum FocusLayout {
-    public static func layout(_ g: GraphIndex, center: Int, include: (Int) -> Bool = { _ in true }, maxFirst: Int = 72, maxSecond: Int = 64) -> [FocusNode] {
+    /// `hierarchy` keeps only `partOf` relatives: parents count as outgoing, parts as incoming,
+    /// and the second ring is their parents and parts.
+    public static func layout(_ g: GraphIndex, center: Int, include: (Int) -> Bool = { _ in true }, maxFirst: Int = 72, maxSecond: Int = 64, hierarchy: Bool = false) -> [FocusNode] {
         var nodes = [FocusNode(node: center, ring: 0, pos: .zero, outgoing: false, incoming: false, parents: [])]
-        let outs = Set(g.out[center]), ins = Set(g.inn[center])
+        let outs = Set(hierarchy ? g.partOf[center] : g.out[center]), ins = Set(hierarchy ? g.parts[center] : g.inn[center])
         var first = Array(outs.union(ins)).filter(include)
         // keep the most connected if a hub has a huge neighborhood
         if first.count > maxFirst { first = Array(first.sorted { g.degree[$0] > g.degree[$1] }.prefix(maxFirst)) }
@@ -100,7 +108,7 @@ public enum FocusLayout {
         // second hop: notes linked from the first ring, scored by how many ring-1 notes reach them
         let firstSet = Set(first)
         var reach: [Int: [Int]] = [:]
-        for i in first { for j in g.neighbors(i) where j != center && !firstSet.contains(j) && include(j) { reach[j, default: []].append(i) } }
+        for i in first { for j in (hierarchy ? g.hierarchyNeighbors(i) : g.neighbors(i)) where j != center && !firstSet.contains(j) && include(j) { reach[j, default: []].append(i) } }
         let second = reach.keys.sorted { (reach[$0]!.count, g.degree[$0], g.names[$1]) > (reach[$1]!.count, g.degree[$1], g.names[$0]) }.prefix(maxSecond)
         let rOuter = (n1 > 28 ? r1 + 58 : r1) + 150
         var placed: [(Int, Double)] = second.map { j in

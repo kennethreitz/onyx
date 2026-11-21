@@ -88,4 +88,17 @@ final class RelationshipsTests: XCTestCase {
         XCTAssertEqual(FieldCompletion.keySuggestions("pa", keys: keys).map(\.key), ["partOf", "part"])
         XCTAssertTrue(FieldCompletion.keySuggestions("x", keys: keys).isEmpty)
     }
+
+    func testHierarchyFocusLayout() {
+        let s = snapshot(["R.md": "", "A.md": "partOf:: R\n[[X]]", "B.md": "partOf:: A", "X.md": "[[A]]", "C.md": "partOf:: R"])
+        let g = GraphIndex.build(s)
+        let a = g.index["A.md"]!
+        XCTAssertEqual(Set(g.parts[g.index["R.md"]!]), [a, g.index["C.md"]!])
+        let all = Set(FocusLayout.layout(g, center: a).map(\.node))
+        XCTAssertTrue(all.contains(g.index["X.md"]!))
+        let h = FocusLayout.layout(g, center: a, hierarchy: true)
+        XCTAssertEqual(Set(h.filter { $0.ring == 1 }.map(\.node)), [g.index["R.md"]!, g.index["B.md"]!])
+        XCTAssertEqual(Set(h.filter { $0.ring == 2 }.map(\.node)), [g.index["C.md"]!])   // sibling via the parent
+        XCTAssertTrue(h.first { $0.node == g.index["R.md"]! }!.outgoing)
+    }
 }

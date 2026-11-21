@@ -73,6 +73,7 @@ struct GraphView: View {
     @State private var folderFilter = ""
     @State private var tagFilter = ""
     @State private var showOrphans = false
+    @AppStorage("onyx.graph.hierarchyOnly") private var hierarchyOnly = false
     @State private var recency = 0.0
     @State private var grouping: Atlas.Grouping = .folders
     @State private var monitors: [Any] = []
@@ -109,6 +110,7 @@ struct GraphView: View {
         .onDisappear { monitors.forEach { NSEvent.removeMonitor($0) }; monitors = []; store.zoomReport = "no graph" }
         .onChange(of: store.zoomOutToken) { zoomOutToFloor() }
         .onChange(of: ws.graphAtlas) { refit(animated: true); Task { await loadAtlas() } }
+        .onChange(of: hierarchyOnly) { if let f = focus { setFocus(f, record: false) } }
         .onChange(of: filterKey) { Task { await loadAtlas() }; if let f = focus { setFocus(f, record: false) } }
         .onChange(of: grouping) { Task { await loadAtlas() } }
     }
@@ -166,7 +168,7 @@ struct GraphView: View {
         let current = currentPositions(now)
         if record, let f = focus, f != i { trail.append(f); if trail.count > 30 { trail.removeFirst() } }
         let inc = includeFn()
-        let newLayout = FocusLayout.layout(g, center: i, include: { inc($0) || $0 == i })
+        let newLayout = FocusLayout.layout(g, center: i, include: { inc($0) || $0 == i }, hierarchy: hierarchyOnly)
         let newIDs = Set(newLayout.map(\.node))
         exiting = animated ? current.filter { !newIDs.contains($0.key) }.map { ($0.key, $0.value) } : []
         from = animated ? current : [:]
@@ -452,6 +454,18 @@ struct GraphView: View {
             }
             let tone = kind == .related ? accent : (kind == .partOf ? Color.muted : ink)
             ctx.stroke(path, with: .color(tone.opacity((hot ? 0.75 : (hover == nil ? (kind == .link ? 0.32 : 0.42) : 0.1)) * a)), style: style)
+            if kind == .partOf {
+                // a small open chevron halfway along, pointing child → parent
+                let toParent = g.partOf[f].contains(n.node)
+                let (c0, p0) = toParent ? (center, screen(p, c)) : (screen(p, c), center)
+                let dx = p0.x - c0.x, dy = p0.y - c0.y, len = max(1, (dx * dx + dy * dy).squareRoot())
+                let ux = dx / len, uy = dy / len, m = CGPoint(x: c0.x + dx * 0.55, y: c0.y + dy * 0.55), k = 3.4
+                var head = Path()
+                head.move(to: CGPoint(x: m.x - ux * k - uy * k, y: m.y - uy * k + ux * k))
+                head.addLine(to: m)
+                head.addLine(to: CGPoint(x: m.x - ux * k + uy * k, y: m.y - uy * k - ux * k))
+                ctx.stroke(head, with: .color(tone.opacity((hot ? 0.8 : (hover == nil ? 0.5 : 0.1)) * a)), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+            }
         }
         // nodes
         var placer = LabelPlacer()
@@ -714,6 +728,7 @@ struct GraphView: View {
             }
             Divider()
             Toggle("Show orphans", isOn: $showOrphans)
+            Toggle("Hierarchy only (partOf)", isOn: $hierarchyOnly)
             Section("Recency") {
                 Slider(value: $recency, in: 0...0.995).controlSize(.mini)
                 Text(recencyLabel).foregroundStyle(Color.faint)
@@ -729,6 +744,7 @@ struct GraphView: View {
         var parts: [String] = []
         if !folderFilter.isEmpty { parts.append(folderFilter) }
         if !tagFilter.isEmpty { parts.append("#" + tagFilter) }
+        if hierarchyOnly && !ws.graphAtlas { parts.append("Hierarchy") }
         return parts.isEmpty ? "Filter" : parts.joined(separator: " · ")
     }
     var topFolders: [String] {
@@ -801,7 +817,7 @@ struct GraphView: View {
         HStack(spacing: 5) { Circle().fill(Color.ink).frame(width: 7, height: 7); Text("links to") }
         HStack(spacing: 5) { Circle().strokeBorder(Color.ink, lineWidth: 1).frame(width: 8, height: 8); Text("links here") }
         HStack(spacing: 5) { Circle().fill(Color.muted.opacity(0.6)).frame(width: 6, height: 6); Text("two steps away") }
-        HStack(spacing: 5) { Capsule().fill(Color.muted).frame(width: 16, height: 2); Text("part of") }
+        HStack(spacing: 5) { Capsule().fill(Color.muted).frame(width: 16, height: 2); Text("part of ›") }
         HStack(spacing: 5) { Text("┄").foregroundStyle(Color.cursorBlue); Text("related") }
     }
 
