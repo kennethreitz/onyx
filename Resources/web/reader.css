@@ -215,6 +215,16 @@ audio, video { display: block; margin: 1em auto; max-width: 100%; }
 .dataview-task-title .internal-link { text-decoration: none; }
 .onyx-dv-inline { font: inherit; }
 .dataview-inline-error { font-family: var(--font-interface); font-size: 0.9em; color: var(--text-faint); }
+.dataview-calendar { font-family: var(--font-interface); margin: 0.8em 0; display: flex; flex-wrap: wrap; gap: 1.4em 2em; }
+.dv-cal-month { width: 16.5em; }
+.dv-cal-caption { font-weight: 600; font-size: 0.95em; margin: 0 0 0.4em; }
+.dv-cal-weekdays, .dv-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; }
+.dv-cal-weekdays span { font-size: 0.72em; color: var(--text-faint); padding: 0.2em 0; }
+.dv-cal-day { position: relative; font-size: 0.85em; min-height: 2em; padding: 0.2em 0 0.85em; }
+.dv-cal-day.is-pad { visibility: hidden; }
+.dv-cal-dots { position: absolute; left: 0; right: 0; bottom: 0.15em; line-height: 1; letter-spacing: 0.05em; }
+.dv-cal-dot { color: var(--text-normal); text-decoration: none; font-size: 0.85em; }
+.dv-cal-day.has-notes { font-weight: 600; }
 
 /* Kanban — lanes as columns of a typeset table */
 .kanban { display: flex; gap: 1.4rem; overflow-x: auto; margin: 1em -8rem 2em; padding: 0 0 1em; align-items: flex-start; }

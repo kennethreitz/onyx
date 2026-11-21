@@ -24,15 +24,15 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
 - **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N. Open Random Note is in the command palette and the Go menu
 - **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync
-- **Preliminary Dataview support** — `dataview` blocks in the reader for TABLE, LIST, TASK, GROUP BY, and FLATTEN, plus `= expr` inline queries; unsupported queries show an error box
+- **Preliminary Dataview support** — `dataview` blocks in the reader for TABLE, LIST, TASK, CALENDAR, GROUP BY, and FLATTEN, plus `= expr` inline queries; unsupported queries show an error box
 
 ## Preliminary Dataview support
 
 `dataview` code blocks run in the typeset reader.
 
-Supported: TABLE (including WITHOUT ID) with AS columns, LIST, and TASK (grouped by file, with checkboxes that toggle the source note); inline `` `= expr` `` queries in the reader (`` `$= ` `` waits on DataviewJS); FROM a folder or `#tag` with OR and `-` exclusion; WHERE with comparisons, AND/OR, and the function library below; SORT; LIMIT; GROUP BY (with `rows`); FLATTEN. Implicit `file.*` fields: name, path, folder, link, ctime, mtime, cday, mday, tags, etags, inlinks, outlinks, aliases, tasks, size, day. Dates and durations (`date(today)`, `dur()`, date comparisons and math). Functions: length, lower, upper, round, min/max/sum, join, link, dateformat, regexmatch, replace, startswith/endswith, filter/map, any/all, nonnull, number, string, striptime, choice, default, contains/icontains, econtains. Inline `key:: value` fields are queried like frontmatter.
+Supported: TABLE (including WITHOUT ID) with AS columns, LIST, and TASK (grouped by file, with checkboxes that toggle the source note); CALENDAR month grids; inline `` `= expr` `` queries in the reader (`` `$= ` `` waits on DataviewJS); FROM a folder or `#tag` with OR and `-` exclusion; WHERE with comparisons, AND/OR, and the function library below; SORT; LIMIT; GROUP BY (with `rows`); FLATTEN. Implicit `file.*` fields: name, path, folder, link, ctime, mtime, cday, mday, tags, etags, inlinks, outlinks, aliases, tasks, size, day. Dates and durations (`date(today)`, `dur()`, date comparisons and math). Functions: length, lower, upper, round, min/max/sum, join, link, dateformat, regexmatch, replace, startswith/endswith, filter/map, any/all, nonnull, number, string, striptime, choice, default, contains/icontains, econtains. Inline `key:: value` fields are queried like frontmatter.
 
-Not yet supported: DataviewJS and CALENDAR. Unsupported queries show an error box.
+Not yet supported: DataviewJS. Unsupported queries show an error box.
 
 ## Download
 

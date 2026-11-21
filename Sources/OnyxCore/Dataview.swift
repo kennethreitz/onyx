@@ -195,12 +195,21 @@ public struct DVTaskGroup: Sendable {
     public var tasks: [DVTask]
 }
 
+public struct DVCalendarMonth: Sendable {
+    public var year: Int
+    public var month: Int
+    /// Notes keyed by day-of-month (1...31).
+    public var days: [Int: [DVValue]]
+}
+
 public struct DVResult: Sendable {
     public var headers: [String]
     public var rows: [[DVValue]]
     public var isList: Bool
     public var isTask: Bool = false
     public var taskGroups: [DVTaskGroup] = []
+    public var isCalendar: Bool = false
+    public var calendar: [DVCalendarMonth] = []
 }
 
 public enum DataviewError: Error, CustomStringConvertible {
@@ -593,7 +602,6 @@ public enum Dataview {
 
     public static func run(_ source: String, in snap: VaultSnapshot, from currentPath: String? = nil, now: Date = Date()) throws -> DVResult {
         let q = try parse(source)
-        if q.kind == .calendar { throw DataviewError.parse("CALENDAR isn’t supported yet") }
         var pages = snap.notes.values.filter { matchesFrom(q.from, $0, snap: snap, current: currentPath) }
         pages.sort { $0.path < $1.path }
         let hasSort = q.pipeline.contains { if case .sort = $0 { return true }; return false }
@@ -688,8 +696,40 @@ public enum Dataview {
         case .task:
             return taskResult(rows, snap: snap, grouped: groupExpr(q) != nil)
         case .calendar:
-            throw DataviewError.parse("CALENDAR isn’t supported yet")
+            return calendarResult(rows, expr: q.listExpr ?? .field("file.day"), snap: snap)
         }
+    }
+
+    static func calendarResult(_ rows: [Env], expr: DVExpr, snap: VaultSnapshot) -> DVResult {
+        let cal = Calendar.current
+        var buckets: [String: (year: Int, month: Int, days: [Int: [DVValue]])] = [:]
+        var order: [String] = []
+        for env in rows {
+            guard let date = eval(expr, env).dateValue else { continue }
+            let c = cal.dateComponents([.year, .month, .day], from: date)
+            guard let y = c.year, let m = c.month, let d = c.day else { continue }
+            let key = String(format: "%04d-%02d", y, m)
+            if buckets[key] == nil { order.append(key); buckets[key] = (y, m, [:]) }
+            let link: DVValue
+            if let p = env.page { link = display(.page(p.path), snap) }
+            else if let t = env.task { link = .link(path: t.path, name: t.text) }
+            else { link = display(env.bindings["key"] ?? .null, snap) }
+            buckets[key]!.days[d, default: []].append(link)
+        }
+        // Fill months from the first result through the last, so a gap is still a page of the calendar.
+        var months: [DVCalendarMonth] = []
+        if let first = order.first, let last = order.last,
+           let start = buckets[first], let end = buckets[last] {
+            var y = start.year, m = start.month
+            while (y, m) <= (end.year, end.month) {
+                let key = String(format: "%04d-%02d", y, m)
+                let days = buckets[key]?.days ?? [:]
+                months.append(DVCalendarMonth(year: y, month: m, days: days))
+                m += 1
+                if m > 12 { m = 1; y += 1 }
+            }
+        }
+        return DVResult(headers: [], rows: [], isList: false, isCalendar: true, calendar: months)
     }
 
     static func rowValue(_ env: Env) -> DVValue {

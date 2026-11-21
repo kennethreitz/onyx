@@ -51,9 +51,41 @@ final class DataviewTests: XCTestCase {
     }
 
     func testUnsupportedQueriesStillError() {
-        XCTAssertThrowsError(try run("CALENDAR file.day FROM \"Daily\"")) { err in
-            XCTAssertTrue(String(describing: err).contains("CALENDAR"))
+        XCTAssertThrowsError(try run("CHART file.day FROM \"Daily\"")) { err in
+            XCTAssertTrue(String(describing: err).lowercased().contains("chart") || String(describing: err).contains("supports"))
         }
+    }
+
+    func testCalendarQueries() throws {
+        let q = try Dataview.parse("CALENDAR file.day FROM \"Daily\"")
+        XCTAssertEqual(q.kind, .calendar)
+        if case .field("file.day") = q.listExpr { } else { XCTFail("date expr") }
+        let r = try run("CALENDAR file.day FROM \"Daily\"")
+        XCTAssertTrue(r.isCalendar)
+        XCTAssertEqual(r.calendar.count, 1)
+        XCTAssertEqual(r.calendar[0].year, 2026)
+        XCTAssertEqual(r.calendar[0].month, 11)
+        XCTAssertEqual(Set(r.calendar[0].days[20]?.map(\.text) ?? []), ["2026-11-20"])
+        XCTAssertEqual(Set(r.calendar[0].days[21]?.map(\.text) ?? []), ["2026-11-21"])
+        XCTAssertNil(r.calendar[0].days[22])
+        // Notes without a date (the planets) do not appear; FROM Daily already excludes them.
+        let due = try run("CALENDAR due FROM \"Knowledge\"")
+        XCTAssertTrue(due.isCalendar)
+        // due is a task field; calendar is page-level so due is null unless we flatten tasks.
+        // A note with a date property should land on that day:
+        let custom = snap(["Projects/Launch.md": "---\nwhen: 2026-12-02\n---\n# Launch\n"])
+        let c = try Dataview.run("CALENDAR when FROM \"Projects\"", in: custom, now: now)
+        XCTAssertEqual(c.calendar.count, 1)
+        XCTAssertEqual(c.calendar[0].month, 12)
+        XCTAssertEqual(c.calendar[0].days[2]?.first?.text, "Launch")
+        // Months between the first and last result are kept
+        let span = snap([
+            "Daily/2026-10-31.md": "# Halloween\n",
+            "Daily/2026-12-01.md": "# December\n",
+        ])
+        let s = try Dataview.run("CALENDAR file.day FROM \"Daily\"", in: span, now: now)
+        XCTAssertEqual(s.calendar.map { "\($0.year)-\($0.month)" }, ["2026-10", "2026-11", "2026-12"])
+        XCTAssertTrue(s.calendar[1].days.isEmpty)
     }
 
     func testTaskQueries() throws {

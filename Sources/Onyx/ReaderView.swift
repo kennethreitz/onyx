@@ -407,10 +407,45 @@ enum ReaderPayload {
         return "<div class=\"dataview-task-list\">\(groups)</div>"
     }
 
+    static func calendarHTML(_ r: DVResult) -> String {
+        if r.calendar.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
+        let cal = Calendar.current
+        let symbols = cal.veryShortWeekdaySymbols
+        let first = cal.firstWeekday  // 1 = Sunday
+        let weekdays = (0..<7).map { symbols[($0 + first - 1) % 7] }
+        let months = r.calendar.map { mon -> String in
+            var comps = DateComponents(); comps.year = mon.year; comps.month = mon.month; comps.day = 1
+            let start = cal.date(from: comps) ?? Date()
+            let fmt = DateFormatter(); fmt.calendar = cal; fmt.locale = .current; fmt.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+            let caption = fmt.string(from: start)
+            let weekdayRow = weekdays.map { "<span>\(esc($0))</span>" }.joined()
+            let pad = ((cal.component(.weekday, from: start) - first) + 7) % 7
+            let dim = cal.range(of: .day, in: .month, for: start)?.count ?? 30
+            var cells = Array(repeating: "<span class=\"dv-cal-day is-pad\"></span>", count: pad)
+            for d in 1...dim {
+                let notes = mon.days[d] ?? []
+                if notes.isEmpty {
+                    cells.append("<span class=\"dv-cal-day\">\(d)</span>")
+                } else {
+                    let dots = notes.map { v -> String in
+                        if case .link(let p, let n) = v {
+                            return "<a class=\"internal-link dv-cal-dot\" data-path=\"\(esc(p))\" title=\"\(esc(n))\">•</a>"
+                        }
+                        return "<span class=\"dv-cal-dot\" title=\"\(esc(v.text))\">•</span>"
+                    }.joined()
+                    cells.append("<span class=\"dv-cal-day has-notes\">\(d)<span class=\"dv-cal-dots\">\(dots)</span></span>")
+                }
+            }
+            return "<div class=\"dv-cal-month\"><div class=\"dv-cal-caption\">\(esc(caption))</div><div class=\"dv-cal-weekdays\">\(weekdayRow)</div><div class=\"dv-cal-grid\">\(cells.joined())</div></div>"
+        }.joined()
+        return "<div class=\"dataview-calendar\">\(months)</div>"
+    }
+
     static func dataviewHTML(_ query: String, snap: VaultSnapshot, path: String) -> String {
         do {
             let r = try Dataview.run(query, in: snap, from: path)
             if r.isTask { return taskHTML(r) }
+            if r.isCalendar { return calendarHTML(r) }
             if r.isList {
                 return "<ul class=\"dataview-list\">" + r.rows.map { "<li>" + $0.map(cell).joined(separator: ": ") + "</li>" }.joined() + "</ul>"
             }
