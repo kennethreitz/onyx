@@ -241,25 +241,36 @@ struct RootView: View {
         }
     }
 
-    // MARK: Split panes — hairline dividers; each pane keeps its own note and mode
+    // MARK: Split panes — draggable hairline dividers; each pane keeps its own note and mode
 
     @ViewBuilder var splitPanes: some View {
-        let layout = ws.splitAxis == .vertical ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
-        layout {
-            ForEach(Array(ws.panes.enumerated()), id: \.element.id) { i, pane in
-                if i > 0 {
-                    Rectangle().fill(Color.hairline)
-                        .frame(width: ws.splitAxis == .vertical ? 0.8 : nil, height: ws.splitAxis == .horizontal ? 0.8 : nil)
-                        .padding(ws.splitAxis == .vertical ? .vertical : .horizontal, ws.splitAxis == .vertical ? 0 : 24)
+        GeometryReader { geo in
+            let vertical = ws.splitAxis == .vertical
+            let total = vertical ? geo.size.width : geo.size.height
+            let sizes = ws.paneSizes(along: total)
+            let layout = vertical ? AnyLayout(HStackLayout(spacing: 0)) : AnyLayout(VStackLayout(spacing: 0))
+            layout {
+                ForEach(Array(ws.panes.enumerated()), id: \.element.id) { i, pane in
+                    if i > 0 {
+                        SplitPaneDivider(ws: ws, index: i - 1, total: total)
+                    }
+                    paneView(i, pane)
+                        .frame(width: vertical ? (i < sizes.count ? sizes[i] : nil) : nil,
+                               height: vertical ? nil : (i < sizes.count ? sizes[i] : nil),
+                               alignment: .topLeading)
+                        .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil)
+                        .background(GeometryReader { g in
+                            Color.clear
+                                .onAppear { ws.paneFrames[pane.id] = g.frame(in: .global) }
+                                .onChange(of: g.frame(in: .global)) { ws.paneFrames[pane.id] = g.frame(in: .global) }
+                        })
+                        // Don't use .opacity on the pane: WKWebView goes blank inside an opacity group.
+                        .overlay {
+                            if i != ws.focusedPane {
+                                Color.paper.opacity(0.14).allowsHitTesting(false)
+                            }
+                        }
                 }
-                paneView(i, pane)
-                    .padding(.top, ws.splitAxis == .horizontal && i > 0 ? 8 : 0)
-                    .background(GeometryReader { g in
-                        Color.clear
-                            .onAppear { ws.paneFrames[pane.id] = g.frame(in: .global) }
-                            .onChange(of: g.frame(in: .global)) { ws.paneFrames[pane.id] = g.frame(in: .global) }
-                    })
-                    .opacity(i == ws.focusedPane ? 1 : 0.86)
             }
         }
         .onDisappear { ws.paneFrames = [:] }
@@ -760,6 +771,63 @@ struct PathSegment: View {
     }
 }
 
+
+/// The hairline between two split panes. A 9pt hit area, a resize cursor on hover,
+/// drag to move the split (240pt minimum), double-click to equalize every pane.
+struct SplitPaneDivider: View {
+    @Bindable var ws: Workspace
+    let index: Int
+    let total: CGFloat
+    @State private var hover = false
+    @State private var dragging = false
+    @State private var start: [Double]? = nil
+    @State private var cursorPushed = false
+
+    var body: some View {
+        let vertical = ws.splitAxis == .vertical
+        ZStack {
+            Rectangle().fill(Color.hairline)
+                .frame(width: vertical ? 0.8 : nil, height: vertical ? nil : 0.8)
+                .padding(vertical ? .vertical : .horizontal, vertical ? 0 : 24)
+            Capsule().fill(Color.ink.opacity(dragging ? 0.34 : hover ? 0.22 : 0))
+                .frame(width: vertical ? 3 : 36, height: vertical ? 36 : 3)
+                .animation(.easeOut(duration: 0.15), value: hover || dragging)
+        }
+        .frame(width: vertical ? 0.8 : nil, height: vertical ? nil : 0.8)
+        .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil)
+        .overlay {
+            Color.clear
+                .frame(width: vertical ? 9 : nil, height: vertical ? nil : 9)
+                .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil)
+                .contentShape(Rectangle())
+                .onHover { h in hover = h; updateCursor() }
+                .gesture(
+                    DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                        .onChanged { v in
+                            if start == nil { start = ws.paneRatios; dragging = true; updateCursor() }
+                            let delta = vertical ? v.translation.width : v.translation.height
+                            ws.resizePanes(from: start ?? ws.paneRatios, divider: index, delta: delta, total: total)
+                        }
+                        .onEnded { _ in start = nil; dragging = false; updateCursor() }
+                )
+                .onTapGesture(count: 2) { ws.equalizePanes() }
+        }
+        .zIndex(1)
+        .help("Drag to resize · double-click to equalize")
+        .onDisappear { if cursorPushed { NSCursor.pop(); cursorPushed = false } }
+    }
+
+    private func updateCursor() {
+        let want = hover || dragging
+        if want && !cursorPushed {
+            (ws.splitAxis == .vertical ? NSCursor.resizeLeftRight : NSCursor.resizeUpDown).push()
+            cursorPushed = true
+        } else if !want && cursorPushed {
+            NSCursor.pop()
+            cursorPushed = false
+        }
+    }
+}
 
 /// The inner edge of a panel: a hairline that shows a small grip and a resize cursor on hover.
 /// Drag to resize (clamped to `range`), double-click to go back to the default width.

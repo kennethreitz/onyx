@@ -59,6 +59,12 @@ struct LaunchOptions {
     var windowIDFile: String?
     var size: CGSize?
     var sidebar: Bool?
+    /// Test/screenshot hook: open a split after the vault is up. `--split stacked` (or
+    /// `horizontal`) stacks; anything else is side by side. `--pane-ratios 0.35,0.65`
+    /// sets the sizes (also implies a split). `--split-open` opens that note in the new pane.
+    var split: SplitAxis?
+    var splitOpen: String?
+    var paneRatios: [Double]?
 
     static func parse() -> LaunchOptions {
         var o = LaunchOptions()
@@ -72,6 +78,12 @@ struct LaunchOptions {
         o.windowIDFile = val("--window-id-file")
         if let sb = val("--sidebar") { o.sidebar = sb == "open" }
         if let s = val("--size") { let p = s.split(separator: "x").compactMap { Double($0) }; if p.count == 2 { o.size = CGSize(width: p[0], height: p[1]) } }
+        if let s = val("--split") { o.split = (s == "stacked" || s == "horizontal") ? .horizontal : .vertical }
+        o.splitOpen = val("--split-open")
+        if let r = val("--pane-ratios") {
+            let parts = r.split(separator: ",").compactMap { Double($0.trimmingCharacters(in: .whitespaces)) }
+            if parts.count >= 2 { o.paneRatios = parts; if o.split == nil { o.split = .vertical } }
+        }
         return o
     }
 }
@@ -165,6 +177,20 @@ struct OnyxApp: App {
                 default: break
                 }
             }
+        }
+        // Screenshot / test hook: do not persist. Ratios live on the Workspace for this window only.
+        // Wait until the vault has opened the first note; otherwise the left pane is born empty.
+        if options.split != nil {
+            func applySplit(attempt: Int = 0) {
+                if (ws.isIndexing || ws.currentPath == nil || ws.text.isEmpty), attempt < 40 {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { applySplit(attempt: attempt + 1) }
+                    return
+                }
+                if !ws.isSplit { ws.split(options.split ?? .vertical) }
+                if let path = options.splitOpen { ws.openNote(path) }
+                if let r = options.paneRatios { ws.setPaneRatios(r) }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { applySplit() }
         }
     }
 

@@ -72,6 +72,9 @@ final class Workspace {
     var focusedPane = 0
     var splitAxis: SplitAxis = .vertical
     var paneFrames: [UUID: CGRect] = [:]   // window coords, top-left origin
+    /// Relative sizes along the split axis, one per pane, summing to 1. Session-only
+    /// (not written to defaults). Empty when there is no split.
+    var paneRatios: [Double] = []
     /// Topmost visible source line (fractional, 0-based, frontmatter included) of the focused
     /// pane and of each unfocused pane. Reported by the editor and reader as they scroll and
     /// read by a freshly created view, so ⌘↩ and splits land on the same spot. Not observed:
@@ -1141,6 +1144,7 @@ extension Workspace {
             // like duplicating a browser tab, the new pane starts with the same history
             let fresh = Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)
             paneTop[fresh.id] = liveTop   // the new pane opens where the source pane is
+            paneRatios = PaneRatios.splitting(paneRatios.isEmpty ? [1] : paneRatios, at: focusedPane)
             panes.insert(fresh, at: focusedPane + 1)
             focusedPane += 1
         }
@@ -1182,6 +1186,7 @@ extension Workspace {
         captureFocused()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
             if panes.count == 1 { splitAxis = .vertical }
+            paneRatios = PaneRatios.splitting(paneRatios.isEmpty ? [1] : paneRatios, at: panes.count - 1)
             panes.append(Pane(id: UUID(), path: nil, text: "", mode: mode, isGraph: true))
         }
     }
@@ -1189,10 +1194,11 @@ extension Workspace {
         guard let g = graphPaneIndex else { return }
         captureFocused()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            paneRatios = PaneRatios.removing(paneRatios, at: g)
             panes.remove(at: g)
             if focusedPane > g { focusedPane -= 1 }
             focusedPane = min(focusedPane, max(0, panes.count - 1))
-            if panes.count == 1 { panes = []; focusedPane = 0 }
+            if panes.count <= 1 { panes = []; focusedPane = 0; paneRatios = [] }
         }
     }
 
@@ -1205,6 +1211,7 @@ extension Workspace {
         if panes.filter({ !$0.isGraph }).count == 1, graphPaneIndex != nil { closeGraphPane(); return true }
         flushSave()
         withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+            paneRatios = PaneRatios.removing(paneRatios, at: focusedPane)
             panes.remove(at: focusedPane)
             focusedPane = min(focusedPane, panes.count - 1)
             if panes[focusedPane].isGraph, let n = panes.indices.filter({ !panes[$0].isGraph }).min(by: { abs($0 - focusedPane) < abs($1 - focusedPane) }) { focusedPane = n }
@@ -1214,11 +1221,35 @@ extension Workspace {
         history = p.history; historyIndex = p.historyIndex
         liveTop = paneTop[p.id] ?? liveTop
         mode = p.mode
-        if panes.count == 1 { panes = [] ; focusedPane = 0 }
+        if panes.count <= 1 { panes = []; focusedPane = 0; paneRatios = [] }
         chromeLog("closePane → panes=\(panes.count) \(currentPath ?? "-")")
         return true
     }
 
     /// Text an unfocused pane should show: live text if it's the same note as the focused pane.
     func displayText(_ p: Pane) -> String { p.path != nil && p.path == currentPath ? text : p.text }
+
+    /// Point sizes along the split axis for the current ratios.
+    func paneSizes(along total: CGFloat) -> [CGFloat] {
+        PaneRatios.sizes(paneRatios, count: panes.count, total: Double(total)).map { CGFloat($0) }
+    }
+
+    func setPaneRatios(_ ratios: [Double]) {
+        guard panes.count > 1 else { return }
+        paneRatios = PaneRatios.normalized(ratios, count: panes.count)
+    }
+
+    func equalizePanes() {
+        guard panes.count > 1 else { return }
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+            paneRatios = PaneRatios.equal(panes.count)
+        }
+    }
+
+    /// Drag the divider between pane `divider` and the next. `from` is the ratio snapshot
+    /// at mouse-down so each translation is applied from a stable start.
+    func resizePanes(from start: [Double], divider: Int, delta: CGFloat, total: CGFloat) {
+        guard panes.count > 1 else { return }
+        paneRatios = PaneRatios.dragging(start, divider: divider, delta: Double(delta), total: Double(total))
+    }
 }

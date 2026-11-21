@@ -554,7 +554,7 @@
       if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
       const ud = page.querySelector('details[data-k=unlinked]');
       if (ud && ud.open) post({ type: 'unlinked' });
-      if (payload.keepScroll) { window.scrollTo(0, y); }
+      if (payload.keepScroll) { window.scrollTo(0, y); page.classList.add('shown'); requestAnimationFrame(() => page.classList.remove('instant')); }
       else if (payload.line > 0) {
         // Opened at a remembered spot (⌘↩ from the editor, or a split): no slide-in, just land there.
         page.classList.add('shown');

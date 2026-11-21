@@ -105,6 +105,18 @@ struct ReaderView: NSViewRepresentable {
             c.eval("Onyx.scrollToHeading(\(j))")
             DispatchQueue.main.async { ws.readerJump = nil }
         }
+        // A pane that first appears at 0×0 (a fresh split) may have flushed Onyx.render
+        // before the web view had a size; without a second render the page stays blank.
+        if c.ready, wv.bounds.width > 10, abs(c.lastLayoutWidth - wv.bounds.width) > 1 {
+            let first = c.lastLayoutWidth < 10
+            c.lastLayoutWidth = wv.bounds.width
+            if first {
+                c.eval("var p=document.getElementById('page'); if(p){p.classList.add('shown');p.classList.remove('instant');}")
+                c.eval("Onyx.setType(\(fontSize), \(measure))")
+            } else {
+                c.eval("window.dispatchEvent(new Event('resize'))")
+            }
+        }
     }
 
     @MainActor
@@ -125,6 +137,7 @@ struct ReaderView: NSViewRepresentable {
         var preview = false
         var startLine: Double = 0
         var scrollHandled: Int?
+        var lastLayoutWidth: CGFloat = 0
 
         init(ws: Workspace) { self.ws = ws }
 

@@ -31,11 +31,14 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   ⌘I is caught ahead of the editor so it works while typing. Esc puts it away too.
 - **Title fade**: a paper-colored gradient sits behind the title path, so body text scrolls
   up into a soft fade instead of colliding with the path.
-- **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes with hairline
-  dividers; a new split sets the axis for the whole group. Swap model: the focused pane
-  drives the live editor/reader state; unfocused panes keep their own path, text and mode
-  and render read-only (dimmed a touch) until clicked or reached with ⌃⇥. Two panes on the
-  same note show the live text in both.
+- **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes; a new split sets
+  the axis for the whole group. The hairline between panes is draggable (resize cursor on
+  hover, a small grip while dragging, 240pt minimum; when the window is tighter, panes
+  shrink together). Double-click a divider to equalize. Ratios last for the window
+  session and are not written to defaults. Swap model: the focused pane drives the live
+  editor/reader state; unfocused panes keep their own path, text and mode and render
+  read-only (dimmed a touch) until clicked or reached with ⌃⇥. Two panes on the same
+  note show the live text in both.
 - **Focus mode** ⌃⌘F: pure text; the same keys restore exactly what was showing.
 
 ## Keys
