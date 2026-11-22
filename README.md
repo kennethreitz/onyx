@@ -19,6 +19,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
 - **Custom shortcuts** — every bindable command in Settings ▸ Shortcuts; click a row to record a new combination
 - **Obsidian’s core commands** — formatting, headings, lists and checkboxes, move/duplicate/delete line, jump to heading, duplicate note, zoom, spellcheck, and more, all in the command palette ([list](docs/commands.md))
+- **Folding** — fold a heading’s section or a nested list from a quiet margin chevron, in the editor and the reader. Folds are display only, remembered per note, and open themselves when Find, the outline, or a link lands inside ([docs](docs/folding.md))
 - **Note composer** — merge two notes (links follow, the source goes to the Trash), or extract a selection or heading into a new note, or append it to one you pick. Settings ▸ Editor
 - **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault

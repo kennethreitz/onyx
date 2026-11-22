@@ -23,6 +23,22 @@ final class OnyxTextView: NSTextView {
     var onExtractHeading: (() -> Void)?
     var onComposerMenu: ((NSMenu) -> Void)?
     var measure: CGFloat = Theme.editorMeasure
+    /// Heading/list folding (EditorFolding.swift): display only, the text is never changed.
+    let folds = EditorFolds()
+    var applyingFolds = false
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        folds.draw(dirtyRect)
+    }
+
+    private var foldTracking: NSTrackingArea?
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let t = foldTracking { removeTrackingArea(t) }
+        let t = NSTrackingArea(rect: .zero, options: [.mouseMoved, .mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self, userInfo: ["onyx": "folds"])
+        addTrackingArea(t); foldTracking = t
+    }
 
     override func menu(for event: NSEvent) -> NSMenu? {
         let menu = super.menu(for: event) ?? NSMenu()
@@ -64,6 +80,9 @@ final class OnyxTextView: NSTextView {
 
     // ⌘-click follows [[links]]; plain click edits.
     override func mouseDown(with event: NSEvent) {
+        if !event.modifierFlags.contains(.command), let (region, _) = folds.hit(convert(event.locationInWindow, from: nil)) {
+            folds.toggle(region); return   // the chevron or the ⋯ pill: never moves the caret
+        }
         if event.modifierFlags.contains(.command), let target = wikilink(at: convert(event.locationInWindow, from: nil)) {
             onFollowLink(target); return
         }
@@ -75,6 +94,9 @@ final class OnyxTextView: NSTextView {
     private var previewRange: NSRange?
     override func mouseMoved(with event: NSEvent) {
         super.mouseMoved(with: event)
+        let p = convert(event.locationInWindow, from: nil)
+        folds.mouseMoved(to: p)
+        if folds.hoverPart != nil { NSCursor.arrow.set() }
         previewHover(event.modifierFlags, at: convert(event.locationInWindow, from: nil))
     }
     override func flagsChanged(with event: NSEvent) {
@@ -82,7 +104,7 @@ final class OnyxTextView: NSTextView {
         guard let w = window else { return }
         previewHover(event.modifierFlags, at: convert(w.mouseLocationOutsideOfEventStream, from: nil))
     }
-    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); endPreviewHover() }
+    override func mouseExited(with event: NSEvent) { super.mouseExited(with: event); endPreviewHover(); folds.mouseExited() }
     func previewHover(_ flags: NSEvent.ModifierFlags, at point: NSPoint) {
         guard flags.contains(.command), bounds.contains(point), let hit = wikilinkHit(at: point) else { endPreviewHover(); return }
         if hit.range == previewRange { return }
@@ -283,6 +305,8 @@ final class OnyxTextView: NSTextView {
     }
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
+        // Carets never live inside folded text: navigation steps over it, Find/outline/undo open it.
+        let ranges = folds.adjust(ranges, stillSelecting: stillSelecting)
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         needsDisplay = true
         if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
@@ -387,7 +411,7 @@ struct EditorView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let storage = NSTextStorage()
-        let lm = NSLayoutManager()
+        let lm = FoldLayoutManager()
         storage.addLayoutManager(lm)
         let tc = NSTextContainer(size: NSSize(width: Theme.editorMeasure, height: .greatestFiniteMagnitude))
         tc.widthTracksTextView = true
@@ -414,6 +438,8 @@ struct EditorView: NSViewRepresentable {
         tv.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude)
         tv.textContainerInset = NSSize(width: 80, height: 96)
         tv.delegate = context.coordinator
+        tv.folds.attach(tv)
+        tv.folds.onChange = { [weak ws] p in ws?.editorFoldsChanged(p) }
         tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
         tv.fieldSuggest = { [weak ws] part, q in ws?.fieldSuggestions(part, q) ?? [] }
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
@@ -532,7 +558,9 @@ struct EditorView: NSViewRepresentable {
             guard let tv = textView, let ts = tv.textStorage else { return }
             let sel = tv.selectedRange()
             let visible = tv.enclosingScrollView?.contentView.bounds.origin
+            tv.folds.loading = true
             ts.setAttributedString(NSAttributedString(string: text, attributes: highlighter.baseAttributes))
+            tv.folds.loading = false
             highlighter.apply(to: ts)
             if keepSelection {
                 tv.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
@@ -542,6 +570,13 @@ struct EditorView: NSViewRepresentable {
                 tv.scroll(.zero)
             }
             tv.undoManager?.removeAllActions()
+            tv.folds.restore(path: parent.path, store: FoldStores.store(for: parent.ws.root))
+        }
+
+        /// Edits that would change folded text (or pull the next line into a fold) open it first.
+        func textView(_ textView: NSTextView, shouldChangeTextInRanges ranges: [NSValue], replacementStrings: [String]?) -> Bool {
+            (textView as? OnyxTextView)?.folds.revealForEdit(ranges.map(\.rangeValue))
+            return true
         }
 
         /// Start writing below the frontmatter and title, like opening a notebook to the page.

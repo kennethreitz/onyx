@@ -197,6 +197,8 @@ struct EditorSettingsPage: View {
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.escToReading) private var escToReading = true
     @AppStorage(EditorPrefs.spellcheck) private var spellcheck = true
+    @AppStorage(EditorPrefs.foldHeadings) private var foldHeadings = true
+    @AppStorage(EditorPrefs.foldLists) private var foldLists = true
     @AppStorage(NoteComposer.Settings.confirmMergeKey) private var confirmMerge = true
     @AppStorage(NoteComposer.Settings.placementKey) private var mergePlacement = NoteComposer.Placement.append.rawValue
     @AppStorage(NoteComposer.Settings.locationKey) private var extractLocation = NoteComposer.NewLocation.sameFolder.rawValue
@@ -214,6 +216,15 @@ struct EditorSettingsPage: View {
                 Toggle("Check spelling while typing", isOn: $spellcheck)
                     .onChange(of: spellcheck) { Workspace.applySpellcheck(spellcheck) }
             } header: { settingsHeader("Editor") }
+
+            Section {
+                Toggle("Fold headings", isOn: $foldHeadings)
+                    .onChange(of: foldHeadings) { Workspace.applyFoldPrefs() }
+                Toggle("Fold indent (nested lists)", isOn: $foldLists)
+                    .onChange(of: foldLists) { Workspace.applyFoldPrefs() }
+                Text("A quiet chevron in the margin folds a section; folded text stays in the note. Folds are remembered per note on this Mac.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { settingsHeader("Folding") }
 
             Section {
                 Toggle("Esc returns to reading view", isOn: $escToReading)

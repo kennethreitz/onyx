@@ -334,6 +334,7 @@ enum PaletteCommands {
             item("settings") { DispatchQueue.main.async { Workspace.openSettings() } },
             item("hints") { withAnimation(Motion.quick) { ws.showHints = true } },
         ] + Workspace.formatMenu.compactMap { $0 }.map { id in item(id) { ws.runEditCommand(id) } }
+          + Workspace.foldMenu.map { id in item(id) { ws.runFold(id) } }
     }
 
     /// Jump to heading…: the open note's headings, indented by level.

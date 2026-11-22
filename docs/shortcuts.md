@@ -28,6 +28,8 @@
 | <kbd>⇧⌘N</kbd> | New folder (in the selected folder, or the vault root) |
 | <kbd>⌘S</kbd> | Save. A still-Untitled note is named from its first heading (or first line) and appears under that name in the sidebar. Autosave writes the file while you type, but leaves the placeholder name until you save or leave the note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
+| <kbd>⌥⌘←</kbd> · <kbd>⌥⌘→</kbd> | Fold / unfold the section at the caret ([folding](folding.md)) |
+| <kbd>⌥⇧⌘←</kbd> · <kbd>⌥⇧⌘→</kbd> | Fold all headings and lists / unfold all |
 | <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
 | <kbd>⌘,</kbd> | Settings |
 | <kbd>⌘B</kbd> · <kbd>⌘/</kbd> · <kbd>⌘L</kbd> | Toggle bold · toggle `%%comment%%` · cycle checkbox (`- [ ]` → `- [x]`). The rest of the Format menu (italic, headings, lists, move line, …) is unbound by default; see [Commands](commands.md) |

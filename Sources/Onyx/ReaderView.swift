@@ -64,6 +64,7 @@ struct ReaderView: NSViewRepresentable {
     @AppStorage(Typeset.face) private var tsFace = "lm"
     @AppStorage(Typeset.opening) private var tsOpening = "smallcaps"
     @AppStorage(Typeset.justify) private var tsJustify = false
+    @AppStorage(EditorPrefs.foldHeadings) private var foldHeadings = true
 
     var path: String? { source == nil ? ws.currentPath : source!.path }
     var text: String { source?.text ?? ws.text }
@@ -101,9 +102,9 @@ struct ReaderView: NSViewRepresentable {
         if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
         let typeset = Typeset.signature
-        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset {
+        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset || c.foldable != foldHeadings {
             let sameNote = c.renderedPath == path
-            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset
+            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset; c.foldable = foldHeadings
             c.render(keepScroll: sameNote)
         }
         if c.typeKey != "\(fontSize)/\(measure)" {
@@ -151,6 +152,18 @@ struct ReaderView: NSViewRepresentable {
         var startLine: Double = 0
         var scrollHandled: Int?
         var lastLayoutWidth: CGFloat = 0
+        var foldable = true
+
+        /// Source lines of this note's folded headings (shared with the editor via FoldStore).
+        func foldedLines(_ text: String, path: String) -> [Int] {
+            guard foldable, !preview, let stored = ws.foldStore?.anchors(for: path), !stored.isEmpty else { return [] }
+            return MarkdownFolds.regions(in: text).filter { $0.kind == .heading && stored.contains($0.anchor) }.map(\.line)
+        }
+
+        func pushFolds(for path: String) {
+            guard renderedPath == path, let text = renderedText else { return }
+            eval("Onyx.setFolds(\(foldedLines(text, path: path)))")
+        }
 
         init(ws: Workspace) { self.ws = ws }
 
@@ -176,7 +189,8 @@ struct ReaderView: NSViewRepresentable {
 
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
-            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview, kanbanEditable: paneID == nil && !preview)
+            let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview, kanbanEditable: paneID == nil && !preview,
+                                               folds: foldedLines(renderedText ?? "", path: path), foldable: foldable && !preview)
             startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
@@ -231,6 +245,8 @@ struct ReaderView: NSViewRepresentable {
                 if !preview, let p = body["path"] as? String, let i = body["index"] as? Int {
                     ws.toggleDataviewTask(path: p, index: i)
                 }
+            case "folds":
+                if let p = renderedPath, let text = renderedText, let lines = body["lines"] as? [Int] { ws.setReaderFolds(path: p, text: text, lines: lines) }
             case "edit": ws.toggleMode()
             case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
             default: break
@@ -243,7 +259,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataviewjs|dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true, folds: [Int] = [], foldable: Bool = false) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -324,6 +340,7 @@ enum ReaderPayload {
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
             "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
+            "folds": folds, "foldable": foldable,
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)

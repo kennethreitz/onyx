@@ -272,6 +272,11 @@ struct OnyxApp: App {
             ShortcutMenus.button("modetoggle", title: ws.mode == .read ? "Edit Note" : "Read Note") { ws.toggleMode() }
             ShortcutMenus.button("mode", title: ws.mode == .read ? "Edit Note and Save" : "Save and Read") { ws.toggleMode() }
             ShortcutMenus.button("focus", title: ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }
+            Menu("Folding") {
+                ForEach(Workspace.foldMenu, id: \.self) { id in
+                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.runFold(id) }
+                }
+            }
             Divider()
             ShortcutMenus.button("files", title: ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }
             ShortcutMenus.button("search") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }

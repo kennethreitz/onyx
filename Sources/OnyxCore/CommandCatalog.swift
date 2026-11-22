@@ -118,6 +118,12 @@ public enum CommandCatalog {
         cmd("dark", "Appearance: Dark", .view, [], "moon"),
         cmd("system", "Appearance: Match System", .view, [], "circle.lefthalf.filled"),
         cmd("synclog", "Show Sync Log", .view, [], "list.bullet.rectangle"),
+        // Folding: ⌥⌘[ / ⌥⌘] already page daily notes, so these follow Xcode's ⌥⌘← / ⌥⌘→.
+        cmd("fold", "Fold Section", .view, [.command("\u{F702}", option: true)], "chevron.right"),
+        cmd("unfold", "Unfold Section", .view, [.command("\u{F703}", option: true)], "chevron.down"),
+        cmd("togglefold", "Toggle Fold", .view, [], "chevron.up.chevron.down"),
+        cmd("foldall", "Fold All Headings and Lists", .view, [.command("\u{F702}", shift: true, option: true)], "rectangle.compress.vertical"),
+        cmd("unfoldall", "Unfold All", .view, [.command("\u{F703}", shift: true, option: true)], "rectangle.expand.vertical"),
         cmd("zoomin", "Zoom In", .view, [.command("=")], "plus.magnifyingglass"),
         cmd("zoomout", "Zoom Out", .view, [.command("-")], "minus.magnifyingglass"),
         cmd("zoomreset", "Actual Size", .view, [.command("0")], "1.magnifyingglass"),

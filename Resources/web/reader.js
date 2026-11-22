@@ -514,6 +514,7 @@
     const cur = marks[FIND.i];
     cur.classList.add('current');
     if (reveal) {
+      revealFolded(cur);
       const d = cur.closest('details'); if (d && !d.open) d.open = true;
       cur.scrollIntoView({ block: 'center' });
     }
@@ -527,6 +528,56 @@
     if (!t.on) return print;
     return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.justify ? ' just' : '') + (t.face === 'et' ? ' face-et' : '') + print;
   }
+
+  // Heading folds (Settings ▸ Editor ▸ Fold headings). Display only: the markdown is never
+  // touched. Swift keeps the folded source lines per note, shared with the editor.
+  let FOLDS = new Set();
+  const HEAD = /^H[1-6]$/;
+  function foldHeads() { return [...page.children].filter(e => HEAD.test(e.tagName) && e.dataset.line && !e.classList.contains('fallback-title')); }
+  function sectionOf(h) {   // following blocks up to the next heading of the same or a higher level
+    const lvl = +h.tagName[1], out = [];
+    for (let e = h.nextElementSibling; e; e = e.nextElementSibling) {
+      if (HEAD.test(e.tagName) && +e.tagName[1] <= lvl) break;
+      if (e.classList.contains('doc-backlinks') || e.classList.contains('footnotes')) break;
+      out.push(e);
+    }
+    return out;
+  }
+  function setupFolds() {
+    FOLDS = new Set(((P && P.folds) || []).map(Number));
+    if (!P || !P.foldable || P.preview || P.kanban) return;
+    for (const h of foldHeads()) {
+      if (!sectionOf(h).some(e => e.textContent.trim() || e.querySelector('img, svg, video, iframe, table, hr, canvas'))) continue;
+      h.classList.add('foldable');
+      const t = document.createElement('span'); t.className = 'fold-toggle'; t.setAttribute('role', 'button'); t.setAttribute('aria-label', 'Fold section'); h.prepend(t);
+      const m = document.createElement('span'); m.className = 'fold-more'; m.setAttribute('role', 'button'); m.setAttribute('aria-label', 'Unfold section'); h.append(m);
+    }
+    refreshFolds(false);
+  }
+  function refreshFolds(relayout = true) {
+    const heads = foldHeads();
+    for (const h of heads) h.classList.toggle('folded', h.classList.contains('foldable') && FOLDS.has(+h.dataset.line));
+    // Nested folds survive opening their parent: hidden = covered by any folded section.
+    const hidden = new Set();
+    for (const h of heads) if (h.classList.contains('folded')) for (const e of sectionOf(h)) hidden.add(e);
+    for (const e of page.children) e.classList.toggle('fold-hidden', hidden.has(e));
+    if (relayout && P && P.sidenotes) layoutSidenotes();
+  }
+  function postFolds() { post({ type: 'folds', lines: [...FOLDS] }); }
+  function revealFolded(el) {   // Find and heading jumps open the folds they land in
+    const top = el && [...page.children].find(c => c === el || c.contains(el));
+    if (!top || !top.classList.contains('fold-hidden')) return;
+    for (const h of foldHeads()) if (h.classList.contains('folded') && sectionOf(h).includes(top)) FOLDS.delete(+h.dataset.line);
+    refreshFolds(); postFolds();
+  }
+  document.addEventListener('click', e => {
+    const t = e.target.closest && e.target.closest('.fold-toggle, .fold-more');
+    if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    const h = t.parentElement, l = +h.dataset.line;
+    FOLDS.has(l) ? FOLDS.delete(l) : FOLDS.add(l);
+    refreshFolds(); postFolds();
+  }, true);
 
   window.Onyx = {
     render(payload) {
@@ -561,6 +612,7 @@
       if (payload.sidenotes) { layoutSidenotes(); if (document.fonts) document.fonts.ready.then(scheduleNotes); }
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
+      setupFolds();
       if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;
       if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
       const ud = page.querySelector('details[data-k=unlinked]');
@@ -622,9 +674,30 @@
     },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
+    setFolds(lines) { FOLDS = new Set(lines.map(Number)); refreshFolds(); },
+    foldCommand(id) {
+      const heads = foldHeads().filter(h => h.classList.contains('foldable'));
+      if (!heads.length) return;
+      if (id === 'foldall') heads.forEach(h => FOLDS.add(+h.dataset.line));
+      else if (id === 'unfoldall') FOLDS.clear();
+      else {
+        // the section being read: the last visible heading at or above the reading line
+        let cur = null;
+        for (const h of heads) { if (h.classList.contains('fold-hidden')) continue; if (h.getBoundingClientRect().top <= ANCHOR + 4) cur = h; else break; }
+        cur = cur || heads.find(h => !h.classList.contains('fold-hidden'));
+        if (!cur) return;
+        const l = +cur.dataset.line, on = id === 'fold' ? true : id === 'unfold' ? false : !FOLDS.has(l);
+        on ? FOLDS.add(l) : FOLDS.delete(l);
+        refreshFolds(); postFolds();
+        if (on && cur.getBoundingClientRect().top < 0) cur.scrollIntoView({ block: 'start' });
+        return;
+      }
+      refreshFolds(); postFolds();
+    },
     scrollToHeading(i) {
       const hs = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
       const h = hs[i];
+      if (h) revealFolded(h);
       if (h) h.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     },
   };

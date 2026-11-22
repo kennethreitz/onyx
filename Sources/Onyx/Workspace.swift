@@ -1086,6 +1086,7 @@ final class Workspace {
             treeOrder.overrides = o
         }
         bookmarks = bookmarks.map(remap); UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        foldStore?.remapPaths(map)   // folds follow the note
         var parent = (dest as NSString).deletingLastPathComponent
         while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
         if edited.isEmpty { toast = reason } else { toast = "\(reason) · updated links in \(edited.count) note\(edited.count == 1 ? "" : "s")" }

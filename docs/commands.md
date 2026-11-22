@@ -95,6 +95,11 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Appearance: Dark | — |
 | Appearance: Match System | — |
 | Show Sync Log | — |
+| Fold Section | <kbd>⌥⌘←</kbd> |
+| Unfold Section | <kbd>⌥⌘→</kbd> |
+| Toggle Fold | — |
+| Fold All Headings and Lists | <kbd>⌥⇧⌘←</kbd> |
+| Unfold All | <kbd>⌥⇧⌘→</kbd> |
 | Zoom In | <kbd>⌘=</kbd> |
 | Zoom Out | <kbd>⌘-</kbd> |
 | Actual Size | <kbd>⌘0</kbd> |
@@ -152,6 +157,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 - Move Line Up/Down, Duplicate Line, and Delete Line act on every line the selection touches.
 - Today’s Daily Note and Previous/Next Daily Note were already there. Previous/Next step between existing daily notes when one is open. Yesterday’s and Tomorrow’s always go by the calendar, and create the note if needed.
 - Jump to Heading… lists the open note’s headings in a palette.
+- Folding (View ▸ Folding) folds a heading’s section or a list item’s nested items in the editor, and headings in the reader. It’s display only; the note text never changes. See [folding.md](folding.md).
 - Zoom In/Out change the editor and reader text sizes together, within the Settings ranges. Actual Size resets both.
 - Spellcheck is on by default; the toggle is also in Settings ▸ Editor.
 - Note composer matches Obsidian’s core plugin. Merge Current File With Another File… opens a quick switcher, asks you to confirm, then appends (or prepends) the open note to the one you pick, merges frontmatter, rewrites links to the source so they point at the target, and moves the source to the Trash. Extract Current Selection… and Extract This Heading… (the heading and everything until the next heading of the same or a higher level) write the text to a new note or append it to an existing one, and replace the original with a wikilink, an embed, or nothing — one undo step in the editor. Both extract commands are also in the editor’s context menu. A selection that starts with a heading offers that heading as the filename. Settings are in Settings ▸ Editor: confirm before merging, append vs prepend, where new notes land, what to leave behind, and whether to open the extracted note.

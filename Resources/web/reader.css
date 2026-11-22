@@ -351,3 +351,20 @@ body.theme-dark .math-error { background: rgba(220, 90, 70, 0.16); }
   .doc-backlinks summary::before { transition: none; }
   html { scroll-behavior: auto !important; }
 }
+
+/* Heading folds: a quiet chevron in the left margin on hover (always shown when folded),
+   and a small ⋯ pill after a folded heading. Folded blocks are display:none; the
+   markdown itself is never touched. */
+.foldable { position: relative; }
+.fold-toggle { position: absolute; left: -1.6em; top: 50%; width: 1.2em; height: 1.2em; margin-top: -0.6em; cursor: pointer; opacity: 0; transition: opacity .12s ease-out; }
+.fold-toggle::before { content: ""; position: absolute; left: 50%; top: 50%; width: 0.34em; height: 0.34em; border-right: 1.2px solid var(--text-faint); border-bottom: 1.2px solid var(--text-faint); transform: translate(-50%, -70%) rotate(45deg); transition: transform .15s ease-out; }
+.foldable:hover > .fold-toggle, .folded > .fold-toggle { opacity: 1; }
+.fold-toggle:hover::before { border-color: var(--text-muted); }
+.folded > .fold-toggle::before { transform: translate(-70%, -50%) rotate(-45deg); }
+.fold-more { display: none; }
+.folded > .fold-more { display: inline-block; margin-left: 0.45em; padding: 0 0.5em; border-radius: 1em; background: var(--background-secondary); line-height: 1.25; font-weight: 400; font-size: 0.8em; vertical-align: 0.15em; cursor: pointer; }
+.folded > .fold-more::after { content: "\22EF"; color: var(--text-faint); }
+.folded > .fold-more:hover::after { color: var(--text-muted); }
+.fold-hidden { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .fold-toggle, .fold-toggle::before { transition: none; } }
+@media print { .fold-toggle, .fold-more { display: none !important; } }

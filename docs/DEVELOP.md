@@ -118,6 +118,11 @@ trash <path>          # no confirm
 escape                # run the same Esc path as the key, print the action
 move <path> -> <folder>
 rename <path> -> <new path>
+fold <command id>     # fold, unfold, togglefold, foldall, unfoldall
+foldclick <n>         # click the nth fold region's chevron (through mouseDown)
+select <offset>       # a programmatic caret move, as Find does (opens folds)
+foldstate             # folded count, hidden ranges, text height, text intact?
+rfold [command id]    # reader: run a fold command, print foldable/folded/hidden counts
 ```
 
 There are more workspace commands for tree selection, previews, and relations; see `TypeSelfTest` in `Sources/Onyx/LinkSuggest.swift`. Never set `ONYX_TYPE_TEST` in normal use.

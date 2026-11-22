@@ -405,6 +405,14 @@ enum TypeSelfTest {
     }
     @MainActor static func run(_ line: String) {
         if let ws, workspaceCommand(line, ws) { fflush(stdout); return }
+        if line.hasPrefix("rfold"), let r = ws?.liveReader {   // reader fold probe: `rfold` state, `rfold <cmd>` runs a fold command
+            let arg = line.dropFirst(5).trimmingCharacters(in: .whitespaces)
+            if !arg.isEmpty { r.eval("Onyx.foldCommand('\(arg)')") }
+            r.evalResult("[document.querySelectorAll('.foldable').length, document.querySelectorAll('.folded').length, document.querySelectorAll('.fold-hidden').length].join(',')") { v in
+                print("[rfold] foldable,folded,hidden=\(v ?? "nil") stored=\(ws?.currentPath.flatMap { ws?.foldStore?.anchors(for: $0).map(\.signature).sorted() } ?? [])"); fflush(stdout)
+            }
+            return
+        }
         guard let tv = editor() else { print("[type] no editor"); return }
         tv.directKeys = true
         if line.hasPrefix("type ") {
@@ -421,6 +429,8 @@ enum TypeSelfTest {
                 default: ""
             }
             send(tv, chars: chars, code: code, flags: f)
+        } else if line.hasPrefix("fold") || line.hasPrefix("select ") {
+            foldCommand(line, tv)
         } else if line == "dump" {
             let sel = tv.selectedRange().location
             let s = tv.string as NSString
@@ -430,5 +440,26 @@ enum TypeSelfTest {
             print("[type] \(marked)   popup=\(tv.suggestionsVisible)")
         }
         fflush(stdout)
+    }
+
+    /// Folding probes: `fold <command id>`, `foldclick <n>` (the nth region's chevron, through
+    /// mouseDown), `select <loc>` (a programmatic selection, like Find), `foldstate`.
+    @MainActor static func foldCommand(_ line: String, _ tv: OnyxTextView) {
+        let arg = String(line.split(separator: " ", maxSplits: 1).dropFirst().first ?? "")
+        if line.hasPrefix("foldstate") {
+            let hidden = (tv.layoutManager as? FoldLayoutManager)?.hiddenRanges ?? []
+            let ns = tv.string as NSString
+            print("[fold] folded=\(tv.folds.folded.count) hidden=\(hidden.map { "\($0.location)+\($0.length)" }) height=\(Int(tv.frame.height)) sel=\(tv.selectedRange().location) intact=\(ws.map { $0.text == tv.string } ?? false) len=\(ns.length) regions=\(tv.folds.regions.count)")
+        } else if line.hasPrefix("foldclick") {
+            let i = Int(arg) ?? 0
+            let rs = tv.folds.regions
+            guard rs.indices.contains(i), let c = tv.folds.chevronRect(rs[i]), let w = tv.window else { print("[fold] no region \(i)"); return }
+            let loc = tv.convert(NSPoint(x: c.midX, y: c.midY), to: nil)
+            if let e = NSEvent.mouseEvent(with: .leftMouseDown, location: loc, modifierFlags: [], timestamp: 0, windowNumber: w.windowNumber, context: nil, eventNumber: 1, clickCount: 1, pressure: 1) { tv.mouseDown(with: e) }
+        } else if line.hasPrefix("select ") {
+            tv.setSelectedRange(NSRange(location: Int(arg) ?? 0, length: 0))
+        } else if let ws {
+            ws.runFold(arg)
+        }
     }
 }
