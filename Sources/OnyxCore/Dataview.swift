@@ -180,13 +180,23 @@ public enum DVClause: Sendable {
     case limit(Int)
 }
 
+public indirect enum DVSource: Equatable, Sendable {
+    case folder(String)
+    case tag(String)
+    case incoming(String?)
+    case outgoing(String?)
+    case and(DVSource, DVSource)
+    case or(DVSource, DVSource)
+    case not(DVSource)
+}
+
 public struct DVQuery: Sendable {
     public enum Kind: Sendable { case table, list, task, calendar }
     public var kind: Kind
     public var withoutID = false
     public var columns: [(DVExpr, String)] = []
     public var listExpr: DVExpr?
-    public var from: [(String, Bool)] = []
+    public var from: DVSource? = nil
     public var pipeline: [DVClause] = []
 }
 
@@ -308,7 +318,7 @@ enum DVDate {
 
 public enum Dataview {
     // MARK: Tokenizer
-    enum Tok: Equatable { case ident(String), str(String), num(Double), op(String), lparen, rparen, comma, hash(String) }
+    enum Tok: Equatable { case ident(String), str(String), num(Double), op(String), lparen, rparen, comma, hash(String), wiki(String) }
 
     static func tokenize(_ s: String) throws -> [Tok] {
         var out: [Tok] = []
@@ -355,6 +365,12 @@ public enum Dataview {
                 while j < c.count && (c[j].isLetter || c[j].isNumber || c[j] == "_" || c[j] == "." ||
                                       (c[j] == "-" && j + 1 < c.count && c[j + 1].isLetter)) { v.append(c[j]); j += 1 }
                 out.append(.ident(v)); i = j; continue
+            }
+            if ch == "[", i + 1 < c.count, c[i + 1] == "[" {
+                var j = i + 2; var v = ""
+                while j + 1 < c.count, !(c[j] == "]" && c[j + 1] == "]") { v.append(c[j]); j += 1 }
+                if j + 1 >= c.count { throw DataviewError.parse("Unclosed wikilink") }
+                out.append(.wiki(v)); i = j + 2; continue
             }
             throw DataviewError.parse("Unexpected character '\(ch)'")
         }
@@ -480,6 +496,65 @@ public enum Dataview {
             if !any { throw DataviewError.parse("dur() needs a duration") }
             return acc
         }
+
+        func source() throws -> DVSource { try orSource() }
+        func orSource() throws -> DVSource {
+            var l = try andSource()
+            while isKeyword("OR") || peek == .op("||") || peek == .op("|") { i += 1; l = .or(l, try andSource()) }
+            return l
+        }
+        func andSource() throws -> DVSource {
+            var l = try unarySource()
+            while isKeyword("AND") || peek == .op("&&") || peek == .op("&") || startsSource(peek) {
+                if isKeyword("AND") || peek == .op("&&") || peek == .op("&") { i += 1 }
+                l = .and(l, try unarySource())
+            }
+            return l
+        }
+        func unarySource() throws -> DVSource {
+            if peek == .op("-") || peek == .op("!") || isKeyword("NOT") { i += 1; return .not(try unarySource()) }
+            return try primarySource()
+        }
+        func startsSource(_ tok: Tok?) -> Bool {
+            switch tok {
+            case .str, .hash, .wiki, .lparen: return true
+            case .ident(let s):
+                let u = s.uppercased()
+                return u == "OUTGOING" || u == "INCOMING"
+            default: return false
+            }
+        }
+        func primarySource() throws -> DVSource {
+            if peek == .lparen {
+                i += 1
+                let src = try source()
+                if peek == .rparen { i += 1 }
+                return src
+            }
+            if case .str(let v) = peek { i += 1; return .folder(v) }
+            if case .hash(let v) = peek { i += 1; return .tag(v) }
+            if case .wiki(let v) = peek { i += 1; return .incoming(wikiTarget(v)) }
+            if isKeyword("OUTGOING") || isKeyword("INCOMING") {
+                let outgoing = isKeyword("OUTGOING")
+                i += 1
+                guard peek == .lparen else { throw DataviewError.parse("Expected ( after \(outgoing ? "outgoing" : "incoming")") }
+                i += 1
+                let target: String?
+                if case .wiki(let v) = peek { i += 1; target = wikiTarget(v) }
+                else if case .str(let v) = peek { i += 1; target = v }
+                else { throw DataviewError.parse("Expected a wikilink inside outgoing()/incoming()") }
+                if peek == .rparen { i += 1 }
+                return outgoing ? .outgoing(target) : .incoming(target)
+            }
+            throw DataviewError.parse("Expected a FROM source (folder, #tag, [[Note]], outgoing(), or incoming())")
+        }
+        func wikiTarget(_ raw: String) -> String? {
+            var t = raw.trimmingCharacters(in: .whitespaces)
+            if let bar = t.firstIndex(of: "|") { t = String(t[..<bar]).trimmingCharacters(in: .whitespaces) }
+            if let hash = t.firstIndex(of: "#") { t = String(t[..<hash]).trimmingCharacters(in: .whitespaces) }
+            if t.isEmpty { return nil }
+            return t
+        }
     }
 
     // MARK: Query parser
@@ -530,15 +605,7 @@ public enum Dataview {
                     if p.peek == .comma { p.i += 1 }
                 }
             case "FROM":
-                var neg = false
-                for tk in ts {
-                    switch tk {
-                    case .str(let s): q.from.append((s, neg)); neg = false
-                    case .hash(let s): q.from.append(("#" + s, neg)); neg = false
-                    case .op("-"), .op("!"): neg = true
-                    default: break
-                    }
-                }
+                if !ts.isEmpty { q.from = try parseSource(ts) }
             case "WHERE":
                 q.pipeline.append(.whereExpr(try P(ts).expr()))
             case "SORT":
@@ -837,6 +904,13 @@ public enum Dataview {
         return eval(try parseExpr(source), Env(snap: snap, page: page, now: now, currentPath: path))
     }
 
+    public static func evalExpr(_ source: String, in snap: VaultSnapshot, from path: String, now: Date = Date(), bindings: [String: DVValue]) throws -> DVValue {
+        let page = snap.notes[path]
+        var env = Env(snap: snap, page: page, now: now, currentPath: path)
+        env.bindings = bindings
+        return eval(try parseExpr(source), env)
+    }
+
     /// Replace `` `= expr` `` (and `` `$= js` ``) inline code with placeholders. Code fences are left alone.
     /// `html[i]` is the rendered value (or a small error) for `data-i="i"`.
     public static func rewriteInlineQueries(_ body: String, in snap: VaultSnapshot, from path: String, now: Date = Date()) -> (text: String, html: [String]) {
@@ -891,21 +965,76 @@ public enum Dataview {
         s.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
     }
 
-    static func matchesFrom(_ from: [(String, Bool)], _ n: NoteRecord, snap: VaultSnapshot, current: String?) -> Bool {
-        if from.isEmpty { return true }
-        var anyPositive = false, matchedPositive = false
-        for (src, neg) in from {
-            let m: Bool
-            if src.hasPrefix("#") {
-                let t = String(src.dropFirst()).lowercased()
-                m = n.summary.tags.contains { $0.lowercased() == t || $0.lowercased().hasPrefix(t + "/") }
-            } else {
-                let s = src.hasSuffix("/") ? String(src.dropLast()) : src
-                m = n.path == s || n.path == s + ".md" || n.path.hasPrefix(s + "/")
-            }
-            if neg { if m { return false } } else { anyPositive = true; if m { matchedPositive = true } }
+    public static func parseSource(_ source: String) throws -> DVSource? {
+        let text = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text.isEmpty { return nil }
+        return try parseSource(try tokenize(text))
+    }
+
+    static func parseSource(_ ts: [Tok]) throws -> DVSource {
+        let p = P(ts)
+        let src = try p.source()
+        if p.peek != nil { throw DataviewError.parse("Unexpected trailing tokens in FROM") }
+        return src
+    }
+
+    static func matchesFrom(_ from: DVSource?, _ n: NoteRecord, snap: VaultSnapshot, current: String?) -> Bool {
+        guard let from else { return true }
+        return match(from, n, snap: snap, current: current)
+    }
+
+    static func match(_ src: DVSource, _ n: NoteRecord, snap: VaultSnapshot, current: String?) -> Bool {
+        switch src {
+        case .folder(let raw):
+            let s = raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+            return n.path == s || n.path == s + ".md" || n.path.hasPrefix(s + "/")
+        case .tag(let raw):
+            let t = raw.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+            return n.summary.tags.contains { $0.lowercased() == t || $0.lowercased().hasPrefix(t + "/") }
+        case .incoming(let target):
+            guard let dest = resolveSourceLink(target, snap: snap, current: current) else { return false }
+            return (snap.backlinks[dest] ?? []).contains(n.path)
+        case .outgoing(let target):
+            guard let srcPath = resolveSourceLink(target, snap: snap, current: current) else { return false }
+            return outgoingPaths(srcPath, snap: snap).contains(n.path)
+        case .and(let a, let b):
+            return match(a, n, snap: snap, current: current) && match(b, n, snap: snap, current: current)
+        case .or(let a, let b):
+            return match(a, n, snap: snap, current: current) || match(b, n, snap: snap, current: current)
+        case .not(let a):
+            return !match(a, n, snap: snap, current: current)
         }
-        return !anyPositive || matchedPositive
+    }
+
+    static func resolveSourceLink(_ target: String?, snap: VaultSnapshot, current: String?) -> String? {
+        let name = target?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.isEmpty {
+            guard let current else { return nil }
+            return snap.notes[current] != nil ? current : snap.resolve(current, from: nil)
+        }
+        return snap.resolve(name, from: current)
+    }
+
+    static func outgoingPaths(_ path: String, snap: VaultSnapshot) -> Set<String> {
+        guard let n = snap.notes[path] else { return [] }
+        var out = Set<String>()
+        for l in n.summary.links {
+            if let t = snap.resolve(l.target, from: path), t != path { out.insert(t) }
+        }
+        for m in n.summary.markdownLinks {
+            let rel = ((n.folder as NSString).appendingPathComponent(m) as NSString).standardizingPath
+            if snap.notes[rel] != nil, rel != path { out.insert(rel) }
+            else if let t = snap.resolve(m, from: path), t != path { out.insert(t) }
+        }
+        return out
+    }
+
+    public static func pagePaths(_ source: String?, in snap: VaultSnapshot, from current: String?) throws -> [String] {
+        let src = try parseSource(source ?? "")
+        return snap.sortedNotePaths.filter { path in
+            guard let n = snap.notes[path] else { return false }
+            return matchesFrom(src, n, snap: snap, current: current)
+        }
     }
 
     static func norm(_ s: String) -> String {
@@ -1316,6 +1445,123 @@ public enum Dataview {
         if case .task(let x) = a, case .task(let y) = b { return x.path == y.path && x.line == y.line }
         return a.text == b.text
     }
+
+    // MARK: Render
+
+    public static func html(_ r: DVResult) -> String {
+        if r.isTask { return taskHTML(r) }
+        if r.isCalendar { return calendarHTML(r) }
+        if r.isList {
+            if r.rows.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
+            return "<ul class=\"dataview-list\">" + r.rows.map { "<li>" + $0.map(htmlCell).joined(separator: ": ") + "</li>" }.joined() + "</ul>"
+        }
+        if r.rows.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
+        let head = "<thead><tr>" + r.headers.map { "<th>\(esc($0))</th>" }.joined() + "</tr></thead>"
+        let rows = r.rows.map { "<tr>" + $0.map { "<td>\(htmlCell($0))</td>" }.joined() + "</tr>" }.joined()
+        return "<div class=\"table-wrap\"><table class=\"dataview\">\(head)<tbody>\(rows)</tbody></table></div>"
+    }
+
+    public static func markdown(_ r: DVResult) throws -> String {
+        if r.isCalendar { throw DataviewError.parse("Cannot render calendar queries to markdown.") }
+        if r.isTask { return markdownTaskList(r.taskGroups.flatMap(\.tasks)) }
+        if r.isList { return markdownList(r.rows.map { $0.count == 1 ? $0[0] : .list($0) }) }
+        return markdownTable(r.headers, r.rows)
+    }
+
+    public static func markdownTable(_ headers: [String], _ rows: [[DVValue]]) -> String {
+        func cell(_ v: DVValue) -> String { markdownCell(v).replacingOccurrences(of: "|", with: "\\|").replacingOccurrences(of: "\n", with: " ") }
+        var lines = [
+            "| " + headers.map { $0.replacingOccurrences(of: "|", with: "\\|") }.joined(separator: " | ") + " |",
+            "| " + headers.map { _ in "---" }.joined(separator: " | ") + " |",
+        ]
+        for row in rows {
+            var cells = row.map(cell)
+            if cells.count < headers.count { cells += Array(repeating: "", count: headers.count - cells.count) }
+            lines.append("| " + cells.prefix(headers.count).joined(separator: " | ") + " |")
+        }
+        return lines.joined(separator: "\n")
+    }
+
+    public static func markdownList(_ values: [DVValue]) -> String {
+        values.map { "- \(markdownCell($0))" }.joined(separator: "\n")
+    }
+
+    public static func markdownTaskList(_ tasks: [DVTask]) -> String {
+        tasks.map { "- [\($0.completed ? "x" : " ")] \($0.text)" }.joined(separator: "\n")
+    }
+
+    static func markdownCell(_ v: DVValue) -> String {
+        switch v {
+        case .link(let p, let n):
+            let name = ((p as NSString).lastPathComponent as NSString).deletingPathExtension
+            if n == name { return "[[\(n)]]" }
+            return "[[\(name)|\(n)]]"
+        case .list(let l):
+            return l.map(markdownCell).joined(separator: ", ")
+        case .task(let t):
+            return t.text
+        default:
+            return v.text
+        }
+    }
+
+    static func htmlCell(_ v: DVValue) -> String {
+        switch v {
+        case .link(let p, let n): return "<a class=\"internal-link\" data-path=\"\(esc(p))\">\(esc(n))</a>"
+        case .list(let l): return l.map(htmlCell).joined(separator: ", ")
+        case .task(let t): return esc(t.text)
+        default: return esc(v.text)
+        }
+    }
+
+    static func taskHTML(_ r: DVResult) -> String {
+        if r.taskGroups.allSatisfy({ $0.tasks.isEmpty }) { return "<p class=\"dataview-empty\">No tasks.</p>" }
+        let groups = r.taskGroups.filter { !$0.tasks.isEmpty }.map { g -> String in
+            let title = "<div class=\"dataview-task-title\">\(htmlCell(g.heading))</div>"
+            return "<div class=\"dataview-task-group\">\(title)<ul class=\"dataview-list dataview-tasks\">" + g.tasks.map(taskItemHTML).joined() + "</ul></div>"
+        }.joined()
+        return "<div class=\"dataview-task-list\">\(groups)</div>"
+    }
+
+    static func taskItemHTML(_ t: DVTask) -> String {
+        let checked = t.completed ? " checked" : ""
+        return "<li class=\"task-list-item\(t.completed ? " is-checked" : "")\"><input type=\"checkbox\" data-dv-task data-path=\"\(esc(t.path))\" data-index=\"\(t.indexInFile)\"\(checked)>\(esc(t.text))</li>"
+    }
+
+    static func calendarHTML(_ r: DVResult) -> String {
+        if r.calendar.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
+        let cal = Calendar.current
+        let symbols = cal.veryShortWeekdaySymbols
+        let first = cal.firstWeekday
+        let weekdays = (0..<7).map { symbols[($0 + first - 1) % 7] }
+        let months = r.calendar.map { mon -> String in
+            var comps = DateComponents(); comps.year = mon.year; comps.month = mon.month; comps.day = 1
+            let start = cal.date(from: comps) ?? Date()
+            let fmt = DateFormatter(); fmt.calendar = cal; fmt.locale = .current; fmt.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+            let caption = fmt.string(from: start)
+            let weekdayRow = weekdays.map { "<span>\(esc($0))</span>" }.joined()
+            let pad = ((cal.component(.weekday, from: start) - first) + 7) % 7
+            let dim = cal.range(of: .day, in: .month, for: start)?.count ?? 30
+            var cells = Array(repeating: "<span class=\"dv-cal-day is-pad\"></span>", count: pad)
+            for d in 1...dim {
+                let notes = mon.days[d] ?? []
+                if notes.isEmpty {
+                    cells.append("<span class=\"dv-cal-day\">\(d)</span>")
+                } else {
+                    let dots = notes.map { v -> String in
+                        if case .link(let p, let n) = v {
+                            return "<a class=\"internal-link dv-cal-dot\" data-path=\"\(esc(p))\" title=\"\(esc(n))\">•</a>"
+                        }
+                        return "<span class=\"dv-cal-dot\" title=\"\(esc(v.text))\">•</span>"
+                    }.joined()
+                    cells.append("<span class=\"dv-cal-day has-notes\">\(d)<span class=\"dv-cal-dots\">\(dots)</span></span>")
+                }
+            }
+            return "<div class=\"dv-cal-month\"><div class=\"dv-cal-caption\">\(esc(caption))</div><div class=\"dv-cal-weekdays\">\(weekdayRow)</div><div class=\"dv-cal-grid\">\(cells.joined())</div></div>"
+        }.joined()
+        return "<div class=\"dataview-calendar\">\(months)</div>"
+    }
+
 }
 
 extension Array { subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil } }

@@ -309,4 +309,25 @@ final class DataviewTests: XCTestCase {
         XCTAssertTrue(r.html[4].contains("dataview-inline-error"), r.html[4])
     }
 
+
+    func testFromLinkSourcesAndAndOr() throws {
+        let incoming = try run("LIST FROM [[Sun]]")
+        XCTAssertEqual(incoming.rows.compactMap { $0.first?.text }, ["Moon"])
+        let alsoIncoming = try run("LIST FROM incoming([[Sun]])")
+        XCTAssertEqual(alsoIncoming.rows.compactMap { $0.first?.text }, incoming.rows.compactMap { $0.first?.text })
+        let outgoing = try run("LIST FROM outgoing([[Sun]])")
+        XCTAssertEqual(outgoing.rows.compactMap { $0.first?.text }, ["Moon"])
+        let current = try run("LIST FROM [[]]", from: "Knowledge/Astrology/Planets/Sun.md")
+        XCTAssertEqual(current.rows.compactMap { $0.first?.text }, ["Moon"])
+        let and = try run("LIST FROM #atlas and \"Knowledge\"")
+        XCTAssertEqual(and.rows.compactMap { $0.first?.text }, ["Planets"])
+        let orQ = try run("LIST FROM #atlas or \"Projects\"")
+        let orPaths = orQ.rows.compactMap { row -> String? in
+            if case .link(let p, _) = row.first { return p }
+            return nil
+        }
+        XCTAssertEqual(Set(orPaths), Set(["Knowledge/Astrology/Planets/Planets.md", "Projects/Moon.md"]))
+        let parsed = try Dataview.parseSource("outgoing([[Sun]]) or incoming([[Moon]])")
+        if case .or(.outgoing("Sun"), .incoming("Moon")) = parsed { } else { XCTFail("parsed \(String(describing: parsed))") }
+    }
 }

@@ -53,20 +53,24 @@ public enum DataviewJS {
         }
         ctx.evaluateScript(prelude)
         if let jsError { return (nil, jsError) }
+        installBridges(ctx, snap: snap, path: path, now: now)
         ctx.evaluateScript("OnyxDV.load(\(jsonLiteral(json)))")
         if let jsError { return (nil, jsError) }
 
         let wrapped: String
         if expression {
-            wrapped = "OnyxDV.runExpr(function(){ return (\n\(source)\n); })"
+            wrapped = "OnyxDV.runExpr(async function(){ return (\n\(source)\n); })"
         } else {
-            wrapped = "OnyxDV.run(function(){\n\(source)\n})"
+            wrapped = "OnyxDV.run(async function(){\n\(source)\n})"
         }
         guard let val = ctx.evaluateScript(wrapped) else {
             return (nil, jsError ?? "DataviewJS failed")
         }
         if let jsError { return (nil, jsError) }
-        guard let raw = val.toString(), let parsed = parseResult(raw) else {
+        let (settled, promiseError) = awaitPromise(val, in: ctx)
+        if let promiseError { return (nil, promiseError) }
+        if let jsError { return (nil, jsError) }
+        guard let settled, let raw = settled.toString(), let parsed = parseResult(raw) else {
             return (nil, jsError ?? "DataviewJS returned nothing")
         }
         return (parsed, nil)
@@ -227,6 +231,10 @@ public enum DataviewJS {
                 }
             }
             return "<\(tag)\(attrs)>\(content)</\(tag)>"
+        case "style":
+            return "<style>\(sanitizeCSS(d["s"] as? String ?? ""))</style>"
+        case "html":
+            return d["s"] as? String ?? ""
         default:
             return Dataview.esc(stringify(node))
         }
@@ -303,6 +311,445 @@ public enum DataviewJS {
         if t.isEmpty { return false }
         if t.hasPrefix("javascript:") || t.hasPrefix("data:") || t.hasPrefix("vbscript:") || t.hasPrefix("file:") { return false }
         return true
+    }
+
+
+    static func awaitPromise(_ value: JSValue, in ctx: JSContext, timeout: TimeInterval = 2) -> (JSValue?, String?) {
+        if value.isUndefined || value.isNull { return (value, nil) }
+        let then = value.objectForKeyedSubscript("then")
+        guard let then, then.isObject, !then.isUndefined, !then.isNull else { return (value, nil) }
+
+        var result: JSValue?
+        var error: String?
+        var done = false
+        let onFulfilled: @convention(block) (JSValue?) -> Void = { v in
+            result = v
+            done = true
+        }
+        let onRejected: @convention(block) (JSValue?) -> Void = { e in
+            error = e?.toString() ?? "Promise rejected"
+            done = true
+        }
+        value.invokeMethod("then", withArguments: [
+            JSValue(object: onFulfilled, in: ctx) as Any,
+            JSValue(object: onRejected, in: ctx) as Any,
+        ])
+
+        let deadline = Date().addingTimeInterval(timeout)
+        while !done, Date() < deadline {
+            ctx.evaluateScript("void 0")
+            if done { break }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.005))
+        }
+        if !done { return (nil, "DataviewJS timed out waiting for a Promise") }
+        if let error { return (nil, error) }
+        return (result, nil)
+    }
+
+    static func encodeJSON(_ obj: Any) -> String {
+        guard JSONSerialization.isValidJSONObject(obj),
+              let data = try? JSONSerialization.data(withJSONObject: obj),
+              let s = String(data: data, encoding: .utf8) else { return "null" }
+        return s
+    }
+
+    static func installBridges(_ ctx: JSContext, snap: VaultSnapshot, path: String, now: Date) {
+        let pages: @convention(block) (String?) -> String = { src in
+            let trimmed = src?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let arg: String? = (trimmed == nil || trimmed == "" || trimmed == "undefined" || trimmed == "null") ? nil : src
+            do {
+                let paths = try Dataview.pagePaths(arg, in: snap, from: path)
+                return encodeJSON(paths)
+            } catch {
+                return encodeJSON(["error": String(describing: error)])
+            }
+        }
+        let load: @convention(block) (String?, String?) -> String? = { raw, origin in
+            guard let rel = resolveVaultPath(raw ?? "", origin: origin, current: path, snap: snap) else { return nil }
+            return readVaultFile(rel, snap: snap)
+        }
+        let normalize: @convention(block) (String?, String?) -> String? = { raw, origin in
+            normalizeVaultPath(raw ?? "", origin: origin, current: path, snap: snap)
+        }
+        let csv: @convention(block) (String?, String?) -> String? = { raw, origin in
+            guard let rel = resolveVaultPath(raw ?? "", origin: origin, current: path, snap: snap),
+                  let text = readVaultFile(rel, snap: snap) else { return nil }
+            return encodeJSON(parseCSV(text))
+        }
+        let view: @convention(block) (String?) -> String = { raw in
+            encodeJSON(loadView(raw ?? "", current: path, snap: snap))
+        }
+        let query: @convention(block) (String?, String?) -> String = { source, file in
+            let from = (file?.isEmpty == false && file != "undefined" && file != "null") ? file! : path
+            do {
+                let r = try Dataview.run(source ?? "", in: snap, from: from, now: now)
+                return encodeJSON(["successful": true, "value": queryValue(r, snap: snap)])
+            } catch {
+                return encodeJSON(["successful": false, "error": String(describing: error)])
+            }
+        }
+        let queryMd: @convention(block) (String?, String?) -> String = { source, file in
+            let from = (file?.isEmpty == false && file != "undefined" && file != "null") ? file! : path
+            do {
+                let r = try Dataview.run(source ?? "", in: snap, from: from, now: now)
+                let md = try Dataview.markdown(r)
+                return encodeJSON(["successful": true, "value": md])
+            } catch {
+                return encodeJSON(["successful": false, "error": String(describing: error)])
+            }
+        }
+        let execute: @convention(block) (String?) -> String = { source in
+            do {
+                return Dataview.html(try Dataview.run(source ?? "", in: snap, from: path, now: now))
+            } catch {
+                return "<div class=\"dataview-error\"><span>dataview</span> \(Dataview.esc(String(describing: error)))<pre>\(Dataview.esc(source ?? ""))</pre></div>"
+            }
+        }
+        let evaluate: @convention(block) (String?, String?) -> String = { expr, contextJSON in
+            do {
+                let v = try Dataview.evalExpr(expr ?? "", in: snap, from: path, now: now, bindings: bindings(from: contextJSON))
+                return encodeJSON(["successful": true, "value": jsonValue(v, snap: snap)])
+            } catch {
+                return encodeJSON(["successful": false, "error": String(describing: error)])
+            }
+        }
+        let duration: @convention(block) (String?) -> String? = { text in
+            guard let d = DVDuration.parse(text ?? "") else { return nil }
+            return encodeJSON([
+                "text": d.text,
+                "years": d.years, "months": d.months, "weeks": d.weeks,
+                "days": d.days, "hours": d.hours, "minutes": d.minutes, "seconds": d.seconds,
+            ])
+        }
+        let parse: @convention(block) (String?) -> String? = { text in
+            parseLiteral(text ?? "", snap: snap)
+        }
+        let markdown: @convention(block) (String?, String?) -> String = { kind, payload in
+            markdownFromJS(kind ?? "", payload ?? "", snap: snap)
+        }
+        ctx.setObject(pages, forKeyedSubscript: "_onyxPages" as NSString)
+        ctx.setObject(load, forKeyedSubscript: "_onyxLoad" as NSString)
+        ctx.setObject(normalize, forKeyedSubscript: "_onyxNormalize" as NSString)
+        ctx.setObject(csv, forKeyedSubscript: "_onyxCSV" as NSString)
+        ctx.setObject(view, forKeyedSubscript: "_onyxView" as NSString)
+        ctx.setObject(query, forKeyedSubscript: "_onyxQuery" as NSString)
+        ctx.setObject(queryMd, forKeyedSubscript: "_onyxQueryMarkdown" as NSString)
+        ctx.setObject(execute, forKeyedSubscript: "_onyxExecute" as NSString)
+        ctx.setObject(evaluate, forKeyedSubscript: "_onyxEvaluate" as NSString)
+        ctx.setObject(duration, forKeyedSubscript: "_onyxDuration" as NSString)
+        ctx.setObject(parse, forKeyedSubscript: "_onyxParse" as NSString)
+        ctx.setObject(markdown, forKeyedSubscript: "_onyxMarkdown" as NSString)
+    }
+
+    static func bindings(from json: String?) -> [String: DVValue] {
+        guard let json, let data = json.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
+        var out: [String: DVValue] = [:]
+        for (k, v) in obj { out[k] = dvValue(v) }
+        return out
+    }
+
+    static func dvValue(_ v: Any) -> DVValue {
+        if v is NSNull { return .null }
+        if let n = v as? NSNumber {
+            if CFGetTypeID(n) == CFBooleanGetTypeID() { return .bool(n.boolValue) }
+            return .number(n.doubleValue)
+        }
+        if let s = v as? String { return DVValue.coerceScalar(s) }
+        if let a = v as? [Any] { return .list(a.map(dvValue)) }
+        if let d = v as? [String: Any] {
+            if let p = d["__l"] as? String { return .link(path: p, name: d["name"] as? String ?? p) }
+            if let isoStr = d["__d"] as? String {
+                let f = ISO8601DateFormatter()
+                f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                if let date = f.date(from: isoStr) ?? ISO8601DateFormatter().date(from: isoStr) {
+                    return .date(date, dayOnly: false)
+                }
+            }
+        }
+        return .string("\(v)")
+    }
+
+    static func queryValue(_ r: DVResult, snap: VaultSnapshot) -> [String: Any] {
+        if r.isCalendar {
+            let months: [[String: Any]] = r.calendar.map { mon in
+                var days: [String: Any] = [:]
+                for (d, notes) in mon.days {
+                    days[String(d)] = notes.map { jsonValue($0, snap: snap) }
+                }
+                return ["year": mon.year, "month": mon.month, "days": days]
+            }
+            return ["type": "calendar", "values": months]
+        }
+        if r.isTask {
+            return ["type": "task", "values": r.taskGroups.flatMap(\.tasks).map { taskJSON($0) }]
+        }
+        if r.isList {
+            let values: [Any] = r.rows.map { row in
+                if row.count == 1 { return jsonValue(row[0], snap: snap) }
+                return row.map { jsonValue($0, snap: snap) }
+            }
+            return ["type": "list", "values": values]
+        }
+        return [
+            "type": "table",
+            "headers": r.headers,
+            "values": r.rows.map { $0.map { jsonValue($0, snap: snap) } },
+        ]
+    }
+
+    static func taskJSON(_ t: DVTask) -> [String: Any] {
+        var o: [String: Any] = [
+            "text": t.text, "completed": t.completed, "path": t.path,
+            "line": t.line, "indexInFile": t.indexInFile, "tags": t.tags,
+        ]
+        if let d = t.due { o["due"] = ["__d": iso(d)] }
+        if let d = t.scheduled { o["scheduled"] = ["__d": iso(d)] }
+        if let d = t.created { o["created"] = ["__d": iso(d)] }
+        if let d = t.completion { o["completion"] = ["__d": iso(d)] }
+        return o
+    }
+
+    static func normalizeRel(_ path: String) -> String? {
+        var parts: [String] = []
+        for part in path.split(separator: "/").map(String.init) {
+            if part.isEmpty || part == "." { continue }
+            if part == ".." {
+                if parts.isEmpty { return nil }
+                parts.removeLast()
+                continue
+            }
+            if part.contains("\0") { return nil }
+            parts.append(part)
+        }
+        return parts.joined(separator: "/")
+    }
+
+    static func cleanPathArg(_ raw: String) -> String? {
+        var t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("[["), t.hasSuffix("]]") {
+            t = String(t.dropFirst(2).dropLast(2))
+            if let bar = t.firstIndex(of: "|") { t = String(t[..<bar]) }
+        }
+        t = t.trimmingCharacters(in: .whitespaces)
+        if t.isEmpty || t.contains("\0") { return nil }
+        if t.hasPrefix("/") || t.hasPrefix("~") || t.hasPrefix("\\") || t.contains("://") { return nil }
+        return t
+    }
+
+    static func resolveVaultPath(_ raw: String, origin: String?, current: String, snap: VaultSnapshot) -> String? {
+        guard let t = cleanPathArg(raw) else { return nil }
+        let originPath = (origin?.isEmpty == false && origin != "undefined" && origin != "null") ? origin! : current
+        if let resolved = snap.resolve(t, from: originPath), readable(resolved, snap: snap) {
+            return sandboxRel(resolved, snap: snap)
+        }
+        let folder = (originPath as NSString).deletingLastPathComponent
+        var candidates: [String] = []
+        if t.hasPrefix("./") || t.hasPrefix("../") {
+            candidates.append(folder.isEmpty ? t : (folder as NSString).appendingPathComponent(t))
+        } else {
+            if !folder.isEmpty { candidates.append((folder as NSString).appendingPathComponent(t)) }
+            candidates.append(t) // also try vault-root relative
+        }
+        for combined in candidates {
+            guard let normalized = normalizeRel(combined), let rel = sandboxRel(normalized, snap: snap) else { continue }
+            if readable(rel, snap: snap) { return rel }
+        }
+        // Fall back to the first sandbox-legal candidate even if the file is missing (normalize uses this too).
+        for combined in candidates {
+            if let normalized = normalizeRel(combined), let rel = sandboxRel(normalized, snap: snap) { return rel }
+        }
+        return nil
+    }
+
+    static func readable(_ rel: String, snap: VaultSnapshot) -> Bool {
+        if snap.notes[rel] != nil { return true }
+        if !rel.hasSuffix(".md"), snap.notes[rel + ".md"] != nil { return true }
+        if snap.attachments[rel] != nil { return true }
+        let root = snap.root.resolvingSymlinksInPath().standardizedFileURL
+        guard FileManager.default.fileExists(atPath: root.path) else { return false }
+        let url = root.appendingPathComponent(rel).resolvingSymlinksInPath().standardizedFileURL
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard url.path == root.path || url.path.hasPrefix(prefix) else { return false }
+        return FileManager.default.fileExists(atPath: url.path)
+    }
+
+    static func normalizeVaultPath(_ raw: String, origin: String?, current: String, snap: VaultSnapshot) -> String? {
+        if let resolved = resolveVaultPath(raw, origin: origin, current: current, snap: snap) {
+            if snap.notes[resolved] != nil { return resolved }
+            if !resolved.hasSuffix(".md"), snap.notes[resolved + ".md"] != nil { return resolved + ".md" }
+            return resolved
+        }
+        guard let t = cleanPathArg(raw) else { return nil }
+        let originPath = (origin?.isEmpty == false && origin != "undefined" && origin != "null") ? origin! : current
+        let folder = (originPath as NSString).deletingLastPathComponent
+        let combined = folder.isEmpty ? t : (folder as NSString).appendingPathComponent(t)
+        guard var normalized = normalizeRel(combined) else { return nil }
+        if (normalized as NSString).pathExtension.isEmpty { normalized += ".md" }
+        return sandboxRel(normalized, snap: snap)
+    }
+
+    static func sandboxRel(_ rel: String, snap: VaultSnapshot) -> String? {
+        guard let normalized = normalizeRel(rel), !normalized.isEmpty else { return nil }
+        let root = snap.root.resolvingSymlinksInPath().standardizedFileURL
+        if !FileManager.default.fileExists(atPath: root.path) { return normalized }
+        let url = root.appendingPathComponent(normalized).resolvingSymlinksInPath().standardizedFileURL
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        if url.path == root.path || url.path.hasPrefix(prefix) { return normalized }
+        return nil
+    }
+
+    static func readVaultFile(_ rel: String, snap: VaultSnapshot) -> String? {
+        if let n = snap.notes[rel] { return n.content }
+        if !rel.hasSuffix(".md"), let n = snap.notes[rel + ".md"] { return n.content }
+        guard sandboxRel(rel, snap: snap) != nil else { return nil }
+        let root = snap.root.resolvingSymlinksInPath().standardizedFileURL
+        guard FileManager.default.fileExists(atPath: root.path) else { return nil }
+        let url = root.appendingPathComponent(rel).resolvingSymlinksInPath().standardizedFileURL
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard url.path == root.path || url.path.hasPrefix(prefix) else { return nil }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), !isDir.boolValue else { return nil }
+        return try? String(contentsOf: url, encoding: .utf8)
+    }
+
+    static func loadView(_ raw: String, current: String, snap: VaultSnapshot) -> [String: String] {
+        let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = t.split(separator: "/").map(String.init)
+        if parts.contains(where: { $0.hasPrefix(".") && $0 != "." && $0 != ".." }) {
+            return ["error": "Dataview: custom view not found for '\(t)/view.js' or '\(t).js'."]
+        }
+        func file(_ rel: String) -> String? {
+            if let path = resolveVaultPath(rel, origin: nil, current: current, snap: snap) {
+                return readVaultFile(path, snap: snap)
+            }
+            if let path = sandboxRel(rel, snap: snap) { return readVaultFile(path, snap: snap) }
+            return nil
+        }
+        let js = file(t + "/view.js") ?? (t.hasSuffix(".js") ? file(t) : file(t + ".js"))
+        guard let js else {
+            return ["error": "Dataview: custom view not found for '\(t)/view.js' or '\(t).js'."]
+        }
+        var out = ["js": js]
+        if let css = file(t + "/view.css") ?? file((t.hasSuffix(".js") ? String(t.dropLast(3)) : t) + ".css") {
+            let clean = sanitizeCSS(css)
+            if !clean.isEmpty { out["css"] = clean }
+        }
+        return out
+    }
+
+    static func sanitizeCSS(_ raw: String) -> String {
+        var s = raw.replacingOccurrences(of: "</style", with: "", options: .caseInsensitive)
+        s = s.replacingOccurrences(of: "<", with: "")
+        let patterns = [#"@import\b[^;]*;?"#, #"url\s*\([^)]*\)"#, #"expression\s*\([^)]*\)"#, #"javascript\s*:"#, #"-moz-binding\s*:[^;]*;?"#]
+        for pat in patterns {
+            s = s.replacingOccurrences(of: pat, with: "", options: [.regularExpression, .caseInsensitive])
+        }
+        return s
+    }
+
+    static func parseCSV(_ text: String) -> [[String: String]] {
+        let rows = csvRows(text)
+        guard let headers = rows.first, !headers.isEmpty else { return [] }
+        return rows.dropFirst().map { row in
+            var o: [String: String] = [:]
+            for (i, h) in headers.enumerated() { o[h] = i < row.count ? row[i] : "" }
+            return o
+        }
+    }
+
+    static func csvRows(_ text: String) -> [[String]] {
+        var rows: [[String]] = []
+        var row: [String] = []
+        var field = ""
+        var quoted = false
+        let chars = Array(text)
+        var i = 0
+        while i < chars.count {
+            let ch = chars[i]
+            if quoted {
+                if ch == "\"" {
+                    if i + 1 < chars.count, chars[i + 1] == "\"" { field.append("\""); i += 2; continue }
+                    quoted = false; i += 1; continue
+                }
+                field.append(ch); i += 1; continue
+            }
+            switch ch {
+            case "\"": quoted = true; i += 1
+            case ",": row.append(field); field = ""; i += 1
+            case "\n":
+                row.append(field); field = ""
+                if !(row.count == 1 && row[0].isEmpty && rows.isEmpty) { rows.append(row) }
+                row = []; i += 1
+            case "\r":
+                i += 1
+                if i < chars.count, chars[i] == "\n" { continue }
+                row.append(field); field = ""
+                if !(row.count == 1 && row[0].isEmpty && rows.isEmpty) { rows.append(row) }
+                row = []
+            default: field.append(ch); i += 1
+            }
+        }
+        if quoted || !field.isEmpty || !row.isEmpty {
+            row.append(field)
+            if !(row.count == 1 && row[0].isEmpty && rows.isEmpty) { rows.append(row) }
+        }
+        return rows
+    }
+
+    static func parseLiteral(_ text: String, snap: VaultSnapshot) -> String? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.hasPrefix("[["), t.hasSuffix("]]") {
+            var inner = String(t.dropFirst(2).dropLast(2))
+            var name: String? = nil
+            if let bar = inner.firstIndex(of: "|") {
+                name = String(inner[inner.index(after: bar)...]).trimmingCharacters(in: .whitespaces)
+                inner = String(inner[..<bar]).trimmingCharacters(in: .whitespaces)
+            }
+            let path = snap.resolve(inner, from: nil) ?? inner
+            return encodeJSON(["__l": path, "name": name ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension])
+        }
+        if let d = DVDate.parse(t) { return encodeJSON(["__d": iso(d)]) }
+        if let d = DVDuration.parse(t) {
+            return encodeJSON([
+                "text": d.text,
+                "years": d.years, "months": d.months, "weeks": d.weeks,
+                "days": d.days, "hours": d.hours, "minutes": d.minutes, "seconds": d.seconds,
+                "__dur": true,
+            ])
+        }
+        return nil
+    }
+
+    static func markdownFromJS(_ kind: String, _ payload: String, snap: VaultSnapshot) -> String {
+        guard let data = payload.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) else { return "" }
+        switch kind {
+        case "table":
+            let d = obj as? [String: Any] ?? [:]
+            let headers = (d["headers"] as? [Any] ?? []).map { stringify($0) }
+            let values = (d["values"] as? [Any] ?? []).map { row -> [DVValue] in
+                (row as? [Any] ?? [row]).map(dvValue)
+            }
+            return Dataview.markdownTable(headers, values)
+        case "list":
+            let values = (obj as? [Any] ?? [obj]).map(dvValue)
+            return Dataview.markdownList(values)
+        case "tasks":
+            let tasks = (obj as? [Any] ?? []).compactMap { item -> DVTask? in
+                guard let d = item as? [String: Any] else { return nil }
+                return DVTask(
+                    text: d["text"] as? String ?? stringify(item),
+                    completed: d["completed"] as? Bool ?? false,
+                    path: d["path"] as? String ?? "",
+                    line: d["line"] as? Int ?? 0,
+                    indexInFile: d["indexInFile"] as? Int ?? 0
+                )
+            }
+            return Dataview.markdownTaskList(tasks)
+        default:
+            return ""
+        }
     }
 
     static let prelude = #"""
@@ -399,7 +846,7 @@ public enum DataviewJS {
       }
 
       var dv = {};
-      dv.pages = function(source){ return pages.filter(function(p){ return matchFrom(source, p); }); };
+      dv.pages = function(source){ return dv.pagePaths(source).map(function(p){ return byPath[p]; }).filter(Boolean); };
       dv.current = function(){ return byPath[currentPath] || null; };
       dv.page = function(path){
         if (!path) return dv.current();
@@ -423,7 +870,12 @@ public enum DataviewJS {
         return isNaN(p) ? null : p;
       };
       dv.paragraph = function(s){ out.push({ t: 'p', s: String(s == null ? '' : s) }); };
-      dv.header = function(s, level){ out.push({ t: 'h', s: String(s == null ? '' : s), level: level || 2 }); };
+      dv.header = function(a, b){
+        var level, s;
+        if (typeof a === 'number') { level = a; s = b; }
+        else { s = a; level = b; }
+        out.push({ t: 'h', s: String(s == null ? '' : s), level: level || 2 });
+      };
       dv.span = function(s){ out.push({ t: 'span', s: String(s == null ? '' : s) }); };
       dv.table = function(headers, rows){
         out.push({ t: 'table', headers: (headers || []).map(function(h){ return String(h); }), rows: (rows || []).map(function(r){
@@ -454,7 +906,147 @@ public enum DataviewJS {
         else node.c = String(content);
         out.push(node);
       };
+
+      dv.pagePaths = function(source){
+        var raw = _onyxPages(source == null ? null : String(source));
+        var data = JSON.parse(raw);
+        if (data && data.error) throw new Error(data.error);
+        return data;
+      };
+      dv.array = function(v){
+        if (v == null) return [];
+        if (Array.isArray(v)) return v;
+        return [v];
+      };
+      dv.isArray = function(v){ return Array.isArray(v); };
+      dv.fileLink = function(path, embed, display){
+        var s = String(path || '');
+        var name = display == null ? s.split('/').pop().replace(/\.md$/,'') : String(display);
+        return { __l: s, name: name, embed: !!embed, toString: function(){ return this.name || this.__l; } };
+      };
+      dv.sectionLink = function(path, section, embed, display){
+        var s = String(path || ''), sec = String(section || '');
+        var name = display == null ? (s.split('/').pop().replace(/\.md$/,'') + '#' + sec) : String(display);
+        return { __l: s, subpath: '#' + sec, name: name, embed: !!embed, toString: function(){ return this.name || this.__l; } };
+      };
+      dv.blockLink = function(path, blockId, embed, display){
+        return dv.sectionLink(path, '^' + String(blockId || ''), embed, display);
+      };
+      dv.duration = function(text){
+        var raw = _onyxDuration(text == null ? '' : String(text));
+        if (!raw) return null;
+        var d = JSON.parse(raw);
+        d.toString = function(){ return this.text; };
+        return d;
+      };
+      dv.compare = function(a, b){ return cmp(a, b); };
+      dv.equal = function(a, b){ return cmp(a, b) === 0; };
+      dv.clone = function(v){
+        if (v == null || typeof v !== 'object') return v;
+        if (v instanceof Date) return new Date(v.getTime());
+        if (Array.isArray(v)) return v.map(dv.clone);
+        var o = {};
+        Object.keys(v).forEach(function(k){ o[k] = dv.clone(v[k]); });
+        if (v.__l) o.toString = function(){ return this.name || this.__l; };
+        return o;
+      };
+      dv.parse = function(value){
+        if (value == null || typeof value !== 'string') return value;
+        var raw = _onyxParse(String(value));
+        if (!raw) return value;
+        var parsed = JSON.parse(raw);
+        if (parsed && parsed.__dur) {
+          parsed.toString = function(){ return this.text; };
+          return parsed;
+        }
+        return revive(parsed);
+      };
+      dv.markdownTable = function(headers, values){
+        return _onyxMarkdown('table', JSON.stringify({ headers: headers || [], values: values || [] }));
+      };
+      dv.markdownList = function(values){
+        return _onyxMarkdown('list', JSON.stringify(values || []));
+      };
+      dv.markdownTaskList = function(tasks){
+        return _onyxMarkdown('tasks', JSON.stringify(tasks || []));
+      };
+      function pathArg(p){
+        if (p == null) return '';
+        if (typeof p === 'object' && p.__l) return String(p.__l);
+        return String(p);
+      }
+      dv.io = {
+        load: function(p, origin){ return Promise.resolve(_onyxLoad(pathArg(p), origin || null)); },
+        csv: function(p, origin){
+          return Promise.resolve(_onyxCSV(pathArg(p), origin || null)).then(function(raw){
+            if (raw == null) return undefined;
+            return JSON.parse(raw);
+          });
+        },
+        normalize: function(p, origin){ return _onyxNormalize(pathArg(p), origin || null); }
+      };
+      var execDepth = 0;
+      dv.execute = function(source){
+        var html = _onyxExecute(String(source || ''));
+        out.push({ t: 'html', s: String(html || '') });
+      };
+      dv.executeJs = function(source){
+        if (execDepth >= 8) throw new Error('DataviewJS executeJs nesting is too deep');
+        execDepth++;
+        try { return (function(){ return eval(String(source || '')); })(); }
+        finally { execDepth--; }
+      };
+      dv.view = function(path, input){
+        return Promise.resolve(_onyxView(String(path || ''))).then(function(raw){
+          var info = JSON.parse(raw);
+          if (!info || info.error) throw new Error((info && info.error) || 'Dataview: custom view not found');
+          if (info.css) out.push({ t: 'style', s: String(info.css) });
+          var fn = new Function('dv', 'input', 'return (async function(){\n' + info.js + '\n}).call(this);');
+          return fn(dv, input);
+        });
+      };
+      dv.query = function(source, file){
+        return Promise.resolve(JSON.parse(_onyxQuery(String(source || ''), file == null ? null : String(file)))).then(function(r){
+          if (r && r.successful && r.value) r.value = revive(r.value);
+          return r;
+        });
+      };
+      dv.tryQuery = function(source, file){
+        return dv.query(source, file).then(function(r){
+          if (!r.successful) throw new Error(r.error || 'Query failed');
+          return r.value;
+        });
+      };
+      dv.queryMarkdown = function(source, file){
+        return Promise.resolve(JSON.parse(_onyxQueryMarkdown(String(source || ''), file == null ? null : String(file))));
+      };
+      dv.tryQueryMarkdown = function(source, file){
+        return dv.queryMarkdown(source, file).then(function(r){
+          if (!r.successful) throw new Error(r.error || 'Query failed');
+          return r.value;
+        });
+      };
+      dv.evaluate = function(expression, context){
+        var ctx = {};
+        if (context && typeof context === 'object') {
+          Object.keys(context).forEach(function(k){
+            var v = context[k];
+            if (v instanceof Date) ctx[k] = { __d: v.toISOString() };
+            else ctx[k] = v;
+          });
+        }
+        var r = JSON.parse(_onyxEvaluate(String(expression || ''), JSON.stringify(ctx)));
+        if (r && r.successful) r.value = revive(r.value);
+        return r;
+      };
+      dv.tryEvaluate = function(expression, context){
+        var r = dv.evaluate(expression, context);
+        if (!r.successful) throw new Error(r.error || 'Evaluation failed');
+        return r.value;
+      };
+      Object.freeze(dv.io);
       Object.freeze(dv);
+
 
       return {
         load: function(json){
@@ -466,17 +1058,20 @@ public enum DataviewJS {
           pages.forEach(function(p){ if (p && p.file) byPath[p.file.path] = p; });
           out = [];
           globalThis.dv = dv;
+          globalThis.dataview = dv;
         },
         run: function(fn){
           out = [];
-          fn(dv);
-          return JSON.stringify({ out: out });
+          return Promise.resolve(fn(dv)).then(function(){ return Promise.resolve(); }).then(function(){
+            return JSON.stringify({ out: out });
+          });
         },
         runExpr: function(fn){
           out = [];
-          var v = fn(dv);
-          var value = (v == null) ? '' : (v instanceof Date ? v.toISOString() : (typeof v === 'object' && v.__l ? (v.name || v.__l) : String(v)));
-          return JSON.stringify({ out: out, value: value });
+          return Promise.resolve(fn(dv)).then(function(v){
+            var value = (v == null) ? '' : (v instanceof Date ? v.toISOString() : (typeof v === 'object' && v.__l ? (v.name || v.__l) : String(v)));
+            return JSON.stringify({ out: out, value: value });
+          });
         }
       };
     })();

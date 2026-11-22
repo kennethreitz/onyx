@@ -450,16 +450,7 @@ enum ReaderPayload {
 
     static func dataviewHTML(_ query: String, snap: VaultSnapshot, path: String) -> String {
         do {
-            let r = try Dataview.run(query, in: snap, from: path)
-            if r.isTask { return taskHTML(r) }
-            if r.isCalendar { return calendarHTML(r) }
-            if r.isList {
-                return "<ul class=\"dataview-list\">" + r.rows.map { "<li>" + $0.map(cell).joined(separator: ": ") + "</li>" }.joined() + "</ul>"
-            }
-            if r.rows.isEmpty { return "<p class=\"dataview-empty\">No results.</p>" }
-            let head = "<thead><tr>" + r.headers.map { "<th>\(esc($0))</th>" }.joined() + "</tr></thead>"
-            let rows = r.rows.map { "<tr>" + $0.map { "<td>\(cell($0))</td>" }.joined() + "</tr>" }.joined()
-            return "<div class=\"table-wrap\"><table class=\"dataview\">\(head)<tbody>\(rows)</tbody></table></div>"
+            return Dataview.html(try Dataview.run(query, in: snap, from: path))
         } catch {
             return "<div class=\"dataview-error\"><span>dataview</span> \(esc(String(describing: error)))<pre>\(esc(query))</pre></div>"
         }
