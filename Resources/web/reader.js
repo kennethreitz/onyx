@@ -625,7 +625,7 @@
     scrollToHeading(i) {
       const hs = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
       const h = hs[i];
-      if (h) h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (h) h.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
     },
   };
 

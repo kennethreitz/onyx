@@ -24,7 +24,7 @@
 }
 .theme-light {
   --background-primary: #fdfdfb; --background-primary-alt: #f6f6f1; --background-secondary: #f4f4ef;
-  --text-normal: #1a1a18; --text-muted: #565650; --text-faint: #8a8a82; --text-accent-hover: #000;
+  --text-normal: #1a1a18; --text-muted: #565650; --text-faint: #7f7f78; --text-accent-hover: #000;
   --hr-color: #1a1a18; --table-border-color: #1a1a18; --border: #dedcd2;
   --text-selection: rgba(255, 220, 40, 0.22); --highlight: rgba(255, 220, 40, 0.32);
 }
@@ -32,7 +32,7 @@
   --background-primary: #1b1b19; --background-primary-alt: #222220; --background-secondary: #201f1d;
   --text-normal: #e9e8e1; --text-muted: #b3b2a9; --text-faint: #7f7e76; --text-accent-hover: #fff;
   --hr-color: #e9e8e1; --table-border-color: #e9e8e1; --border: #34332e;
-  --text-selection: rgba(255, 220, 40, 0.12); --highlight: rgba(255, 220, 40, 0.20);
+  --text-selection: rgba(255, 220, 40, 0.14); --highlight: rgba(255, 220, 40, 0.20);
 }
 
 html, body { margin: 0; padding: 0; background: transparent; }
@@ -90,12 +90,17 @@ ul, ol { padding-left: 1.5em; margin: 0.3em 0 0.7em; }
 li { margin: 0.12em 0; }
 li > p { margin: 0; }
 
-a { color: var(--text-normal); text-decoration: underline; text-decoration-color: var(--text-faint); text-underline-offset: 2px; cursor: pointer; }
+a { color: var(--text-normal); text-decoration: underline; text-decoration-color: var(--text-faint); text-decoration-thickness: 0.055em; text-underline-offset: 0.17em; text-decoration-skip-ink: auto; cursor: pointer; transition: color .12s ease-out, text-decoration-color .12s ease-out; }
+a:focus-visible { outline: 1.5px solid color-mix(in srgb, var(--text-normal) 45%, transparent); outline-offset: 2px; border-radius: 2px; }
 a:hover { color: var(--text-accent-hover); text-decoration-color: var(--text-accent-hover); }
 a.is-unresolved { text-decoration-style: dotted; color: var(--text-muted); }
 a.external-link::after { content: "\2009\2197"; font-size: 0.7em; color: var(--text-faint); vertical-align: super; }
 
 strong { font-weight: 700; } em { font-style: italic; }
+/* Raised and lowered figures never open up their line (typeset mode already does this for sup). */
+sup, sub { line-height: 0; }
+/* Keys: a quiet keycap in the mono face, the size of the text around it. */
+kbd { font-family: var(--font-monospace); font-size: 0.8em; padding: 0.05em 0.38em 0.1em; border: 0.8px solid var(--border); border-bottom-width: 1.6px; border-radius: 3px; background: var(--background-primary-alt); white-space: nowrap; font-variant-ligatures: none; }
 /* clone: each line fragment keeps its own background. WKWebView still paints
    one unbroken box around the whole mark if border-radius is set — a band the
    width of the pane that starts and ends mid-line and runs into the margins —
@@ -138,6 +143,7 @@ details.callout[open] > summary::after { content: " \25BE"; }
 .footnotes h2 { display: none; }
 .footnotes ol { padding-left: 1.4em; }
 .footnotes a[data-footnote-backref] { text-decoration: none; color: var(--text-faint); }
+.footnotes a[data-footnote-backref]:hover { color: var(--text-normal); }
 sup a[data-footnote-ref] { text-decoration: none; }
 
 /* Tufte sidenotes in the right margin when the window is wide enough.
@@ -180,7 +186,9 @@ sup.mn-ref a { text-decoration: none; color: var(--text-faint); font-size: 0.9em
 /* Tasks — a plain hairline square */
 li.task-list-item { list-style: none; margin-left: -1.3em; }
 input[type="checkbox"] { -webkit-appearance: none; appearance: none; width: 0.8em; height: 0.8em; border: 1px solid var(--text-normal); border-radius: 0; background: transparent; margin: 0 0.45em 0.15em 0; vertical-align: middle; cursor: pointer; }
+input[type="checkbox"] { transition: background-color .12s ease-out; }
 input[type="checkbox"]:checked { background: var(--text-normal); box-shadow: inset 0 0 0 1.5px var(--background-primary); }
+li.task-list-item { transition: color .15s ease-out; }
 li.is-checked { color: var(--text-muted); }
 
 img { display: block; margin: 1.2em auto; max-width: 100%; }
@@ -334,3 +342,12 @@ mark.onyx-find.current { background: rgba(255, 138, 0, .62); box-shadow: 0 0 0 1
 }
 .math-error.display { text-align: left; padding: 0.4em 0.6em; }
 body.theme-dark .math-error { background: rgba(220, 90, 70, 0.16); }
+
+/* Reduce Motion: the page appears without the lift, panels open without sliding; fades stay short. */
+@media (prefers-reduced-motion: reduce) {
+  .markdown-preview-view { transition: opacity .12s linear; }
+  .markdown-preview-view:not(.shown) { transform: none; }
+  .properties .rows { transition: opacity .12s linear; }
+  .doc-backlinks summary::before { transition: none; }
+  html { scroll-behavior: auto !important; }
+}
