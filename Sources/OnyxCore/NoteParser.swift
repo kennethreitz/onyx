@@ -67,15 +67,42 @@ public enum NoteParser {
         return WikiLink(target: s.trimmingCharacters(in: .whitespaces), heading: heading, alias: alias, isEmbed: embed, range: range)
     }
 
+    /// The UTF-16 ranges of every line, terminators included — exactly what repeated
+    /// `NSString.lineRange(for:)` walks give, from one pass over a UTF-16 copy.
+    public static func lineRanges(_ u: [UInt16]) -> [NSRange] {
+        var out: [NSRange] = []
+        var start = 0, i = 0
+        let n = u.count
+        while i < n {
+            let c = u[i]
+            if c == 10 || c == 13 || c == 0x85 || c == 0x2028 || c == 0x2029 {
+                var end = i + 1
+                if c == 13, end < n, u[end] == 10 { end += 1 }
+                out.append(NSRange(location: start, length: end - start))
+                start = end; i = end
+            } else { i += 1 }
+        }
+        if start < n { out.append(NSRange(location: start, length: n - start)) }
+        return out
+    }
+
     /// Ranges (UTF-16) of fenced code blocks and frontmatter, which never contain links or tags.
     public static func codeRanges(_ text: String) -> [NSRange] {
+        // No backtick or tilde anywhere: no fences.
+        guard text.utf8.contains(where: { $0 == 0x60 || $0 == 0x7E }) else { return [] }
+        return codeRanges(text, utf16: Array(text.utf16))
+    }
+    static func codeRanges(_ text: String, utf16 u: [UInt16], lines: [NSRange]? = nil) -> [NSRange] {
         let ns = text as NSString
         var out: [NSRange] = []
-        var loc = 0
         var fenceStart = -1
         var fenceMarker = ""
-        while loc < ns.length {
-            let lineRange = ns.lineRange(for: NSRange(location: loc, length: 0))
+        for lineRange in lines ?? lineRanges(u) {
+            // Only a line starting with ` or ~ after at most three spaces can be a fence.
+            var k = lineRange.location
+            let end = NSMaxRange(lineRange)
+            while k < end, k - lineRange.location < 3, u[k] == 32 { k += 1 }
+            guard k < end, u[k] == 96 || u[k] == 126 else { continue }
             let line = ns.substring(with: lineRange)
             if let m = fenceRegex.firstMatch(in: line, range: NSRange(location: 0, length: (line as NSString).length)) {
                 let marker = (line as NSString).substring(with: m.range(at: 1))
@@ -86,8 +113,6 @@ public enum NoteParser {
                     fenceStart = -1
                 }
             }
-            loc = NSMaxRange(lineRange)
-            if lineRange.length == 0 { break }
         }
         if fenceStart >= 0 { out.append(NSRange(location: fenceStart, length: ns.length - fenceStart)) }
         return out
@@ -127,12 +152,14 @@ public enum NoteParser {
 
     public static func parseHeadings(_ text: String, skipping code: [NSRange]? = nil, from start: Int = 0) -> [Heading] {
         let ns = text as NSString
+        let u = Array(text.utf16)
         let code = code ?? codeRanges(text)
         var out: [Heading] = []
-        var loc = 0
-        var lineNo = 0
-        while loc < ns.length {
-            let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
+        var lineNo = -1
+        for lr in lineRanges(u) {
+            lineNo += 1
+            // Headings start with "#": other lines are skipped without being copied out.
+            guard u[lr.location] == 35 else { continue }
             if lr.location >= start && !code.contains(where: { NSLocationInRange(lr.location, $0) }) {
                 let line = ns.substring(with: lr).trimmingCharacters(in: .newlines)
                 if line.hasPrefix("#") {
@@ -145,9 +172,6 @@ public enum NoteParser {
                     }
                 }
             }
-            lineNo += 1
-            loc = NSMaxRange(lr)
-            if lr.length == 0 { break }
         }
         return out
     }

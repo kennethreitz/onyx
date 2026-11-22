@@ -43,7 +43,13 @@ final class Workspace {
 
     // Open note
     private(set) var currentPath: String?
-    var text: String = "" { didSet { if text != oldValue { textDidChange() } } }
+    var text: String = "" { didSet { if text != oldValue { settle(); textDidChange() } } }
+    /// `text` for views that summarize the whole note (word count, outline, properties).
+    /// Short notes stay live; long ones catch up when typing pauses, so a keystroke in a
+    /// 300 KB clipping doesn't re-parse all of it.
+    private(set) var settledText: String = ""
+    @ObservationIgnored private var settleTask: Task<Void, Never>?
+    static let liveStatsLimit = 20_000
     private(set) var lastSaved: String = ""
     var mode: ViewMode = .read
     let finder = FindModel()
@@ -1104,6 +1110,16 @@ final class Workspace {
 
     // MARK: Editing & saving
 
+    private func settle() {
+        settleTask?.cancel()
+        if suppressTextChange || currentPath == nil || text.utf16.count < Self.liveStatsLimit { settledText = text; return }
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard let self, !Task.isCancelled else { return }
+            self.settledText = self.text
+        }
+    }
+
     private func textDidChange() {
         guard !suppressTextChange, currentPath != nil else { return }
         editedSinceLint = true
@@ -1281,8 +1297,13 @@ final class Workspace {
     private func applyExternal(_ paths: [String]) {
         guard var snap = snapshot, let root else { return }
         var external = false
+        // Our own saves come back as FSEvents too. A note whose bytes on disk are what the
+        // index already holds needs no re-read, and a batch of only those needs no new snapshot.
+        var stale: [String] = []
         for p in paths where p.lowercased().hasSuffix(".md") || p.isCanvasPath || p.isBasePath {
             let disk = try? String(contentsOf: root.appendingPathComponent(p), encoding: .utf8)
+            let md = p.lowercased().hasSuffix(".md")
+            if !md || disk == nil || snap.notes[p]?.content != disk { stale.append(p) }
             if p == currentPath {
                 if let disk, disk != lastSaved {
                     external = true
@@ -1295,8 +1316,11 @@ final class Workspace {
                 }
             } else if !p.isCanvasPath, !p.isBasePath, snap.notes[p]?.content != disk { external = true }
         }
-        snap.refresh(paths: paths)
-        snapshot = snap
+        let others = paths.filter { !($0.lowercased().hasSuffix(".md") || $0.isCanvasPath || $0.isBasePath) }
+        if !stale.isEmpty || !others.isEmpty {
+            snap.refresh(paths: stale + others)
+            snapshot = snap
+        }
         if let cur = currentPath, snap.notes[cur] == nil, snap.canvases[cur] == nil, snap.bases[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
             toast = "“\((cur as NSString).lastPathComponent)” was moved or deleted elsewhere"
         }

@@ -411,6 +411,7 @@ struct EditorView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSScrollView {
         let storage = NSTextStorage()
+        storage.delegate = context.coordinator   // tracks what each keystroke changed (partial restyle)
         let lm = FoldLayoutManager()
         storage.addLayoutManager(lm)
         let tc = NSTextContainer(size: NSSize(width: Theme.editorMeasure, height: .greatestFiniteMagnitude))
@@ -537,7 +538,7 @@ struct EditorView: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, NSTextViewDelegate {
+    final class Coordinator: NSObject, NSTextViewDelegate, @preconcurrency NSTextStorageDelegate {
         var parent: EditorView
         weak var textView: OnyxTextView?
         var loadedToken = -1
@@ -551,6 +552,24 @@ struct EditorView: NSViewRepresentable {
         var scrollHandled: Int?
         private var reportQueued = false
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }
+        /// The styled text's shape and the one character edit since, for restyling just its lines.
+        private var shape: MarkdownHighlighter.Shape?
+        private var pendingEdit: MarkdownHighlighter.Edit?
+        private var editsSinceStyle = 0
+
+        func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
+            guard editedMask.contains(.editedCharacters) else { return }
+            editsSinceStyle += 1
+            pendingEdit = MarkdownHighlighter.Edit(range: editedRange, delta: delta)
+        }
+
+        /// Restyle after a change: only the edited lines when exactly one edit happened and the
+        /// highlighter agrees it was local; everything otherwise.
+        private func restyle(_ ts: NSTextStorage, full: Bool) {
+            let edit = !full && editsSinceStyle == 1 ? pendingEdit : nil
+            shape = highlighter.apply(to: ts, edit: edit, previous: edit == nil ? nil : shape)
+            pendingEdit = nil; editsSinceStyle = 0
+        }
 
         init(_ p: EditorView) { parent = p }
 
@@ -561,7 +580,7 @@ struct EditorView: NSViewRepresentable {
             tv.folds.loading = true
             ts.setAttributedString(NSAttributedString(string: text, attributes: highlighter.baseAttributes))
             tv.folds.loading = false
-            highlighter.apply(to: ts)
+            restyle(ts, full: true)
             if keepSelection {
                 tv.setSelectedRange(NSRange(location: min(sel.location, (text as NSString).length), length: 0))
                 if let v = visible { tv.enclosingScrollView?.contentView.scroll(to: v) }
@@ -586,7 +605,7 @@ struct EditorView: NSViewRepresentable {
 
         func rehighlight() {
             guard let ts = textView?.textStorage else { return }
-            highlighter.apply(to: ts)
+            restyle(ts, full: true)
             textView?.needsDisplay = true
         }
 
@@ -683,7 +702,7 @@ struct EditorView: NSViewRepresentable {
         func textDidChange(_ notification: Notification) {
             guard let tv = textView, let ts = tv.textStorage else { return }
             isEditing = true
-            highlighter.apply(to: ts)
+            restyle(ts, full: false)
             if parent.source == nil { parent.ws.text = tv.string }
             isEditing = false
             if parent.source == nil, parent.ws.finder.visible, parent.ws.mode == .edit {   // keep the count and marks true while typing

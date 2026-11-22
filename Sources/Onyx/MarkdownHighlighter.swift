@@ -32,30 +32,78 @@ struct MarkdownHighlighter {
          .kern: -0.14, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorSize * 1.3) / 2]
     }
 
-    func apply(to ts: NSTextStorage) {
+    /// What `InlineFields` leaves out (inline code, %% and <!-- --> comments, scanned together,
+    /// so a backtick can swallow a %%): part of the shape, since it decides which field keys get styled.
+    static let fieldExclusions = try! NSRegularExpression(pattern: #"`+[^`\n]*`+|%%[\s\S]*?%%|<!--[\s\S]*?-->"#)
+
+    /// The parts of a note whose styling reaches past the line they start on: where the
+    /// frontmatter ends, fenced code, and %% / <!-- --> comments.
+    struct Shape: Equatable {
+        var body: Int
+        var spans: [NSRange]
+
+        /// This shape carried through an edit, if none of its edges fell inside the replaced text.
+        func shifted(by e: Edit) -> Shape? {
+            let start = e.range.location, oldEnd = NSMaxRange(e.range) - e.delta
+            func map(_ x: Int) -> Int? { x <= start ? x : (x >= oldEnd ? x + e.delta : nil) }
+            guard let b = map(body) else { return nil }
+            var out: [NSRange] = []
+            for r in spans {
+                guard let a = map(r.location), let z = map(NSMaxRange(r)) else { return nil }
+                out.append(NSRange(location: a, length: z - a))
+            }
+            return Shape(body: b, spans: out)
+        }
+    }
+    /// One text change: the new text's range and the change in length.
+    struct Edit { var range: NSRange; var delta: Int }
+    /// Below this, every keystroke restyles the whole note (it's fast). Above it, an edit that
+    /// leaves the `Shape` alone restyles only the lines around it, so layout isn't redone for all of it.
+    static let partialMinLength = 30_000
+
+    @discardableResult
+    func apply(to ts: NSTextStorage, edit: Edit? = nil, previous: Shape? = nil) -> Shape {
         let s = ts.string
         let ns = s as NSString
         let full = NSRange(location: 0, length: ns.length)
-        ts.beginEditing()
-        ts.setAttributes(baseAttributes, range: full)
         let fm = Frontmatter.parse(s)
-        if fm.bodyOffset > 0 {
-            ts.addAttributes([.foregroundColor: Theme.faint], range: NSRange(location: 0, length: fm.bodyOffset))
-        }
         let codeBlocks = NoteParser.codeRanges(s)
+        let comments = Self.comment.matches(in: s, range: full).map(\.range)
         func skip(_ r: NSRange) -> Bool {
             r.location < fm.bodyOffset || codeBlocks.contains { NSIntersectionRange($0, r).length > 0 || NSLocationInRange(r.location, $0) }
         }
-        for r in codeBlocks { ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) }
+        // Footnote refs can run across lines, so they're found in the whole note like comments.
+        let body = NSRange(location: fm.bodyOffset, length: ns.length - fm.bodyOffset)
+        let footnotes = Self.footnote.matches(in: s, range: body).map(\.range).filter { !skip($0) }
+        let big = ns.length >= Self.partialMinLength
+        let shape = Shape(body: fm.bodyOffset, spans: big ? codeBlocks + comments + footnotes + Self.fieldExclusions.matches(in: s, range: full).map(\.range) : [])
+        var region = full
+        if let e = edit, let previous, big, e.range.location > fm.bodyOffset,
+           NSMaxRange(e.range) <= ns.length, previous.shifted(by: e) == shape {
+            let lines = ns.lineRange(for: e.range)
+            let before = lines.location > 0 ? ns.lineRange(for: NSRange(location: lines.location - 1, length: 0)).location : 0
+            let after = NSMaxRange(lines) < ns.length ? NSMaxRange(ns.lineRange(for: NSRange(location: NSMaxRange(lines), length: 0))) : ns.length
+            region = NSRange(location: before, length: after - before)
+        }
+        func clip(_ r: NSRange) -> NSRange? {
+            let i = NSIntersectionRange(r, region)
+            return i.length > 0 ? i : nil
+        }
+        ts.beginEditing()
+        ts.setAttributes(baseAttributes, range: region)
+        if fm.bodyOffset > 0, let r = clip(NSRange(location: 0, length: fm.bodyOffset)) {
+            ts.addAttributes([.foregroundColor: Theme.faint], range: r)
+        }
+        for r in codeBlocks { if let r = clip(r) { ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) } }
 
-        for f in InlineFields.parse(s) where !f.isFrontmatter {
+        for f in InlineFields.parse(s, lines: region) where !f.isFrontmatter {
             let r = NSRange(location: f.keyRange.location, length: f.keyRange.length + 2)
             ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r)
         }
 
         // Line-level: headings, quotes, lists, rules, tasks
-        var loc = fm.bodyOffset
-        while loc < ns.length {
+        var loc = max(fm.bodyOffset, region.location)
+        while loc < NSMaxRange(region) {
             let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
             defer { loc = NSMaxRange(lr) }
             if lr.length == 0 { break }
@@ -104,7 +152,9 @@ struct MarkdownHighlighter {
         }
 
         func each(_ re: NSRegularExpression, _ body: (NSTextCheckingResult) -> Void) {
-            for m in re.matches(in: s, range: NSRange(location: fm.bodyOffset, length: ns.length - fm.bodyOffset)) where !skip(m.range) { body(m) }
+            let from = max(fm.bodyOffset, region.location)
+            guard NSMaxRange(region) > from else { return }
+            for m in re.matches(in: s, range: NSRange(location: from, length: NSMaxRange(region) - from)) where !skip(m.range) { body(m) }
         }
         let faint: [NSAttributedString.Key: Any] = [.foregroundColor: Theme.faint]
         each(Self.bold) { m in
@@ -147,9 +197,10 @@ struct MarkdownHighlighter {
             ts.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: Theme.faint, .cursor: NSCursor.pointingHand], range: visible)
         }
         each(Self.tag) { m in ts.addAttributes([.foregroundColor: Theme.muted], range: m.range) }
-        each(Self.footnote) { m in ts.addAttributes([.foregroundColor: Theme.faint], range: m.range) }
-        for m in Self.comment.matches(in: s, range: full) { ts.addAttributes([.foregroundColor: Theme.faint], range: m.range) }
+        for f in footnotes { if let r = clip(f) { ts.addAttributes([.foregroundColor: Theme.faint], range: r) } }
+        for c in comments { if let r = clip(c) { ts.addAttributes([.foregroundColor: Theme.faint], range: r) } }
         ts.endEditing()
+        return shape
     }
 
     private func currentSize(_ ts: NSTextStorage, _ loc: Int) -> CGFloat {

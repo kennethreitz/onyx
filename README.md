@@ -56,6 +56,7 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 - [Commands](docs/commands.md)
 - [Compatibility and privacy](docs/compatibility.md)
 - [Building from source](docs/DEVELOP.md)
+- [Performance](docs/performance.md) — benchmarking against a copy of your vault
 - [Changelog](CHANGELOG.md)
 
 ## License

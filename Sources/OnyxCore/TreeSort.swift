@@ -38,8 +38,19 @@ public struct TreeDates: Sendable {
             var f = (p as NSString).deletingLastPathComponent
             while !f.isEmpty { bump(f, m, c); f = (f as NSString).deletingLastPathComponent }
         }
-        for (p, n) in snap.notes { up(p, n.mtime, n.ctime) }
-        for (p, d) in snap.attachments { up(p, d, d) }
+        // Each file sets its own dates and its folder's; folders then pass theirs up once
+        // (206 folders instead of walking every file's ancestry).
+        var direct: [String: (Date, Date)] = [:]
+        func file(_ p: String, _ m: Date, _ c: Date) {
+            bump(p, m, c)
+            let f = (p as NSString).deletingLastPathComponent
+            guard !f.isEmpty else { return }
+            let o = direct[f]
+            direct[f] = (max(o?.0 ?? .distantPast, m), min(o?.1 ?? .distantFuture, c))
+        }
+        for (p, n) in snap.notes { file(p, n.mtime, n.ctime) }
+        for (p, d) in snap.attachments { file(p, d, d) }
+        for (f, (m, c)) in direct { up(f, m, c) }
     }
 
     public func ordered(_ nodes: [FileNode], by s: TreeSort) -> [FileNode] {

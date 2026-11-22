@@ -27,19 +27,35 @@ public enum InlineFields {
     static let list = try! NSRegularExpression(pattern: #"^\s+-[ \t]+(.+?)\s*$"#)
     static let code = try! NSRegularExpression(pattern: #"`+[^`\n]*`+|%%[\s\S]*?%%|<!--[\s\S]*?-->"#)
 
-    public static func parse(_ text: String) -> [InlineField] {
+    /// `lines` limits which lines are read (the editor restyling one paragraph); fences,
+    /// comments and frontmatter are still found in the whole text.
+    public static func parse(_ text: String, lines: NSRange? = nil) -> [InlineField] {
         let ns = text as NSString, fm = Frontmatter.parse(text)
-        let excluded = NoteParser.codeRanges(text) + code.matches(in: text, range: NSRange(location: 0, length: ns.length)).map(\.range)
+        let stop = lines.map(NSMaxRange) ?? ns.length
+        let u = Array(text.utf16)
+        let all = NoteParser.lineRanges(u)
+        // Found only once a body line could hold a field.
+        lazy var excluded = NoteParser.codeRanges(text, utf16: u, lines: all) + code.matches(in: text, range: NSRange(location: 0, length: ns.length)).map(\.range)
+        /// Body fields always contain "::"; lines without it are skipped uncopied.
+        func hasFieldMarker(_ lr: NSRange) -> Bool {
+            var i = lr.location
+            let end = NSMaxRange(lr) - 1
+            while i < end { if u[i] == 58 && u[i + 1] == 58 { return true }; i += 1 }
+            return false
+        }
         var fields: [InlineField] = [], offset = 0
         var yamlKey: (String, NSRange)?
+        // Frontmatter list items need the key above them, so a range inside it starts from the top.
+        if let lines, lines.location >= fm.bodyOffset { offset = lines.location }
         func add(_ key: String, _ kr: NSRange, _ vr: NSRange, _ range: NSRange, _ front: Bool) {
             let ls = values(ns.substring(with: vr), offset: vr.location, key: key)
             // Only relation properties (or explicit link-valued properties) are special in YAML.
             if front && ls.isEmpty { return }
             fields.append(InlineField(key: key, value: ns.substring(with: vr), range: range, valueRange: vr, keyRange: kr, links: ls, isFrontmatter: front))
         }
-        while offset < ns.length {
-            let lr = ns.lineRange(for: NSRange(location: offset, length: 0))
+        for lr in all where NSMaxRange(lr) > offset {
+            if lr.location >= stop { break }
+            if lr.location >= fm.bodyOffset && !hasFieldMarker(lr) { continue }
             let s = ns.substring(with: lr).trimmingCharacters(in: .newlines), len = (s as NSString).length
             let local = s as NSString
             func global(_ r: NSRange) -> NSRange { NSRange(location: lr.location + r.location, length: r.length) }
@@ -61,7 +77,6 @@ public enum InlineFields {
                     add(local.substring(with: m.range(at: 1)), global(m.range(at: 1)), global(m.range(at: 2)), r, false)
                 }
             }
-            offset = NSMaxRange(lr)
         }
         return fields
     }

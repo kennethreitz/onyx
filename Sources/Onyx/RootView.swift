@@ -178,10 +178,10 @@ struct RootView: View {
     }
 
     var countText: String {
-        let words = NoteParser.countWords(ws.text)
+        let words = NoteParser.countWords(ws.settledText)
         var s = "\(words.formatted()) words"
         if footerHover {
-            s += " · \(ws.text.count.formatted()) characters"
+            s += " · \(ws.settledText.count.formatted()) characters"
             if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 { s += " · \(c) backlinks" }
         }
         return s

@@ -254,9 +254,20 @@ public struct QuickIndex: Sendable {
     public let entries: [QuickEntry]
 
     public init(_ snap: VaultSnapshot) {
-        let all = snap.notes.values.map { n in
-            QuickEntry(path: n.path, name: MatchKey(n.name), folder: MatchKey(n.folder), aliases: n.aliases.map(MatchKey.init), mtime: n.mtime, dated: QuickIndex.date(in: n.name))
-        } + (Array(snap.canvases.keys) + Array(snap.bases.keys)).map { p in   // canvases and bases open from ⌘O too
+        // Folders are shared by many notes: fold each one once. Names fold in parallel.
+        var folderKeys: [String: MatchKey] = [:]
+        for n in snap.notes.values where folderKeys[n.folder] == nil { folderKeys[n.folder] = MatchKey(n.folder) }
+        let notes = Array(snap.notes.values)
+        var made = [QuickEntry?](repeating: nil, count: notes.count)
+        let fk = folderKeys
+        made.withUnsafeMutableBufferPointer { buf in
+            let base = buf.baseAddress!
+            DispatchQueue.concurrentPerform(iterations: notes.count) { i in
+                let n = notes[i]
+                base[i] = QuickEntry(path: n.path, name: MatchKey(n.name), folder: fk[n.folder]!, aliases: n.aliases.map(MatchKey.init), mtime: n.mtime, dated: QuickIndex.date(in: n.name))
+            }
+        }
+        let all = made.map { $0! } + (Array(snap.canvases.keys) + Array(snap.bases.keys)).map { p in   // canvases and bases open from ⌘O too
             QuickEntry(path: p, name: MatchKey(((p as NSString).lastPathComponent as NSString).deletingPathExtension), folder: MatchKey((p as NSString).deletingLastPathComponent),
                        aliases: [], mtime: snap.attachments[p] ?? .distantPast, dated: nil)
         }

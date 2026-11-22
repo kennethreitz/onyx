@@ -79,7 +79,7 @@ public struct VaultSnapshot: Sendable {
     public func resolve(_ rawTarget: String, from source: String? = nil) -> String? {
         var target = rawTarget.trimmingCharacters(in: .whitespaces)
         if target.isEmpty { return source }
-        target = target.removingPercentEncoding ?? target
+        if target.utf8.contains(UInt8(ascii: "%")) { target = target.removingPercentEncoding ?? target }
         var lower = target.lowercased()
         if lower.hasPrefix("/") { lower.removeFirst() }
         let noExt = lower.hasSuffix(".md") ? String(lower.dropLast(3)) : lower
@@ -110,22 +110,33 @@ public struct VaultSnapshot: Sendable {
     public func backlinks(to path: String) -> [Backlink] {
         guard let sources = backlinks[path] else { return [] }
         var out: [Backlink] = []
+        // A link can only resolve here if its target, lowercased, contains this file's name
+        // (or is percent-encoded), so lines without either are skipped unparsed.
+        let needle = ((path as NSString).lastPathComponent as NSString).deletingPathExtension.lowercased()
         for s in sources.sorted() {
             if canvases[s] != nil { out.append(Backlink(source: s, line: 0, context: "Canvas")); continue }
             guard let note = notes[s] else { continue }
-            let lines = note.content.components(separatedBy: "\n")
             var found = false
-            for (i, line) in lines.enumerated() where line.contains("[[") {
-                for l in NoteParser.parseWikiLinks(line) where resolve(l.target, from: s) == path {
-                    out.append(Backlink(source: s, line: i, context: line.trimmingCharacters(in: .whitespaces)))
-                    found = true
-                    break
+            let pct = note.content.utf8.contains(UInt8(ascii: "%"))
+            var lines: [String]? = nil
+            if pct || needle.isEmpty || ByteSearch.count(needle, in: note.lowered, cap: 1) > 0 {
+                var i = 0
+                for raw in note.content.utf8.split(separator: 10, omittingEmptySubsequences: false) {
+                    defer { i += 1 }
+                    guard raw.contains(UInt8(ascii: "[")) else { continue }
+                    let line = String(Substring(raw))
+                    guard line.contains("[["), pct || needle.isEmpty || line.lowercased().contains(needle) else { continue }
+                    if NoteParser.parseWikiLinks(line).contains(where: { resolve($0.target, from: s) == path }) {
+                        out.append(Backlink(source: s, line: i, context: line.trimmingCharacters(in: .whitespaces)))   // every linking line
+                        found = true
+                    }
                 }
             }
             if !found, let l = note.summary.links.first(where: { $0.isBare && resolve($0.target, from: s) == path }) {
                 let prefix = (note.content as NSString).substring(to: min(l.range.location, (note.content as NSString).length))
                 let i = prefix.reduce(0) { $1 == "\n" ? $0 + 1 : $0 }
-                out.append(Backlink(source: s, line: i, context: i < lines.count ? lines[i].trimmingCharacters(in: .whitespaces) : ""))
+                if lines == nil { lines = note.content.components(separatedBy: "\n") }
+                out.append(Backlink(source: s, line: i, context: i < lines!.count ? lines![i].trimmingCharacters(in: .whitespaces) : ""))
                 found = true
             }
             if !found { out.append(Backlink(source: s, line: 0, context: "")) }
@@ -166,7 +177,7 @@ public struct VaultSnapshot: Sendable {
         let needle = note.name.lowercased()
         let linked = backlinks[path] ?? []
         var out: [Backlink] = []
-        for (p, n) in notes where p != path && !linked.contains(p) && n.lowered.contains(needle) {
+        for (p, n) in notes where p != path && !linked.contains(p) && ByteSearch.count(needle, in: n.lowered, cap: 1) > 0 {
             let lines = n.content.components(separatedBy: "\n")
             if let i = lines.firstIndex(where: { $0.lowercased().contains(needle) }) {
                 out.append(Backlink(source: p, line: i, context: lines[i].trimmingCharacters(in: .whitespaces)))
@@ -232,11 +243,16 @@ public struct VaultSnapshot: Sendable {
     /// Re-read a set of changed vault-relative paths from disk.
     public mutating func refresh(paths: [String]) {
         let fm = FileManager.default
+        // Edits to notes that already exist leave every path, name and folder alone, so only
+        // their own links, tags and relations need redoing. Anything else rebuilds everything.
+        var structural = false
+        var edits: [(NoteRecord, NoteRecord)] = []
         for rel in paths {
             let url = root.appendingPathComponent(rel)
             var isDir: ObjCBool = false
             let exists = fm.fileExists(atPath: url.path, isDirectory: &isDir)
             if !exists {
+                if notes[rel] != nil || attachments[rel] != nil || canvases[rel] != nil || bases[rel] != nil || folders.contains(rel) { structural = true }
                 notes[rel] = nil; attachments[rel] = nil; canvases[rel] = nil; bases[rel] = nil
                 if folders.contains(rel) {
                     folders = folders.filter { $0 != rel && !$0.hasPrefix(rel + "/") }
@@ -250,6 +266,7 @@ public struct VaultSnapshot: Sendable {
             if (rel as NSString).lastPathComponent.hasPrefix(".") || rel.split(separator: "/").contains(where: { $0.hasPrefix(".") }) { continue }
             if isDir.boolValue {
                 if !folders.contains(rel) { // new folder: scan it
+                    structural = true
                     let sub = VaultSnapshot.scan(root: url)
                     folders.insert(rel)
                     for f in sub.folders { folders.insert(rel + "/" + f) }
@@ -267,17 +284,20 @@ public struct VaultSnapshot: Sendable {
             let mtime = attrs?[.modificationDate] as? Date ?? Date()
             if rel.lowercased().hasSuffix(".md") {
                 if let r = VaultSnapshot.makeRecord(rel: rel, url: url, mtime: mtime, ctime: attrs?[.creationDate] as? Date ?? mtime, size: attrs?[.size] as? Int ?? 0) {
+                    if let old = notes[rel] { edits.append((old, r)) } else { structural = true }
                     notes[rel] = r
                 }
             } else {
+                if attachments[rel] == nil || rel.isCanvasPath { structural = true }
                 attachments[rel] = mtime
                 if rel.isCanvasPath, let d = try? Data(contentsOf: url) { canvases[rel] = CanvasFile.summarize(String(decoding: d, as: UTF8.self)) }
                 if rel.isBasePath, let d = try? Data(contentsOf: url) { bases[rel] = String(decoding: d, as: UTF8.self) }
             }
             var parent = (rel as NSString).deletingLastPathComponent
-            while !parent.isEmpty && !folders.contains(parent) { folders.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
+            while !parent.isEmpty && !folders.contains(parent) { structural = true; folders.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
         }
-        rebuildDerived()
+        if structural { rebuildDerived(); return }
+        for (old, new) in edits { reindex(old: old, new: new) }
     }
 
     /// Update one note from in-memory content (after Onyx saves it).
@@ -295,8 +315,61 @@ public struct VaultSnapshot: Sendable {
             return
         }
         let old = notes[path]
-        notes[path] = VaultSnapshot.makeRecord(rel: path, content: content, mtime: Date(), ctime: old?.ctime ?? Date(), size: content.utf8.count)
-        rebuildDerived()
+        let new = VaultSnapshot.makeRecord(rel: path, content: content, mtime: Date(), ctime: old?.ctime ?? Date(), size: content.utf8.count)
+        notes[path] = new
+        if let old { reindex(old: old, new: new) } else { rebuildDerived() }
+    }
+
+    /// What one note adds to the derived indexes: who it links to, what it can't resolve,
+    /// its tags, and its field relationships (kind -> targets).
+    struct Contribution {
+        var linked = Set<String>(), unresolved = Set<String>(), tags = Set<String>()
+        var relations: [String: Set<String>] = [:]
+    }
+
+    func contribution(_ n: NoteRecord) -> Contribution {
+        var c = Contribution()
+        let p = n.path
+        for l in n.summary.links {
+            if let t = resolve(l.target, from: p) {
+                if t != p { c.linked.insert(t) }
+                if let key = l.fieldKey, t != p { c.relations[InlineField.kind(key), default: []].insert(t) }
+            }
+            else if !l.target.isEmpty { c.unresolved.insert(l.target) }
+        }
+        for m in n.summary.markdownLinks {
+            let rel = ((n.folder as NSString).appendingPathComponent(m) as NSString).standardizingPath
+            if notes[rel] != nil { c.linked.insert(rel) }
+            else if let t = resolve(m, from: p) { c.linked.insert(t) }
+        }
+        c.tags = Set(n.summary.tags)
+        return c
+    }
+
+    /// Swap one existing note's contribution for its new content without touching the rest
+    /// of the vault (same result as `rebuildDerived`, for a note whose path set is unchanged).
+    mutating func reindex(old: NoteRecord, new: NoteRecord) {
+        let p = new.path
+        let a = contribution(old), b = contribution(new)
+        func swap(_ index: inout [String: Set<String>], _ before: Set<String>, _ after: Set<String>) {
+            for k in before.subtracting(after) {
+                index[k]?.remove(p)
+                if index[k]?.isEmpty == true { index[k] = nil }
+            }
+            for k in after.subtracting(before) { index[k, default: []].insert(p) }
+        }
+        swap(&backlinks, a.linked, b.linked)
+        swap(&unresolved, a.unresolved, b.unresolved)
+        swap(&tags, a.tags, b.tags)
+        if a.relations != b.relations {
+            for (k, ts) in a.relations { for t in ts where b.relations[k]?.contains(t) != true {
+                relationsIn[t]?[k]?.remove(p)
+                if relationsIn[t]?[k]?.isEmpty == true { relationsIn[t]?[k] = nil }
+                if relationsIn[t]?.isEmpty == true { relationsIn[t] = nil }
+            } }
+            for (k, ts) in b.relations { for t in ts { relationsIn[t, default: [:]][k, default: []].insert(p) } }
+            relationsOut[p] = b.relations.isEmpty ? nil : b.relations
+        }
     }
 
     public mutating func rebuildDerived() {
@@ -307,7 +380,6 @@ public struct VaultSnapshot: Sendable {
             paths[String(lower.dropLast(3))] = p
             names[((lower as NSString).lastPathComponent as NSString).deletingPathExtension, default: []].append(p)
         }
-        for (p, n) in notes { for a in n.aliases { _ = a; _ = p } }
         var att: [String: [String]] = [:]
         for p in attachments.keys {
             att[(p.lowercased() as NSString).lastPathComponent, default: []].append(p)
@@ -318,24 +390,21 @@ public struct VaultSnapshot: Sendable {
         var unres: [String: Set<String>] = [:]
         var tg: [String: Set<String>] = [:]
         var rout: [String: [String: Set<String>]] = [:], rin: [String: [String: Set<String>]] = [:]
-        for (p, n) in notes {
-            for l in n.summary.links {
-                if let t = resolve(l.target, from: p) {
-                    if t != p { bl[t, default: []].insert(p) }
-                    if let key = l.fieldKey, t != p {
-                        let k = InlineField.kind(key)
-                        rout[p, default: [:]][k, default: []].insert(t)
-                        rin[t, default: [:]][k, default: []].insert(p)
-                    }
-                }
-                else if !l.target.isEmpty { unres[l.target, default: []].insert(p) }
-            }
-            for m in n.summary.markdownLinks {
-                let rel = ((n.folder as NSString).appendingPathComponent(m) as NSString).standardizingPath
-                if notes[rel] != nil { bl[rel, default: []].insert(p) }
-                else if let t = resolve(m, from: p) { bl[t, default: []].insert(p) }
-            }
-            for t in n.summary.tags { tg[t, default: []].insert(p) }
+        // Resolving every link is the expensive part; do it in parallel, then merge.
+        let all = Array(notes.values)
+        var parts = [Contribution](repeating: Contribution(), count: all.count)
+        let me = self
+        parts.withUnsafeMutableBufferPointer { buf in
+            let base = buf.baseAddress!
+            DispatchQueue.concurrentPerform(iterations: all.count) { i in base[i] = me.contribution(all[i]) }
+        }
+        for (i, n) in all.enumerated() {
+            let p = n.path, c = parts[i]
+            for t in c.linked { bl[t, default: []].insert(p) }
+            for t in c.unresolved { unres[t, default: []].insert(p) }
+            for t in c.tags { tg[t, default: []].insert(p) }
+            if !c.relations.isEmpty { rout[p] = c.relations }
+            for (k, ts) in c.relations { for t in ts { rin[t, default: [:]][k, default: []].insert(p) } }
         }
         var cl: [String: [String]] = [:]
         for (p, c) in canvases {
@@ -352,7 +421,7 @@ public struct VaultSnapshot: Sendable {
         tree = buildTree()
     }
 
-    func buildTree() -> FileNode {
+    public func buildTree() -> FileNode {
         final class Box { var name: String; var path: String; var folders: [String: Box] = [:]; var files: [String] = []
             init(_ n: String, _ p: String) { name = n; path = p } }
         let root = Box("", "")
@@ -422,19 +491,33 @@ public struct VaultSnapshot: Sendable {
             else { terms.append(l) }
         }
         if terms.isEmpty && tagFilters.isEmpty && pathFilters.isEmpty && fileFilters.isEmpty { return [] }
-        var hits: [SearchHit] = []
-        for (p, n) in notes {
-            let lp = p.lowercased()
-            if !pathFilters.allSatisfy({ lp.contains($0) }) { continue }
-            if !fileFilters.allSatisfy({ n.name.lowercased().contains($0) }) { continue }
-            if !tagFilters.allSatisfy({ tf in n.summary.tags.contains { $0.lowercased() == tf || $0.lowercased().hasPrefix(tf + "/") } }) { continue }
-            if !terms.allSatisfy({ n.lowered.contains($0) || n.name.lowercased().contains($0) }) { continue }
-            var score = 0
-            let lname = n.name.lowercased()
-            for t in terms {
-                if lname == t { score += 100 } else if lname.contains(t) { score += 40 }
-                score += min(20, n.lowered.components(separatedBy: t).count - 1)
+        // Score every note in parallel (byte search on the pre-lowered text), then build
+        // snippets only for the hits that make the cut.
+        let all = Array(notes.values)
+        var scored = [Int?](repeating: nil, count: all.count)
+        scored.withUnsafeMutableBufferPointer { buf in
+            let base = buf.baseAddress!
+            DispatchQueue.concurrentPerform(iterations: all.count) { i in
+                let n = all[i]
+                let lp = n.path.lowercased()
+                if !pathFilters.allSatisfy({ lp.contains($0) }) { return }
+                let lname = n.name.lowercased()
+                if !fileFilters.allSatisfy({ lname.contains($0) }) { return }
+                if !tagFilters.allSatisfy({ tf in n.summary.tags.contains { $0.lowercased() == tf || $0.lowercased().hasPrefix(tf + "/") } }) { return }
+                var score = 0
+                for t in terms {
+                    let count = ByteSearch.count(t, in: n.lowered, cap: 20)
+                    if count == 0 && !lname.contains(t) { return }
+                    if lname == t { score += 100 } else if lname.contains(t) { score += 40 }
+                    score += count
+                }
+                base[i] = score
             }
+        }
+        var ranked: [(Int, NoteRecord)] = []
+        for (i, s) in scored.enumerated() { if let s { ranked.append((s, all[i])) } }
+        ranked.sort { $0.0 == $1.0 ? $0.1.path < $1.1.path : $0.0 > $1.0 }
+        return ranked.prefix(limit).map { score, n in
             var snippets: [String] = []
             if let first = terms.first {
                 for line in n.content.split(separator: "\n", omittingEmptySubsequences: true) where line.lowercased().contains(first) {
@@ -442,10 +525,8 @@ public struct VaultSnapshot: Sendable {
                     if snippets.count >= 3 { break }
                 }
             }
-            hits.append(SearchHit(path: p, name: n.name, score: score, snippets: snippets))
+            return SearchHit(path: n.path, name: n.name, score: score, snippets: snippets)
         }
-        hits.sort { $0.score == $1.score ? $0.path < $1.path : $0.score > $1.score }
-        return Array(hits.prefix(limit))
     }
 
     func snippet(_ line: String, around term: String) -> String {
@@ -456,5 +537,25 @@ public struct VaultSnapshot: Sendable {
         let s = t.index(t.startIndex, offsetBy: start)
         let e = t.index(s, offsetBy: min(140, t.distance(from: s, to: t.endIndex)))
         return (start > 0 ? "…" : "") + String(t[s..<e]) + (e < t.endIndex ? "…" : "")
+    }
+}
+
+/// Literal substring search over UTF-8 bytes (memmem). Matching UTF-8 bytes is the same as
+/// matching the characters for a literal needle, and far cheaper than bridging to NSString.
+enum ByteSearch {
+    /// Non-overlapping occurrences of `needle` in `hay`, stopping at `cap`.
+    static func count(_ needle: String, in hay: String, cap: Int) -> Int {
+        var hay = hay, needle = needle
+        return hay.withUTF8 { h in
+            needle.withUTF8 { n in
+                guard n.count > 0, h.count >= n.count, let hb = h.baseAddress, let nb = n.baseAddress else { return 0 }
+                var found = 0, off = 0
+                while found < cap, off + n.count <= h.count, let m = memmem(hb + off, h.count - off, nb, n.count) {
+                    found += 1
+                    off = hb.distance(to: m.assumingMemoryBound(to: UInt8.self)) + n.count
+                }
+                return found
+            }
+        }
     }
 }

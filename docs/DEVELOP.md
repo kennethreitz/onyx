@@ -14,6 +14,7 @@ make app                       # native Onyx.app in build/ (this machine’s arc
 make release                   # universal (arm64 + x86_64) Onyx.app, plus the GitHub zip
 UNIVERSAL=1 make app           # universal app, no zip
 make test                      # Swift tests, then the reader tests
+swift run -c release onyx-bench /tmp/vault-copy   # timings against a vault copy (docs/performance.md)
 make install                   # copy the native Onyx.app to /Applications
 make dev                       # debug binary, pointed at a test vault
 make open                      # open the built app on the remembered vault

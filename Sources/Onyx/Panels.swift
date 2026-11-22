@@ -724,7 +724,7 @@ struct InspectorView: View {
     }
 
     @ViewBuilder func outline(_ note: NoteRecord) -> some View {
-        let hs = NoteParser.parseHeadings(ws.text)
+        let hs = NoteParser.parseHeadings(ws.settledText)
         if hs.isEmpty { QuietEmpty(title: "No headings yet.", hint: "Lines that start with # build the outline.").padding(.top, Space.xs) }
         let minLevel = hs.map(\.level).min() ?? 1
         ForEach(Array(hs.enumerated()), id: \.offset) { i, h in
@@ -762,7 +762,7 @@ struct InspectorView: View {
     }
 
     @ViewBuilder func properties(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
-        let fm = Frontmatter.parse(ws.text)
+        let fm = Frontmatter.parse(ws.settledText)
         sectionTitle("Properties")
         if fm.properties.isEmpty { QuietEmpty(title: "No properties.", hint: "Frontmatter between --- lines at the top shows here.") }
         ForEach(fm.properties, id: \.self) { p in
@@ -774,7 +774,7 @@ struct InspectorView: View {
             }.padding(.horizontal, 14).padding(.vertical, 3)
         }
         sectionTitle("Note")
-        let s = NoteParser.summarize(ws.text)
+        let s = NoteParser.summarize(ws.settledText)
         info("Words", "\(s.wordCount)")
         info("Links out", "\(s.links.count)")
         info("Backlinks", "\(snap.backlinks[note.path]?.count ?? 0)")

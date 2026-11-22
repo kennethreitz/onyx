@@ -249,22 +249,30 @@ enum DVDate {
     static func parse(_ s: String) -> Date? {
         let t = s.trimmingCharacters(in: .whitespaces)
         if t.isEmpty { return nil }
-        let fmts = [
-            "yyyy-MM-dd'T'HH:mm:ssXXXXX", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss",
-            "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd",
-        ]
+        // Every format starts with the year and has a "-": anything else (most property values,
+        // which all pass through here) can't be a date, and is rejected without a formatter.
+        guard let c = t.utf8.first, (c >= 0x30 && c <= 0x39) || c == 0x2D || c == 0x2B, t.utf8.contains(0x2D) else { return nil }
+        for f in formatters { if let d = f.date(from: t) { return d } }
+        return nil
+    }
+    /// Built once (DateFormatter is costly to make, and safe to share for parsing).
+    static let formatters: [DateFormatter] = [
+        "yyyy-MM-dd'T'HH:mm:ssXXXXX", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd HH:mm", "yyyy-MM-dd",
+    ].map { fmt in
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = .current
-        for fmt in fmts { f.dateFormat = fmt; if let d = f.date(from: t) { return d } }
-        return nil
+        f.timeZone = .autoupdatingCurrent
+        f.dateFormat = fmt
+        return f
     }
+    static let dayInName = try! NSRegularExpression(pattern: #"(\d{4}-\d{2}-\d{2})"#)
     static func startOfDay(_ d: Date, calendar cal: Calendar = .current) -> Date {
         cal.startOfDay(for: d)
     }
     static func fromFileName(_ name: String) -> Date? {
-        let re = try! NSRegularExpression(pattern: #"(\d{4}-\d{2}-\d{2})"#)
+        let re = dayInName
         let ns = name as NSString
         if let m = re.firstMatch(in: name, range: NSRange(location: 0, length: ns.length)) {
             return parse(ns.substring(with: m.range(at: 1)))
@@ -1038,7 +1046,12 @@ public enum Dataview {
     }
 
     static func norm(_ s: String) -> String {
-        s.lowercased().replacingOccurrences(of: " ", with: "-").replacingOccurrences(of: "_", with: "-")
+        // One pass instead of two Foundation replaces: this runs for every field of every page.
+        let l = s.lowercased()
+        guard l.utf8.contains(where: { $0 == 0x20 || $0 == 0x5F }) else { return l }
+        var out = String.UnicodeScalarView()
+        for u in l.unicodeScalars { out.append(u == " " || u == "_" ? "-" : u) }
+        return String(out)
     }
 
     static func lookup(_ name: String, _ env: Env) -> DVValue {
@@ -1137,7 +1150,8 @@ public enum Dataview {
         case "file.tasks": return .list(tasks(in: n).map { .task($0) })
         default: break
         }
-        if let p = n.summary.frontmatter.properties.first(where: { norm($0.key) == norm(name) }) {
+        let key = norm(name)
+        if let p = n.summary.frontmatter.properties.first(where: { norm($0.key) == key }) {
             let v = DVValue.from(p.value)
             if case .string(let s) = v, s.hasPrefix("[["), s.hasSuffix("]]") {
                 let l = NoteParser.makeLink(inner: String(s.dropFirst(2).dropLast(2)), embed: false, range: NSRange())
@@ -1145,7 +1159,7 @@ public enum Dataview {
             }
             return v
         }
-        let fields = n.summary.fields.filter { norm($0.key) == norm(name) }
+        let fields = n.summary.fields.filter { norm($0.key) == key }
         if !fields.isEmpty {
             let vals: [DVValue] = fields.flatMap { f -> [DVValue] in
                 if f.links.isEmpty { return [DVValue.coerceScalar(f.value)] }
@@ -1157,15 +1171,28 @@ public enum Dataview {
     }
 
     public static func tasks(in n: NoteRecord) -> [DVTask] {
-        tasks(in: n.content, path: n.path)
+        // Every task line has "[ ]", "[x]" or "[X]"; most notes have none, so skip them unsplit.
+        guard ByteSearch.count("[ ]", in: n.lowered, cap: 1) > 0 || ByteSearch.count("[x]", in: n.lowered, cap: 1) > 0 else { return [] }
+        return tasks(in: n.content, path: n.path, frontmatter: n.summary.frontmatter)
     }
+    static let taskLine = try! NSRegularExpression(pattern: #"^(\s*(?:[-*+]|\d+[.)])\s+)\[( |x|X)\]\s?(.*)$"#)
+    static let taskTag = try! NSRegularExpression(pattern: #"(?<![\w/&#])#([A-Za-z0-9_\-/]*[A-Za-z_\-/][A-Za-z0-9_\-/]*)"#)
+    static let taskDates: [String: NSRegularExpression] = {
+        var d: [String: NSRegularExpression] = [:]
+        let stamp = #"\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#
+        for e in ["📅", "⏳", "➕", "✅"] { d[e] = try! NSRegularExpression(pattern: e + stamp) }
+        for k in ["due", "scheduled", "created", "completion"] { d[k] = try! NSRegularExpression(pattern: #"\["# + k + #"::\s*([^\]]+)\]"#) }
+        return d
+    }()
     public static func tasks(in text: String, path: String) -> [DVTask] {
+        tasks(in: text, path: path, frontmatter: Frontmatter.parse(text))
+    }
+    static func tasks(in text: String, path: String, frontmatter fm: Frontmatter) -> [DVTask] {
         let lines = text.components(separatedBy: "\n")
-        let fm = Frontmatter.parse(text)
         var out: [DVTask] = []
         var inFence = false
         var index = 0
-        let check = try! NSRegularExpression(pattern: #"^(\s*(?:[-*+]|\d+[.)])\s+)\[( |x|X)\]\s?(.*)$"#)
+        let check = taskLine
         for (i, line) in lines.enumerated() where i >= fm.lineCount {
             let t = line.trimmingCharacters(in: .whitespaces)
             if t.hasPrefix("```") || t.hasPrefix("~~~") { inFence.toggle(); continue }
@@ -1175,22 +1202,16 @@ public enum Dataview {
             let mark = ns.substring(with: m.range(at: 2))
             let body = ns.substring(with: m.range(at: 3))
             var due: Date?, scheduled: Date?, created: Date?, completion: Date?
-            func eat(_ pattern: String, _ into: inout Date?) {
-                let re = try! NSRegularExpression(pattern: pattern)
-                if let mm = re.firstMatch(in: body, range: NSRange(location: 0, length: (body as NSString).length)) {
+            func eat(_ key: String, _ into: inout Date?) {
+                guard body.contains(key) else { return }
+                if let mm = taskDates[key]!.firstMatch(in: body, range: NSRange(location: 0, length: (body as NSString).length)) {
                     into = DVDate.parse((body as NSString).substring(with: mm.range(at: 1)))
                 }
             }
-            eat(#"📅\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#, &due)
-            eat(#"⏳\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#, &scheduled)
-            eat(#"➕\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#, &created)
-            eat(#"✅\s*(\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?)"#, &completion)
-            eat(#"\[due::\s*([^\]]+)\]"#, &due)
-            eat(#"\[scheduled::\s*([^\]]+)\]"#, &scheduled)
-            eat(#"\[created::\s*([^\]]+)\]"#, &created)
-            eat(#"\[completion::\s*([^\]]+)\]"#, &completion)
+            eat("📅", &due); eat("⏳", &scheduled); eat("➕", &created); eat("✅", &completion)
+            eat("due", &due); eat("scheduled", &scheduled); eat("created", &created); eat("completion", &completion)
             var tags: [String] = []
-            let tagRe = try! NSRegularExpression(pattern: #"(?<![\w/&#])#([A-Za-z0-9_\-/]*[A-Za-z_\-/][A-Za-z0-9_\-/]*)"#)
+            let tagRe = taskTag
             tagRe.enumerateMatches(in: body, range: NSRange(location: 0, length: (body as NSString).length)) { m, _, _ in
                 if let m { tags.append((body as NSString).substring(with: m.range(at: 1))) }
             }
