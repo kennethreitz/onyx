@@ -16,7 +16,10 @@ enum Theme {
     static let secondaryAlt = dyn(0xecece6, 0x262521)
     static let ink = dyn(0x1a1a18, 0xe9e8e1)
     static let muted = dyn(0x565650, 0xb3b2a9)
-    static let faint = dyn(0x7f7f78, 0x7f7e76)      // ≥4:1 on paper in both themes, for 10–11pt labels
+    /// Markdown syntax in the editor: as quiet as iA Writer's.
+    static let faint = dyn(0x8a8a82, 0x7f7e76)
+    /// Chrome labels at 9.5–11pt: a shade darker in light mode so they clear ~4:1 on paper.
+    static let faintLabel = dyn(0x7f7f78, 0x7f7e76)
     static let border = dyn(0xdedcd2, 0x34332e)
     static let cursor = dyn(0x5a7a9e, 0x7aa8cc)
     static let selection = dyn(0xffdc28, 0xffdc28, 0.22, 0.14)
@@ -66,7 +69,7 @@ extension Color {
     static let secondaryPaper = Color(nsColor: Theme.secondary)
     static let ink = Color(nsColor: Theme.ink)
     static let muted = Color(nsColor: Theme.muted)
-    static let faint = Color(nsColor: Theme.faint)
+    static let faint = Color(nsColor: Theme.faintLabel)
     static let hairline = Color(nsColor: Theme.border)
     static let cursorBlue = Color(nsColor: Theme.cursor)
     static let warn = Color(nsColor: Theme.warn)
