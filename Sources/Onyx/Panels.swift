@@ -14,6 +14,20 @@ struct PanelChrome: ViewModifier {
 }
 extension View { func panelChrome(pinned: Bool = false) -> some View { modifier(PanelChrome(pinned: pinned)) } }
 
+/// Empty states share one quiet voice: a line of italic serif, and an optional hint of what fills it.
+struct QuietEmpty: View {
+    var title: String
+    var hint: String? = nil
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.xxs) {
+            Text(title).font(Theme.serif(13.5, italic: true)).foregroundStyle(Color.muted)
+            if let hint { Text(hint).font(.system(size: TypeScale.caption)).foregroundStyle(Color.faint).fixedSize(horizontal: false, vertical: true) }
+        }
+        .padding(.horizontal, 14).padding(.vertical, Space.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct PanelHeader<Tab: Identifiable & Hashable>: View {
     var tabs: [Tab]
     @Binding var selection: Tab
@@ -64,7 +78,7 @@ struct SidebarView: View {
                 switch ws.sidebarTab {
                 case .files: FileTreeView(ws: ws)
                 case .search: SearchPanel(ws: ws)
-                case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.canvases[$0] != nil }, empty: "Nothing opened yet.")
+                case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.canvases[$0] != nil }, empty: "Nothing opened yet.", hint: "Notes you open land here, newest first.")
                 case .bookmarks: BookmarksPanel(ws: ws)
                 case .tags: TagsPanel(ws: ws)
                 case .git: GitPanel(ws: ws)
@@ -542,9 +556,10 @@ struct PathList: View {
     @Bindable var ws: Workspace
     var paths: [String]
     var empty: String
+    var hint: String? = nil
     var body: some View {
         if paths.isEmpty {
-            Text(empty).font(.system(size: 12)).foregroundStyle(Color.faint).padding(16).frame(maxWidth: .infinity, alignment: .leading)
+            QuietEmpty(title: empty, hint: hint).padding(.top, Space.xs)
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
@@ -590,7 +605,9 @@ struct SearchPanel: View {
                 TextField("Search vault  ·  tag:  path:  \"phrase\"", text: $ws.searchQuery)
                     .textFieldStyle(.plain).font(.system(size: 12.5)).focused($focused)
             }
-            .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control)).overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
+            .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
+            .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(focused ? Color.cursorBlue.opacity(0.55) : Color.hairline, lineWidth: focused ? 1 : 0.8))
+            .animation(Motion.hover, value: focused)
             .padding(10)
             if !ws.searchQuery.isEmpty {
                 Text("\(hits.count == 200 ? "200+" : String(hits.count)) results · \(millis) ms").font(.system(size: 10.5)).foregroundStyle(Color.faint)
@@ -599,6 +616,11 @@ struct SearchPanel: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
                     ForEach(hits) { h in NoteRow(ws: ws, path: h.path, detail: h.snippets.first ?? (h.path as NSString).deletingLastPathComponent) }
+                    if ws.searchQuery.isEmpty {
+                        QuietEmpty(title: "Search every note.", hint: "tag:name  ·  path:folder  ·  \"exact phrase\"")
+                    } else if hits.isEmpty && task == nil {
+                        QuietEmpty(title: "Nothing matches.", hint: "Try fewer words, or ⌘O to find a note by name.")
+                    }
                 }.thinScrollers()
             }
         }
@@ -609,13 +631,13 @@ struct SearchPanel: View {
     func run() {
         task?.cancel()
         let q = ws.searchQuery
-        guard let snap = ws.snapshot, !q.trimmingCharacters(in: .whitespaces).isEmpty else { hits = []; return }
+        guard let snap = ws.snapshot, !q.trimmingCharacters(in: .whitespaces).isEmpty else { hits = []; task = nil; return }
         task = Task {
             try? await Task.sleep(nanoseconds: 90_000_000)
             if Task.isCancelled { return }
             let t0 = Date()
             let r = await Task.detached { snap.search(q) }.value
-            if !Task.isCancelled { hits = r; millis = Int(Date().timeIntervalSince(t0) * 1000) }
+            if !Task.isCancelled { hits = r; millis = Int(Date().timeIntervalSince(t0) * 1000); task = nil }
         }
     }
 }
@@ -624,7 +646,7 @@ struct BookmarksPanel: View {
     @Bindable var ws: Workspace
     var body: some View {
         VStack(spacing: 0) {
-            PathList(ws: ws, paths: ws.bookmarks, empty: "No bookmarks yet.")
+            PathList(ws: ws, paths: ws.bookmarks, empty: "No bookmarks yet.", hint: "Bookmark a note from the button below or the command palette.")
             if let p = ws.currentPath {
                 Divider().overlay(Color.hairline)
                 Button { ws.toggleBookmark() } label: {
@@ -647,16 +669,30 @@ struct TagsPanel: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(tags, id: \.0) { t in
-                    HStack {
-                        Text("#" + t.0).font(.custom("IBMPlexMono", size: 11.5)).foregroundStyle(Color.ink)
-                        Spacer()
-                        Text("\(t.1)").font(.system(size: 10.5)).foregroundStyle(Color.faint)
-                    }
-                    .padding(.horizontal, 12).frame(height: 24).contentShape(Rectangle())
-                    .onTapGesture { ws.searchQuery = "tag:" + t.0; ws.sidebarTab = .search }
+                    TagRow(name: t.0, count: t.1) { ws.searchQuery = "tag:" + t.0; ws.sidebarTab = .search }
                 }
             }.padding(.vertical, 6).thinScrollers()
         }
+    }
+}
+
+/// One tag in the Tags panel: the same hover wash as note rows, counts in tabular figures.
+struct TagRow: View {
+    var name: String
+    var count: Int
+    var action: () -> Void
+    @State private var hover = false
+    var body: some View {
+        HStack {
+            Text("#" + name).font(.custom("IBMPlexMono", size: 11.5)).foregroundStyle(Color.ink).lineLimit(1)
+            Spacer()
+            Text("\(count)").font(.system(size: TypeScale.caption).monospacedDigit()).foregroundStyle(Color.faint)
+        }
+        .padding(.horizontal, 12).frame(height: 24)
+        .background(RoundedRectangle(cornerRadius: Radius.control).fill(Color.ink.opacity(hover ? 0.04 : 0)).padding(.horizontal, 5))
+        .contentShape(Rectangle())
+        .onHover { hover = $0 }
+        .onTapGesture(perform: action)
     }
 }
 
@@ -689,7 +725,7 @@ struct InspectorView: View {
 
     @ViewBuilder func outline(_ note: NoteRecord) -> some View {
         let hs = NoteParser.parseHeadings(ws.text)
-        if hs.isEmpty { Text("No headings.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(14) }
+        if hs.isEmpty { QuietEmpty(title: "No headings yet.", hint: "Lines that start with # build the outline.").padding(.top, Space.xs) }
         let minLevel = hs.map(\.level).min() ?? 1
         ForEach(Array(hs.enumerated()), id: \.offset) { i, h in
             Text(h.text)
@@ -710,23 +746,25 @@ struct InspectorView: View {
         relations(note, snap)
         let links = snap.backlinks(to: note.path)
         sectionTitle("Linked mentions · \(links.count)")
-        if links.isEmpty { Text("Nothing links here yet.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.vertical, 4) }
+        if links.isEmpty { QuietEmpty(title: "Nothing links here yet.", hint: "Write [[\(note.name)]] in another note.") }
         ForEach(links, id: \.self) { b in
             NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context))
         }
-        Button { showUnlinked.toggle() } label: {
-            HStack { Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8)); Text("UNLINKED MENTIONS").font(.system(size: 9.5, weight: .semibold)).tracking(0.8) }
+        Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
+            HStack(spacing: Space.xs) { Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold)); Text("UNLINKED MENTIONS").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8) }
                 .foregroundStyle(Color.faint)
         }.buttonStyle(.plain).padding(.horizontal, 14).padding(.top, 14)
         if showUnlinked {
-            ForEach(snap.unlinkedMentions(of: note.path), id: \.self) { b in NoteRow(ws: ws, path: b.source, detail: b.context) }
+            let unlinked = snap.unlinkedMentions(of: note.path)
+            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.") }
+            ForEach(unlinked, id: \.self) { b in NoteRow(ws: ws, path: b.source, detail: b.context) }
         }
     }
 
     @ViewBuilder func properties(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
         let fm = Frontmatter.parse(ws.text)
         sectionTitle("Properties")
-        if fm.properties.isEmpty { Text("No properties.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(.horizontal, 14) }
+        if fm.properties.isEmpty { QuietEmpty(title: "No properties.", hint: "Frontmatter between --- lines at the top shows here.") }
         ForEach(fm.properties, id: \.self) { p in
             HStack(alignment: .firstTextBaseline) {
                 Image(systemName: icon(p.value)).font(.system(size: 10)).foregroundStyle(Color.faint).frame(width: 14)
@@ -769,7 +807,7 @@ struct GitPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if !isRepo {
-                Text("This vault isn’t a git repository.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(14)
+                QuietEmpty(title: "This vault isn’t a git repository.", hint: "Run git init in the vault folder to get history and auto-sync.").padding(.top, Space.xs)
             } else {
                 HStack {
                     Image(systemName: "arrow.triangle.branch").foregroundStyle(Color.faint)
@@ -798,7 +836,7 @@ struct GitPanel: View {
                         }
                     }.thinScrollers()
                 }
-                if changes.isEmpty { Text("Working tree clean.").font(.system(size: 12)).foregroundStyle(Color.faint).padding(.horizontal, 12) }
+                if changes.isEmpty { QuietEmpty(title: "Working tree clean.").padding(.horizontal, -2) }
                 TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)
                 HStack {
                     Button("Commit all") { commit() }.disabled(changes.isEmpty)
