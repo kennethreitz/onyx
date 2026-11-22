@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Note composer, matching Obsidian’s core plugin: Merge Current File With Another File…, Extract Current Selection…, and Extract This Heading…. They’re in the command palette, the Edit menu, and (for the extract commands) the editor’s context menu, and they’re bindable in Settings ▸ Shortcuts, with no default shortcut. Merge asks first, then appends or prepends the open note’s body to a note you pick in the quick switcher, combines frontmatter (target scalars win, lists are unioned), rewrites wikilinks and Markdown links and embeds across the vault so they point at the target, and moves the source to the Trash. Extract writes the selection, or the heading section around the caret, to a new note (or appends it to an existing one), and replaces the original with a link, an embed, or nothing — that’s one undo step in the editor. A selection that starts with a heading offers that heading as the name. Settings ▸ Editor has confirm-before-merge, append vs prepend, where new notes land, and whether to open the extracted note.
+
 ## [0.1.6] - 2026-11-21
 
 ### Added

@@ -28,6 +28,10 @@ struct PaletteView: View {
     var noun = "note"
     var openVerb = "open"
     var allowSplit = true
+    /// Prefills the search field (extract offers the heading as a name).
+    var initialQuery: String = ""
+    /// When the typed name does not already exist, select the Create row first.
+    var preferCreate: Bool = false
     var dismiss: () -> Void
     @State private var query = ""
     @State private var results: [PaletteItem] = []
@@ -90,6 +94,7 @@ struct PaletteView: View {
         .frame(width: 640)
         .panelChrome()
         .onAppear {
+            if query.isEmpty, !initialQuery.isEmpty { query = initialQuery }
             if let q = ProcessInfo.processInfo.environment["ONYX_SWITCHER_QUERY"], onCreate != nil { query = q }
             focused = true; refresh(); install()
         }
@@ -102,8 +107,13 @@ struct PaletteView: View {
         if ProcessInfo.processInfo.environment["ONYX_DEBUG_KEYS"] != nil {
             print("[switcher] query=“\(query)” → \(results.count): \(results.prefix(3).map(\.title)) create=\(showCreate)"); fflush(stdout)
         }
-        // Nothing found: the Create row is the thing to do
-        selection = results.isEmpty && showCreate ? createIndex : 0
+        // Nothing found, or a new name we would rather create: the Create row is the thing to do.
+        if showCreate, preferCreate || results.isEmpty {
+            let exact = results.firstIndex { $0.title.compare(trimmed, options: .caseInsensitive) == .orderedSame }
+            selection = exact ?? createIndex
+        } else {
+            selection = results.isEmpty && showCreate ? createIndex : 0
+        }
     }
 
     private func move(_ d: Int) {
@@ -306,6 +316,9 @@ enum PaletteCommands {
             item("zoomout") { ws.zoom(-1) },
             item("zoomreset") { ws.zoom(0) },
             item("spellcheck", title: EditorPrefs.spellcheckOn ? "Turn spellcheck off" : "Turn spellcheck on") { ws.toggleSpellcheck() },
+            item("merge") { DispatchQueue.main.async { ws.beginMerge() } },
+            item("extract") { DispatchQueue.main.async { ws.beginExtract() } },
+            item("extractheading") { DispatchQueue.main.async { ws.beginExtract(heading: true) } },
             item("settings") { DispatchQueue.main.async { Workspace.openSettings() } },
             item("hints") { withAnimation { ws.showHints = true } },
         ] + Workspace.formatMenu.compactMap { $0 }.map { id in item(id) { ws.runEditCommand(id) } }
@@ -376,6 +389,47 @@ enum PaletteCommands {
         }
         return ws.quickIndex.search(q, recent: ws.recent).map { h in
             var i = item(h.entry.path, h.entry.name.text, h.entry.folder.text)
+            i.titleHits = h.nameHits; i.subtitleHits = h.folderHits
+            if let a = h.alias { i.badge = a; i.badgeHits = h.aliasHits }
+            return i
+        }
+    }
+
+    /// Notes to merge the open file into: Markdown only, excluding the current note.
+    @MainActor static func mergeTargets(_ ws: Workspace, _ q: String) -> [PaletteItem] {
+        noteChoices(ws, q, excluding: ws.currentPath, verb: "merge") { path in
+            ws.confirmMerge(into: path)
+        }
+    }
+
+    /// Notes that can receive an extracted selection: Markdown only, excluding the current note.
+    @MainActor static func extractTargets(_ ws: Workspace, _ q: String) -> [PaletteItem] {
+        noteChoices(ws, q, excluding: ws.currentPath, verb: "append") { path in
+            ws.finishExtract(to: path, creating: false)
+        }
+    }
+
+    @MainActor static func noteChoices(_ ws: Workspace, _ q: String, excluding: String?, verb: String, action: @escaping (String) -> Void) -> [PaletteItem] {
+        guard let snap = ws.snapshot else { return [] }
+        func item(_ path: String, _ title: String, _ folder: String) -> PaletteItem {
+            PaletteItem(id: path, title: title, subtitle: folder.isEmpty ? verb : "\(folder) · \(verb)",
+                        symbol: "doc") { action(path) }
+        }
+        let skip = excluding
+        if q.trimmingCharacters(in: .whitespaces).isEmpty {
+            var paths = ws.recent.filter { $0 != skip && snap.notes[$0] != nil }
+            if paths.count < 12 {
+                let edited = snap.notes.values.sorted { $0.mtime > $1.mtime }.map(\.path)
+                for p in edited where p != skip && !paths.contains(p) { paths.append(p); if paths.count >= 12 { break } }
+            }
+            return paths.prefix(12).compactMap { p in
+                snap.notes[p].map { item(p, $0.name, $0.folder) }
+            }
+        }
+        return ws.quickIndex.search(q, recent: ws.recent).compactMap { h in
+            let path = h.entry.path
+            guard path != skip, snap.notes[path] != nil else { return nil }
+            var i = item(path, h.entry.name.text, h.entry.folder.text)
             i.titleHits = h.nameHits; i.subtitleHits = h.folderHits
             if let a = h.alias { i.badge = a; i.badgeHits = h.aliasHits }
             return i

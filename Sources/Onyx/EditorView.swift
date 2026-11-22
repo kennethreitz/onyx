@@ -19,7 +19,19 @@ final class OnyxTextView: NSTextView {
     }
 
     var onFollowLink: (String) -> Void = { _ in }
+    var onExtract: (() -> Void)?
+    var onExtractHeading: (() -> Void)?
+    var onComposerMenu: ((NSMenu) -> Void)?
     var measure: CGFloat = Theme.editorMeasure
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        let menu = super.menu(for: event) ?? NSMenu()
+        onComposerMenu?(menu)
+        return menu
+    }
+
+    @objc func composeExtract() { onExtract?() }
+    @objc func composeExtractHeading() { onExtractHeading?() }
 
     override func drawBackground(in rect: NSRect) {
         super.drawBackground(in: rect)
@@ -405,6 +417,26 @@ struct EditorView: NSViewRepresentable {
         tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
         tv.fieldSuggest = { [weak ws] part, q in ws?.fieldSuggestions(part, q) ?? [] }
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
+        tv.onExtract = { [weak ws] in ws?.beginExtract() }
+        tv.onExtractHeading = { [weak ws] in ws?.beginExtract(heading: true) }
+        tv.onComposerMenu = { [weak tv] menu in
+            guard let tv, tv.isEditable else { return }
+            let sel = tv.selectedRange()
+            let hasSel = sel.length > 0
+            let inHeading = NoteComposer.headingSection(in: tv.string, at: sel.location) != nil
+            guard hasSel || inHeading else { return }
+            menu.addItem(.separator())
+            if hasSel {
+                let item = NSMenuItem(title: CommandCatalog.title("extract"), action: #selector(OnyxTextView.composeExtract), keyEquivalent: "")
+                item.target = tv
+                menu.addItem(item)
+            }
+            if inHeading {
+                let item = NSMenuItem(title: CommandCatalog.title("extractheading"), action: #selector(OnyxTextView.composeExtractHeading), keyEquivalent: "")
+                item.target = tv
+                menu.addItem(item)
+            }
+        }
         tv.onPreview = { [weak ws, weak tv] t, rect in
             guard let ws, let tv else { return }
             guard let t else { GraphPreviewController.shared.leaveLink(); return }

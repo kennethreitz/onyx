@@ -462,6 +462,33 @@ struct RootView: View {
                     .padding(.top, 88)
                 Spacer()
             }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .merge:
+            dimmer
+            VStack {
+                let name = ws.currentPath.map { ws.noteTitle($0) } ?? "this note"
+                PaletteView(placeholder: "Merge “\(name)” into…", items: { PaletteCommands.mergeTargets(ws, $0) },
+                            allowSplit: false, dismiss: { ws.show(.none) })
+                    .padding(.top, 88)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+        case .extract:
+            dimmer
+            VStack {
+                let pending = ws.pendingExtract
+                let defaultName = pending?.defaultName ?? ""
+                PaletteView(placeholder: "Extract to a new or existing note…", items: { PaletteCommands.extractTargets(ws, $0) },
+                            onCreate: { ws.finishExtract(named: $0) },
+                            exists: { q in
+                                let folder = NoteComposer.folder(forCurrent: ws.currentPath, location: NoteComposer.Settings.location)
+                                let path = NoteComposer.path(named: q, folder: folder)
+                                return ws.snapshot?.notes[path] != nil
+                            },
+                            noun: "note", openVerb: "append to", allowSplit: false,
+                            initialQuery: defaultName, preferCreate: true,
+                            dismiss: { ws.show(.none) })
+                    .padding(.top, 88)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
         case .syncLog:
             dimmer
             VStack {

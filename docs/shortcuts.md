@@ -43,3 +43,5 @@ Every command is also in the menu bar with its shortcut; the full list is in [Co
 Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, and ⌘Z stay with the editor and are not rebound here.
 
 Lint Current Note and Lint All Notes in Folder… are in the command palette and the Note menu; they have no default shortcut. See [Linter](linter.md).
+
+Merge Current File With Another File…, Extract Current Selection…, and Extract This Heading… are in the command palette and the Edit menu; the extract commands are also in the editor’s context menu. They have no default shortcut. Settings are in Settings ▸ Editor.

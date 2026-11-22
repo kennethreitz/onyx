@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -117,6 +117,8 @@ final class Workspace {
     var toast: String? = nil
     let speech = SpeechReader()
     let recorder = AudioRecorder()
+    /// Selection or heading section waiting on the extract-to picker.
+    var pendingExtract: PendingExtract? = nil
     var editorJump: Int? = nil           // line to reveal in the editor
     var readerJump: Int? = nil           // heading index to reveal in the reader
     var expanded: Set<String> = []
@@ -706,7 +708,7 @@ final class Workspace {
     func trash(_ path: String) { trash([path]) }
 
     /// Several paths in one go: one Trash call, one history/pane cleanup, one commit.
-    func trash(_ paths: [String]) {
+    func trash(_ paths: [String], afterward: (() -> Void)? = nil) {
         guard let root else { return }
         let roots = TreeSelection.roots(paths)
         guard !roots.isEmpty else { return }
@@ -717,12 +719,12 @@ final class Workspace {
             DispatchQueue.main.async {
                 guard let self else { return }
                 if let err, trashed.isEmpty { self.toast = "Couldn’t move to Trash: \(err.localizedDescription)"; return }
-                self.afterTrash(affected, gone: gone, name: TreeSelection.describe(roots))
+                self.afterTrash(affected, gone: gone, name: TreeSelection.describe(roots), afterward: afterward)
             }
         }
     }
 
-    private func afterTrash(_ affected: [String], gone: (String) -> Bool, name: String) {
+    private func afterTrash(_ affected: [String], gone: (String) -> Bool, name: String, afterward: (() -> Void)? = nil) {
         treeSelection.prune { !gone($0) }
         snapshot?.refresh(paths: affected)
         recent.removeAll(where: gone)
@@ -760,8 +762,11 @@ final class Workspace {
             speech.stop()
             currentPath = nil
             suppressTextChange = true; text = ""; lastSaved = ""; suppressTextChange = false
-            if history.indices.contains(historyIndex), case .note = history[historyIndex].place { go(0) } else { openHome() }
+            if afterward == nil {
+                if history.indices.contains(historyIndex), case .note = history[historyIndex].place { go(0) } else { openHome() }
+            }
         }
+        if let afterward { afterward(); return }
         let shown = name.hasSuffix(".md") ? String(name.dropLast(3)) : name
         toast = "Moved “\(shown)” to the Trash"
         vaultMutated("Delete \(shown)", paths: affected)

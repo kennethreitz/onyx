@@ -307,6 +307,10 @@ struct OnyxApp: App {
             ShortcutMenus.button("spellcheck", title: EditorPrefs.spellcheckOn ? "Turn Spellcheck Off" : "Turn Spellcheck On") { ws.toggleSpellcheck() }
             Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)
             Button("Find Previous (⇧⌘G while finding)") { ws.findStep(-1) }.disabled(!ws.finder.visible)
+            Divider()
+            ShortcutMenus.button("merge", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginMerge() }
+            ShortcutMenus.button("extract", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginExtract() }
+            ShortcutMenus.button("extractheading", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginExtract(heading: true) }
         }
         CommandMenu("Format") {
             ForEach(Array(Workspace.formatMenu.enumerated()), id: \.offset) { _, id in

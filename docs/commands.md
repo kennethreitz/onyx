@@ -32,6 +32,9 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Find and Replace… | <kbd>⌥⌘F</kbd> |
 | Search Vault for Selection | — |
 | Toggle Spellcheck | — |
+| Merge Current File With Another File… | — |
+| Extract Current Selection… | — |
+| Extract This Heading… | — |
 
 ## Format
 
@@ -151,3 +154,4 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 - Jump to Heading… lists the open note’s headings in a palette.
 - Zoom In/Out change the editor and reader text sizes together, within the Settings ranges. Actual Size resets both.
 - Spellcheck is on by default; the toggle is also in Settings ▸ Editor.
+- Note composer matches Obsidian’s core plugin. Merge Current File With Another File… opens a quick switcher, asks you to confirm, then appends (or prepends) the open note to the one you pick, merges frontmatter, rewrites links to the source so they point at the target, and moves the source to the Trash. Extract Current Selection… and Extract This Heading… (the heading and everything until the next heading of the same or a higher level) write the text to a new note or append it to an existing one, and replace the original with a wikilink, an embed, or nothing — one undo step in the editor. Both extract commands are also in the editor’s context menu. A selection that starts with a heading offers that heading as the filename. Settings are in Settings ▸ Editor: confirm before merging, append vs prepend, where new notes land, what to leave behind, and whether to open the extracted note.

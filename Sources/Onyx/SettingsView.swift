@@ -80,7 +80,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         switch raw {
         case "", "general", "appearance", "vault", "focus": return .general
         case "linter", "lint": return .linter
-        case "editor": return .editor
+        case "editor", "composer", "notecomposer", "note-composer": return .editor
         case "shortcuts", "keys", "keyboard", "hotkeys", "hotkey": return .shortcuts
         case "reading", "typesetting", "typeset", "typography", "speech": return .reading
         case "graph", "atlas", "startup": return .graph
@@ -197,6 +197,11 @@ struct EditorSettingsPage: View {
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.escToReading) private var escToReading = true
     @AppStorage(EditorPrefs.spellcheck) private var spellcheck = true
+    @AppStorage(NoteComposer.Settings.confirmMergeKey) private var confirmMerge = true
+    @AppStorage(NoteComposer.Settings.placementKey) private var mergePlacement = NoteComposer.Placement.append.rawValue
+    @AppStorage(NoteComposer.Settings.locationKey) private var extractLocation = NoteComposer.NewLocation.sameFolder.rawValue
+    @AppStorage(NoteComposer.Settings.afterExtractKey) private var afterExtract = NoteComposer.AfterExtract.link.rawValue
+    @AppStorage(NoteComposer.Settings.openAfterExtractKey) private var openAfterExtract = false
 
     var body: some View {
         Form {
@@ -215,6 +220,30 @@ struct EditorSettingsPage: View {
                 Text("When nothing else is open, Esc in the editor saves and shows the reader. Esc never leaves reading view.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { settingsHeader("Keys") }
+
+            Section {
+                Toggle("Confirm file merge", isOn: $confirmMerge)
+                Picker("Merge placement", selection: $mergePlacement) {
+                    ForEach(NoteComposer.Placement.allCases, id: \.rawValue) { p in
+                        Text(p.title).tag(p.rawValue)
+                    }
+                }
+                Text("Merge Current File With Another File… appends or prepends the open note’s body to the note you pick, combines frontmatter, rewrites links to the source so they point at the target, and moves the source to the Trash.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+                Picker("Location for new notes", selection: $extractLocation) {
+                    ForEach(NoteComposer.NewLocation.allCases, id: \.rawValue) { loc in
+                        Text(loc.title).tag(loc.rawValue)
+                    }
+                }
+                Picker("Text after extraction", selection: $afterExtract) {
+                    ForEach(NoteComposer.AfterExtract.allCases, id: \.rawValue) { s in
+                        Text(s.title).tag(s.rawValue)
+                    }
+                }
+                Toggle("Open new file after extracting", isOn: $openAfterExtract)
+                Text("Extract Current Selection… and Extract This Heading… move the text into a new note, or append it to one you pick. The heading’s name is offered when the selection starts with a heading. Replacing the selection with a link is one undo step in the editor.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+            } header: { settingsHeader("Note composer") }
         }
         .settingsPage()
     }

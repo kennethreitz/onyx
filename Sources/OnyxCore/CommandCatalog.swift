@@ -61,6 +61,9 @@ public enum CommandCatalog {
         cmd("findreplace", "Find and Replace…", .edit, [.command("f", option: true)]),
         cmd("searchsel", "Search Vault for Selection", .edit, [], "text.magnifyingglass"),
         cmd("spellcheck", "Toggle Spellcheck", .edit, [], "textformat.abc.dottedunderline"),
+        cmd("merge", "Merge Current File With Another File…", .edit, [], "arrow.triangle.merge"),
+        cmd("extract", "Extract Current Selection…", .edit, [], "text.badge.plus"),
+        cmd("extractheading", "Extract This Heading…", .edit, [], "text.justify.left"),
 
         // Format (Obsidian's editor commands; ⌘I and ⌘K stay with the inspector and sidebar)
         cmd("bold", "Toggle Bold", .format, [.command("b")], "bold"),
