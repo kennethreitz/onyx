@@ -186,7 +186,7 @@ struct SyncBadge: View {
             case .connecting, .syncing: ("arrow.triangle.2.circlepath.icloud", Color.faint)
             case .paused: ("pause.circle", Color.faint)
             case .offline: ("icloud.slash", Color.faint)
-            case .error, .needsAttention: ("exclamationmark.icloud", Color.orange.opacity(0.85))
+            case .error, .needsAttention: ("exclamationmark.icloud", Color.warn)
         }
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
@@ -229,7 +229,7 @@ struct ObsidianSyncSettings: View {
         Section {
             if !account.signedIn { signInForm } else { signedInBody }
             if let busy { HStack(spacing: 6) { ProgressView().controlSize(.small); Text(busy).font(.system(size: 11)).foregroundStyle(Color.faint) } }
-            if let error { Text(error).font(.system(size: 11)).foregroundStyle(.orange) }
+            if let error { Text(error).font(.system(size: 11)).foregroundStyle(Color.warn) }
             // When the vault isn't connected, the Sync-now row (which also has Show Log) isn't shown.
             if onShowLog != nil, ws.obsidianSync == nil {
                 AppKitPushButton(title: "Show Log", id: SettingsSyncLog.buttonID) { onShowLog?() }

@@ -31,7 +31,7 @@ struct RelationshipsSection: View {
                 tree(Ancestry.partsTree(of: path, parts: { snap.parts(of: $0) }), depth: 0, trail: path)
             }
             if !siblings.isEmpty {
-                Button { withAnimation(.easeOut(duration: 0.15)) { showSiblings.toggle() } } label: {
+                Button { withAnimation(Motion.quick) { showSiblings.toggle() } } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.right").rotationEffect(.degrees(showSiblings ? 90 : 0)).font(.system(size: 7.5, weight: .semibold))
                         Text("SIBLINGS · \(siblings.count)").font(.system(size: 9.5, weight: .semibold)).tracking(0.8)
@@ -72,7 +72,7 @@ struct RelationshipsSection: View {
                         Image(systemName: "chevron.right").font(.system(size: 7.5, weight: .semibold)).foregroundStyle(Color.faint)
                             .rotationEffect(.degrees(open.contains(id) ? 90 : 0))
                             .frame(width: 14, height: 22).contentShape(Rectangle())
-                            .onTapGesture { withAnimation(.easeOut(duration: 0.15)) { if open.contains(id) { open.remove(id) } else { open.insert(id) } } }
+                            .onTapGesture { withAnimation(Motion.quick) { if open.contains(id) { open.remove(id) } else { open.insert(id) } } }
                             .help(open.contains(id) ? "Hide parts" : "Show \(n.children.count) parts")
                     } else { Color.clear.frame(width: 14, height: 1) }
                 }.padding(.leading, CGFloat(depth) * 12)
@@ -96,7 +96,7 @@ struct PartRow: View {
             if let note { Text(note).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(1) }
         }
         .padding(.leading, 2).padding(.trailing, 12).frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: 5).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.trailing, 5))
+        .background(RoundedRectangle(cornerRadius: Radius.control).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.trailing, 5))
         .contentShape(Rectangle())
         .background { GraphPreviewTrigger(ws: ws, path: path) }
         .contextMenu { FileMenu(ws: ws, path: path) }

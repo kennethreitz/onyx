@@ -19,7 +19,7 @@ extension Workspace {
         guard currentPath != nil, !isCanvas, !isBase else { NSSound.beep(); return }
         if mode != .edit {
             guard retry else { NSSound.beep(); return }
-            withAnimation(.easeInOut(duration: 0.18)) { mode = .edit }
+            withAnimation(Motion.fade) { mode = .edit }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.applyEdit(retry: false, f) }
             return
         }
@@ -113,7 +113,7 @@ extension Workspace {
     /// Show the open note in the file tree: dock the sidebar on Files, expand, scroll to it.
     func revealInSidebar() {
         guard let p = currentPath else { return }
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.layout) {
             focusMode = false
             sidebarTab = .files
             if !sidebarVisible || !sidebarPinned {

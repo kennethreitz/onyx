@@ -207,7 +207,7 @@ struct UpdateSheet: View {
                     .foregroundStyle(Color.muted)
                 notes(rel.body)
                 if case .failed(let err) = phase {
-                    Text(err).font(.system(size: 12)).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+                    Text(err).font(.system(size: 12)).foregroundStyle(Color.danger).fixedSize(horizontal: false, vertical: true)
                 } else if case .working(let s) = phase {
                     HStack(spacing: 8) { ProgressView(); Text(s).font(.system(size: 12)).foregroundStyle(Color.muted) }
                 }
@@ -240,8 +240,8 @@ struct UpdateSheet: View {
         }
         .padding(10)
         .background(Color.paperAlt)
-        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.hairline, lineWidth: 1))
-        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Color.hairline, lineWidth: 1))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card))
         .frame(maxHeight: .infinity)
     }
 }

@@ -104,7 +104,7 @@ struct LinterSettingsPage: View {
             Section {
                 Toggle("Lint on save", isOn: $onSave)
                 Text("Off by default. Runs on ⌘S, Save and Read, Esc to reading, and switching notes when you edited the note — never while you type. Current-note linting is one undoable editor edit. Folder linting always requires a preview and confirmation.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Color.muted)
             }
             Section("Rules") {
                 ForEach(Linter.rules) { rule in LintRuleToggle(rule: rule) }
@@ -114,7 +114,7 @@ struct LinterSettingsPage: View {
                 Picker("List marker", selection: $marker) { Text("-").tag("-"); Text("*").tag("*"); Text("+").tag("+") }
                 Picker("Timestamp key", selection: $timestampKey) { Text("updated").tag("updated"); Text("modified").tag("modified") }
                 Text("Timestamps use local time, to the minute. Manual linting stamps only when another rule changes the note; lint-on-save also stamps edited notes. Protected regions are left alone.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.caption).foregroundStyle(Color.muted)
             }
         }
         .formStyle(.grouped).frame(width: SettingsPage.width, height: 600)
@@ -132,7 +132,7 @@ private struct LintRuleToggle: View {
         Toggle(isOn: $enabled) {
             VStack(alignment: .leading) {
                 Text(rule.name)
-                Text(rule.description).font(.caption).foregroundStyle(.secondary)
+                Text(rule.description).font(.caption).foregroundStyle(Color.muted)
             }
         }
     }

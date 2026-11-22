@@ -280,7 +280,7 @@ struct RecordingBadge: View {
         HStack(spacing: 4) {
             switch recorder.state {
             case .recording(let since):
-                Circle().fill(Color.red.opacity(0.75)).frame(width: 6, height: 6)
+                Circle().fill(Color.danger).frame(width: 6, height: 6)
                 TimelineView(.periodic(from: since, by: 1)) { ctx in
                     Text(AudioNote.elapsed(ctx.date.timeIntervalSince(since)))
                         .font(.system(size: 11.5).monospacedDigit())

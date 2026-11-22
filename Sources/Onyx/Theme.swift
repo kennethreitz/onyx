@@ -16,7 +16,7 @@ enum Theme {
     static let secondaryAlt = dyn(0xecece6, 0x262521)
     static let ink = dyn(0x1a1a18, 0xe9e8e1)
     static let muted = dyn(0x565650, 0xb3b2a9)
-    static let faint = dyn(0x8a8a82, 0x7f7e76)
+    static let faint = dyn(0x7f7f78, 0x7f7e76)      // ≥4:1 on paper in both themes, for 10–11pt labels
     static let border = dyn(0xdedcd2, 0x34332e)
     static let cursor = dyn(0x5a7a9e, 0x7aa8cc)
     static let selection = dyn(0xffdc28, 0xffdc28, 0.22, 0.14)
@@ -26,6 +26,9 @@ enum Theme {
         ap.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? NSColor(white: 1, alpha: 0.025) : NSColor(red: 1, green: 0.86, blue: 0.16, alpha: 0.07)
     }
     static let highlight = dyn(0xffdc28, 0xffdc28, 0.30, 0.22)
+    /// Semantic tints, inked rather than system-bright: conflicts, refused drops, errors, recording.
+    static let warn = dyn(0xa8612a, 0xe0a060)       // burnt amber
+    static let danger = dyn(0xa8423c, 0xe2827a)     // madder red
 
     /// Highlightr palette from the vault's plugin settings (8-digit hex, alpha A6).
     static let highlighters: [(String, UInt32)] = [
@@ -66,6 +69,95 @@ extension Color {
     static let faint = Color(nsColor: Theme.faint)
     static let hairline = Color(nsColor: Theme.border)
     static let cursorBlue = Color(nsColor: Theme.cursor)
+    static let warn = Color(nsColor: Theme.warn)
+    static let danger = Color(nsColor: Theme.danger)
+}
+
+// MARK: - Scales (see docs/DESIGN.md › Scales)
+
+/// Spacing steps for chrome. Prefer these to one-off numbers; the page itself is typeset by the reader/editor.
+enum Space {
+    static let xxs: CGFloat = 2, xs: CGFloat = 4, s: CGFloat = 6, m: CGFloat = 8, l: CGFloat = 12, xl: CGFloat = 16, xxl: CGFloat = 24
+}
+
+/// Corner radii: four sizes, picked by how big the thing is.
+enum Radius {
+    static let small: CGFloat = 4     // chips, keycaps, ≤22pt icon buttons
+    static let control: CGFloat = 6   // list rows, tabs, fields
+    static let card: CGFloat = 8      // popovers, find bar, cards
+    static let panel: CGFloat = 12    // summoned panels (panelChrome)
+}
+
+/// Chrome type scale (SF, points). The page uses Latin Modern / Plex at the user's size.
+enum TypeScale {
+    static let label: CGFloat = 9.5     // UPPERCASE section labels, tracked
+    static let caption: CGFloat = 10.5  // counts, hints, secondary lines
+    static let small: CGFloat = 11.5    // panel text, properties, toasts
+    static let body: CGFloat = 12.5     // rows, fields
+    static let row: CGFloat = 13.5      // palette rows
+}
+
+/// Motion: a few named curves, and Reduce Motion respected everywhere. With Reduce Motion on,
+/// springs become a short dissolve and slides/scales become plain fades.
+@MainActor enum Motion {
+    static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+    /// Hover and press feedback (color/opacity only, so it stays on with Reduce Motion).
+    static let hover: Animation = .easeOut(duration: 0.12)
+    /// Selection, disclosure, small toggles.
+    static var quick: Animation { reduced ? .easeOut(duration: 0.1) : .easeOut(duration: 0.15) }
+    /// Read ⇄ edit, cross-fades.
+    static var fade: Animation { .easeInOut(duration: reduced ? 0.12 : 0.18) }
+    /// Summoned overlays (switcher, palette, graph).
+    static var overlay: Animation { reduced ? .easeOut(duration: 0.12) : .spring(response: 0.26, dampingFraction: 0.9) }
+    /// Docking panels, splits, layout changes.
+    static var layout: Animation { reduced ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.88) }
+    /// Slide in from an edge, or just fade with Reduce Motion.
+    static func slide(_ edge: Edge) -> AnyTransition { reduced ? .opacity : .move(edge: edge).combined(with: .opacity) }
+    /// A slight scale-in, or just fade with Reduce Motion.
+    static func pop(_ scale: CGFloat = 0.98, anchor: UnitPoint = .center) -> AnyTransition {
+        reduced ? .opacity : .opacity.combined(with: .scale(scale: scale, anchor: anchor))
+    }
+}
+
+/// Keyboard shortcuts drawn as quiet keycaps: "⇧⌘P" → [⇧][⌘][P]; chords separated by two spaces
+/// ("⌘[  ⌘]") get a little air between them.
+struct Keycaps: View {
+    var keys: String
+    var size: CGFloat = TypeScale.caption
+    var body: some View {
+        HStack(spacing: Space.s) {
+            ForEach(Array(Self.chords(keys).enumerated()), id: \.offset) { _, chord in
+                HStack(spacing: Space.xxs) {
+                    ForEach(Array(chord.enumerated()), id: \.offset) { _, k in
+                        Text(k)
+                            .font(.system(size: size, weight: .medium).monospacedDigit())
+                            .foregroundStyle(Color.muted)
+                            .frame(minWidth: size + 5)
+                            .padding(.horizontal, k.count > 1 ? 4 : 1)
+                            .frame(height: size + 6.5)
+                            .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(0.045)))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.small).strokeBorder(Color.hairline, lineWidth: 0.8))
+                    }
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(keys)
+    }
+    static let modifiers: Set<Character> = ["⌃", "⌥", "⇧", "⌘"]
+    /// Chords (split on runs of 2+ spaces, " · " or " / "), each split into modifier glyphs plus the key.
+    static func chords(_ s: String) -> [[String]] {
+        let parts = s.replacingOccurrences(of: " · ", with: "  ").replacingOccurrences(of: " / ", with: "  ")
+            .components(separatedBy: "  ").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        return parts.map { chord in
+            var caps: [String] = [], rest = ""
+            for ch in chord where ch != " " {
+                if modifiers.contains(ch) && rest.isEmpty { caps.append(String(ch)) } else { rest.append(ch) }
+            }
+            if !rest.isEmpty { caps.append(rest) }
+            return caps
+        }
+    }
 }
 
 /// Stable, muted cluster colors: a folder or tag name hashes into a palette of

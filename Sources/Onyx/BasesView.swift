@@ -69,8 +69,8 @@ struct BasesView: View {
                 }
                 .frame(width: 280)
                 .background(Color.paper)
-                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.ink.opacity(0.35), lineWidth: 1))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Color.ink.opacity(0.35), lineWidth: 1))
+                .clipShape(RoundedRectangle(cornerRadius: Radius.card))
                 .shadow(color: Color.black.opacity(0.18), radius: 16, y: 6)
                 .padding(.top, 72)
                 .padding(.trailing, 28)
@@ -373,8 +373,8 @@ struct BasesView: View {
                         }
                         .frame(maxWidth: .infinity, minHeight: size, alignment: .topLeading)
                         .background(Color.paperAlt)
-                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.hairline, lineWidth: 1))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Color.hairline, lineWidth: 1))
+                        .clipShape(RoundedRectangle(cornerRadius: Radius.card))
                     }
                     .buttonStyle(.plain)
                 }

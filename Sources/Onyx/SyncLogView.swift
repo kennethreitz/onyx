@@ -76,7 +76,7 @@ struct SyncLogView: View {
                 .lineLimit(1)
             Text(e.event.label)
                 .font(.system(size: 11.5, weight: alert ? .medium : .regular))
-                .foregroundStyle(alert ? Color.orange.opacity(0.9) : Color.ink.opacity(0.82))
+                .foregroundStyle(alert ? Color.warn : Color.ink.opacity(0.82))
                 .frame(width: 92, alignment: .leading)
             Text(e.detail.isEmpty ? "—" : e.detail)
                 .font(.system(size: 11.5))
@@ -85,7 +85,7 @@ struct SyncLogView: View {
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 18).padding(.vertical, 7)
-        .background(alert ? Color.orange.opacity(0.06) : .clear)
+        .background(alert ? Color.warn.opacity(0.06) : .clear)
     }
 
     func copy() {
@@ -123,7 +123,7 @@ private struct HeaderButton: View {
         Button(action: action) {
             Text(title).font(.system(size: 11.5)).foregroundStyle(Color.muted)
                 .padding(.horizontal, 8).padding(.vertical, 4)
-                .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(0.05)))
+                .background(RoundedRectangle(cornerRadius: Radius.control).fill(Color.ink.opacity(0.05)))
         }
         .buttonStyle(.plain).help(help)
     }

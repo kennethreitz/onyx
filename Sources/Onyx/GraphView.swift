@@ -700,7 +700,7 @@ struct GraphView: View {
                     .onSubmit { jumpToMatch() }
             }
             .padding(.horizontal, 8).padding(.vertical, 5).frame(width: 130)
-            .background(Color.paper, in: RoundedRectangle(cornerRadius: 6)).overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.hairline))
+            .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control)).overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
             Spacer(minLength: 0)
             if docked {
                 Button { ws.closeGraphPane() } label: { Image(systemName: "xmark").font(.system(size: 11, weight: .semibold)).foregroundStyle(Color.muted).frame(width: 22, height: 22) }

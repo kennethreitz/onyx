@@ -158,7 +158,7 @@ struct FindBar: View {
                     .textFieldStyle(.plain).font(.system(size: 12.5)).frame(width: 190)
                     .focused($field, equals: .find)
                     .onSubmit { ws.findStep(1) }
-                Text(status).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(ws.finder.count == 0 && !ws.finder.query.isEmpty ? Color.red.opacity(0.7) : Color.faint)
+                Text(status).font(.system(size: 10.5).monospacedDigit()).foregroundStyle(ws.finder.count == 0 && !ws.finder.query.isEmpty ? Color.danger : Color.faint)
                     .frame(minWidth: 58, alignment: .trailing)
                 iconButton("chevron.up", "Previous match (⇧⌘G · ⇧↩)") { ws.findStep(-1) }
                 iconButton("chevron.down", "Next match (⌘G · ↩)") { ws.findStep(1) }
@@ -184,8 +184,8 @@ struct FindBar: View {
             }
         }
         .padding(.horizontal, 10).padding(.vertical, 7)
-        .background(Color.paper, in: RoundedRectangle(cornerRadius: 8))
-        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Color.hairline, lineWidth: 0.8))
+        .background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Color.hairline, lineWidth: 0.8))
         .shadow(color: .black.opacity(0.12), radius: 8, y: 2)
         .onAppear { field = .find }
         .onChange(of: ws.finder.focusToken) { field = .find; DispatchQueue.main.async { NSApp.keyWindow?.firstResponder.flatMap { $0 as? NSTextView }?.selectAll(nil) } }

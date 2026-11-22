@@ -129,7 +129,7 @@ struct LinkPreviewCard: View {
                     Image(systemName: m == .page ? "doc.text" : "point.3.connected.trianglepath.dotted")
                         .font(.system(size: 10.5)).frame(width: 22, height: 17)
                         .foregroundStyle(mode == m ? Color.ink : Color.faint)
-                        .background(mode == m ? Color.ink.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: 4))
+                        .background(mode == m ? Color.ink.opacity(0.08) : .clear, in: RoundedRectangle(cornerRadius: Radius.small))
                 }.buttonStyle(.plain).help(m == .page ? "Page preview" : "Graph preview")
             }
         }

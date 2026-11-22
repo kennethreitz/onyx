@@ -429,14 +429,14 @@ final class Workspace {
         defer { navigating = false }
         switch e.place {
         case .note(let p):
-            if overlay != .none { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .none } }
+            if overlay != .none { withAnimation(Motion.overlay) { overlay = .none } }
             if p != currentPath { openNote(p, recordHistory: false) }
             if let m = e.mode, m != mode { mode = m }
             liveTop = e.top
             scrollRequest = ScrollRequest(line: e.top, id: (scrollRequest?.id ?? 0) + 1)
         case .graph(let atlas):
             graphAtlas = atlas
-            if overlay != .graph { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .graph } }
+            if overlay != .graph { withAnimation(Motion.overlay) { overlay = .graph } }
         }
         chromeLog("history \(step < 0 ? "back" : "forward") → \(historyIndex)/\(history.count) \(e.place) top=\(String(format: "%.1f", e.top))")
     }
@@ -781,7 +781,7 @@ final class Workspace {
     func beginMove(_ paths: [String]) {
         moveSources = TreeSelection.roots(paths)
         guard !moveSources.isEmpty else { return }
-        withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .moveTo }
+        withAnimation(Motion.overlay) { overlay = .moveTo }
     }
     func beginMoveCurrent() { if let p = currentPath { beginMove(p) } }
 
@@ -941,7 +941,7 @@ final class Workspace {
         dropExpandTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: 700_000_000)
             guard !Task.isCancelled, dropTarget == f else { return }
-            _ = withAnimation(.easeOut(duration: 0.12)) { expanded.insert(f) }
+            _ = withAnimation(Motion.quick) { expanded.insert(f) }
         }
     }
 
@@ -1308,7 +1308,7 @@ final class Workspace {
     // MARK: Chrome
 
     func toggleSidebar(_ tab: SidebarTab? = nil) {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.layout) {
             if let tab, sidebarVisible, sidebarTab != tab { sidebarTab = tab; return }
             if let tab { sidebarTab = tab }
             sidebarVisible.toggle()
@@ -1319,7 +1319,7 @@ final class Workspace {
     }
     /// ⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.layout) {
             if let tab, inspectorVisible, inspectorTab != tab { inspectorTab = tab; return }
             if let tab { inspectorTab = tab }
             if inspectorVisible { hideInspector(animated: false) }
@@ -1328,12 +1328,12 @@ final class Workspace {
     }
     func hideInspector(animated: Bool = true) {
         let body = { self.inspectorVisible = false; self.inspectorPinned = false }
-        if animated { withAnimation(.spring(response: 0.3, dampingFraction: 0.9), body) } else { body() }
+        if animated { withAnimation(Motion.layout, body) } else { body() }
         persistInspector()
     }
     func persistInspector() { UserDefaults.standard.set(inspectorVisible && inspectorPinned, forKey: "onyx.inspectorOpen") }
     func show(_ o: Overlay) {
-        withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = overlay == o ? .none : o }
+        withAnimation(Motion.overlay) { overlay = overlay == o ? .none : o }
     }
     /// Apply Esc according to `EscPrecedence`. Returns true if the event should be swallowed.
     @discardableResult
@@ -1397,7 +1397,7 @@ final class Workspace {
 
     /// Esc: peel back one floating layer (overlays, then summoned panels).
     func dismissTop() -> Bool {
-        let anim = Animation.spring(response: 0.3, dampingFraction: 0.9)
+        let anim = Motion.layout
         if overlay != .none { withAnimation(anim) { overlay = .none }; return true }
         if inspectorVisible && !inspectorPinned { hideInspector(); return true }
         if sidebarVisible && !sidebarPinned { withAnimation(anim) { sidebarVisible = false }; return true }
@@ -1408,7 +1408,7 @@ final class Workspace {
 
     /// ⌘K: show or hide the file sidebar, remembered across launches. Always docked.
     func toggleDockedSidebar(_ tab: SidebarTab? = nil) {
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.layout) {
             if let tab, sidebarVisible, sidebarTab != tab { sidebarTab = tab; return }
             if let tab { sidebarTab = tab }
             sidebarVisible.toggle()
@@ -1421,7 +1421,7 @@ final class Workspace {
     private var preFocus: (Bool, Bool, Bool, Bool)?
     /// ⌃⌘F: pure text. Everything else steps aside; the same keys bring it back.
     func toggleFocusMode() {
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.9)) {
+        withAnimation(Motion.layout) {
             if focusMode {
                 focusMode = false
                 if let p = preFocus { sidebarVisible = p.0; sidebarPinned = true; inspectorVisible = p.2; inspectorPinned = p.3 }
@@ -1435,7 +1435,7 @@ final class Workspace {
 
     func dismissHints() { withAnimation(.easeOut(duration: 0.2)) { showHints = false }; UserDefaults.standard.set(true, forKey: "onyx.hintsDismissed") }
     func toggleWorkspaceLayout() {
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.88)) {
+        withAnimation(Motion.layout) {
             let on = !(sidebarVisible && inspectorPinned && inspectorVisible)
             sidebarVisible = on
             sidebarPinned = true
@@ -1449,14 +1449,14 @@ final class Workspace {
     func toggleMode() {
         if mode == .edit { lintOnSave() }
         flushSave()
-        withAnimation(.easeInOut(duration: 0.18)) { mode = mode == .read ? .edit : .read }
+        withAnimation(Motion.fade) { mode = mode == .read ? .edit : .read }
     }
     /// Esc (when nothing else is open): save and show the reader. Never the other way.
     func returnToReading() {
         guard mode == .edit else { return }
         lintOnSave()
         flushSave()
-        withAnimation(.easeInOut(duration: 0.18)) { mode = .read }
+        withAnimation(Motion.fade) { mode = .read }
     }
     func toggleBookmark() {
         guard let p = currentPath else { return }
@@ -1532,7 +1532,7 @@ final class Workspace {
     func revealFolder(_ folder: String) {
         let note = folder + "/" + (folder as NSString).lastPathComponent + ".md"
         if snapshot?.notes[note] != nil, currentPath != note { openNote(note) }
-        withAnimation(.spring(response: 0.32, dampingFraction: 0.86)) {
+        withAnimation(Motion.layout) {
             focusMode = false
             sidebarTab = .files
             if !sidebarVisible || !sidebarPinned {
@@ -1616,7 +1616,7 @@ extension Workspace {
         if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)]; focusedPane = 0 }
         guard panes.count < 4 else { toast = "Four panes is the limit"; return }
         captureFocused()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+        withAnimation(Motion.layout) {
             splitAxis = axis
             // like duplicating a browser tab, the new pane starts with the same history
             let fresh = Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)
@@ -1661,13 +1661,13 @@ extension Workspace {
     /// The graph as a pane beside the notes (focus graph follows the note you're on).
     func openGraphPane(atlas: Bool) {
         graphAtlas = atlas
-        if overlay == .graph { withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .none } }
+        if overlay == .graph { withAnimation(Motion.overlay) { overlay = .none } }
         guard graphPaneIndex == nil else { return }
         flushSave()
         if panes.isEmpty { panes = [Pane(id: UUID(), path: currentPath, text: text, mode: mode, history: history, historyIndex: historyIndex)]; focusedPane = 0 }
         guard panes.count < 4 else { toast = "Four panes is the limit"; return }
         captureFocused()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+        withAnimation(Motion.layout) {
             if panes.count == 1 { splitAxis = .vertical }
             paneRatios = PaneRatios.splitting(paneRatios.isEmpty ? [1] : paneRatios, at: panes.count - 1)
             panes.append(Pane(id: UUID(), path: nil, text: "", mode: mode, isGraph: true))
@@ -1677,7 +1677,7 @@ extension Workspace {
     func closeGraphPane() {
         guard let g = graphPaneIndex else { return }
         captureFocused()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+        withAnimation(Motion.layout) {
             paneRatios = PaneRatios.removing(paneRatios, at: g)
             panes.remove(at: g)
             if focusedPane > g { focusedPane -= 1 }
@@ -1695,7 +1695,7 @@ extension Workspace {
         // ⌘W with one note beside a docked graph closes the graph, never the last note
         if panes.filter({ !$0.isGraph }).count == 1, graphPaneIndex != nil { closeGraphPane(); return true }
         flushSave()
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+        withAnimation(Motion.layout) {
             paneRatios = PaneRatios.removing(paneRatios, at: focusedPane)
             panes.remove(at: focusedPane)
             focusedPane = min(focusedPane, panes.count - 1)
@@ -1731,7 +1731,7 @@ extension Workspace {
 
     func equalizePanes() {
         guard panes.count > 1 else { return }
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) {
+        withAnimation(Motion.layout) {
             paneRatios = PaneRatios.equal(panes.count)
         }
         persistSplitLayout()

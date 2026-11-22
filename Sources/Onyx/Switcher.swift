@@ -37,6 +37,7 @@ struct PaletteView: View {
     @State private var results: [PaletteItem] = []
     @State private var selection = 0
     @State private var monitor: Any?
+    @State private var hovered: Int?
     @FocusState private var focused: Bool
 
     private var trimmed: String { query.trimmingCharacters(in: .whitespaces) }
@@ -63,19 +64,21 @@ struct PaletteView: View {
                     ScrollView {
                         VStack(spacing: 0) {
                             if query.isEmpty, onCreate != nil, !results.isEmpty {
-                                Text("RECENT").font(.system(size: 9.5, weight: .semibold)).tracking(1.2).foregroundStyle(Color.faint)
-                                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.top, 6).padding(.bottom, 2)
+                                Text("RECENT").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8).foregroundStyle(Color.faint)
+                                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 18).padding(.top, Space.s).padding(.bottom, Space.xs)
                             }
                             // keyed by position, matching the .id used for scrollTo (two identities confuse LazyVStack)
                             ForEach(Array(results.enumerated()), id: \.offset) { i, item in
-                                row(item, selected: i == selection).id(i)
+                                row(item, selected: i == selection, hovered: hovered == i).id(i)
+                                    .onHover { h in if h { hovered = i } else if hovered == i { hovered = nil } }
                                     .onTapGesture { selection = i; activate(split: NSEvent.modifierFlags.contains(.command)) }
                             }
                             if showCreate {
-                                createRow(selected: selection == createIndex).id(createIndex)
+                                createRow(selected: selection == createIndex, hovered: hovered == createIndex).id(createIndex)
+                                    .onHover { h in if h { hovered = createIndex } else if hovered == createIndex { hovered = nil } }
                                     .onTapGesture { create() }
                             }
-                        }.padding(.vertical, 5)
+                        }.padding(.vertical, Space.s)
                     }
                     .thinScrollers()
                     .frame(maxHeight: 400)
@@ -152,8 +155,8 @@ struct PaletteView: View {
 
     func hint(_ k: String, _ label: String) -> some View {
         HStack(spacing: 4) {
-            Text(k).font(.system(size: 10.5, weight: .medium, design: .rounded)).foregroundStyle(Color.muted)
-            Text(label).font(.system(size: 10.5)).foregroundStyle(Color.faint)
+            Keycaps(keys: k, size: TypeScale.label)
+            Text(label).font(.system(size: TypeScale.caption)).foregroundStyle(Color.faint)
         }
     }
 
@@ -177,16 +180,23 @@ struct PaletteView: View {
         return out
     }
 
-    func row(_ item: PaletteItem, selected: Bool) -> some View {
+    /// Selection is an inset, rounded wash (not a full-bleed bar); hover is half as strong.
+    func rowBackground(selected: Bool, hovered: Bool) -> some View {
+        RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+            .fill(Color.ink.opacity(selected ? 0.075 : (hovered ? 0.035 : 0)))
+            .padding(.horizontal, Space.s)
+    }
+
+    func row(_ item: PaletteItem, selected: Bool, hovered: Bool = false) -> some View {
         HStack(spacing: 10) {
-            if let s = item.symbol { Image(systemName: s).font(.system(size: 12)).foregroundStyle(Color.muted).frame(width: 18) }
+            if let s = item.symbol { Image(systemName: s).font(.system(size: 12)).foregroundStyle(selected ? Color.ink : Color.muted).frame(width: 18) }
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
-                    Self.highlighted(item.title, item.titleHits, base: .ink.opacity(0.82), hit: .ink, size: 13.5).lineLimit(1)
+                    Self.highlighted(item.title, item.titleHits, base: .ink.opacity(0.82), hit: .ink, size: TypeScale.row).lineLimit(1)
                     if !item.badge.isEmpty {
                         Self.highlighted(item.badge, item.badgeHits, base: .faint, hit: .muted, size: 11).lineLimit(1)
                             .padding(.horizontal, 5).padding(.vertical, 1)
-                            .overlay(RoundedRectangle(cornerRadius: 3).stroke(Color.hairline))
+                            .overlay(RoundedRectangle(cornerRadius: Radius.small).stroke(Color.hairline))
                     }
                 }
                 if !item.subtitle.isEmpty {
@@ -194,14 +204,15 @@ struct PaletteView: View {
                 }
             }
             Spacer()
-            if !item.shortcut.isEmpty { Text(item.shortcut).font(.system(size: 11.5, design: .rounded)).foregroundStyle(Color.faint) }
+            if !item.shortcut.isEmpty { Keycaps(keys: item.shortcut).opacity(selected ? 1 : 0.8) }
         }
         .padding(.horizontal, 18).padding(.vertical, item.subtitle.isEmpty ? 8 : 6)
-        .background(selected ? Color.ink.opacity(0.07) : .clear)
+        .frame(minHeight: 34)
+        .background(rowBackground(selected: selected, hovered: hovered))
         .contentShape(Rectangle())
     }
 
-    func createRow(selected: Bool) -> some View {
+    func createRow(selected: Bool, hovered: Bool = false) -> some View {
         let (folder, name) = Self.split(trimmed)
         return HStack(spacing: 10) {
             Image(systemName: "plus").font(.system(size: 12)).foregroundStyle(Color.muted).frame(width: 18)
@@ -210,10 +221,11 @@ struct PaletteView: View {
                 Text(folder.isEmpty ? "new \(noun) in the vault root" : "new \(noun) in \(folder)").font(.system(size: 11)).foregroundStyle(Color.faint).lineLimit(1)
             }
             Spacer()
-            Text("⇧↩").font(.system(size: 11.5, design: .rounded)).foregroundStyle(Color.faint)
+            Keycaps(keys: "⇧↩").opacity(selected ? 1 : 0.8)
         }
         .padding(.horizontal, 18).padding(.vertical, 6)
-        .background(selected ? Color.ink.opacity(0.07) : .clear)
+        .frame(minHeight: 34)
+        .background(rowBackground(selected: selected, hovered: hovered))
         .contentShape(Rectangle())
     }
 
@@ -320,7 +332,7 @@ enum PaletteCommands {
             item("extract") { DispatchQueue.main.async { ws.beginExtract() } },
             item("extractheading") { DispatchQueue.main.async { ws.beginExtract(heading: true) } },
             item("settings") { DispatchQueue.main.async { Workspace.openSettings() } },
-            item("hints") { withAnimation { ws.showHints = true } },
+            item("hints") { withAnimation(Motion.quick) { ws.showHints = true } },
         ] + Workspace.formatMenu.compactMap { $0 }.map { id in item(id) { ws.runEditCommand(id) } }
     }
 

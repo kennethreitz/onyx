@@ -112,7 +112,7 @@ struct RootView: View {
                 }
             }
             .onChange(of: ws.copiedFlash) {
-                withAnimation(.easeOut(duration: 0.15)) { copied = true }
+                withAnimation(Motion.quick) { copied = true }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation(.easeIn(duration: 0.3)) { copied = false } }
             }
             .font(.system(size: 12))
@@ -150,7 +150,7 @@ struct RootView: View {
                 if let t = ws.toast {
                     Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).lineLimit(1)
                         .transition(.opacity)
-                        .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } }
+                        .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation(Motion.quick) { ws.toast = nil } }
                     Spacer()
                 }
                 if ws.speech.isActive {
@@ -198,7 +198,7 @@ struct RootView: View {
                     .padding(.bottom, 14)
             } else if let t = ws.toast {
                 Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).padding(.horizontal, 12).padding(.vertical, 6).panelChrome().padding(.bottom, 14)
-                    .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation { ws.toast = nil } }
+                    .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation(Motion.quick) { ws.toast = nil } }
             }
         }
         .frame(maxWidth: .infinity)
@@ -219,19 +219,19 @@ struct RootView: View {
                         Button { ws.dismissHints() } label: { Image(systemName: "xmark").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Color.faint) }.buttonStyle(.plain)
                     }
                     ForEach(ShortcutHints.all, id: \.0) { k, v in
-                        HStack(spacing: 10) {
-                            Text(k).font(.system(size: 11.5, design: .rounded).weight(.medium)).foregroundStyle(Color.ink).frame(width: 54, alignment: .trailing)
-                            Text(v).font(.system(size: 11.5)).foregroundStyle(Color.muted)
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Keycaps(keys: k).frame(width: 84, alignment: .trailing)
+                            Text(v).font(.system(size: TypeScale.small)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Text("Every command is in the menu bar, too.").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.top, 2)
                 }
-                .padding(14).frame(width: 290)
+                .padding(14).frame(width: 330)
                 .panelChrome()
                 .padding(.trailing, 16).padding(.bottom, 42)
             }
         }
-        .transition(.opacity.combined(with: .move(edge: .bottom)))
+        .transition(Motion.slide(.bottom))
     }
 
     // MARK: Page
@@ -245,8 +245,8 @@ struct RootView: View {
                     if !ws.isIndexing {
                         VStack(alignment: .leading, spacing: 6) {
                             ForEach(ShortcutHints.all, id: \.0) { k, v in
-                                HStack(spacing: 12) {
-                                    Text(k).font(.system(size: 12, design: .rounded).weight(.medium)).foregroundStyle(Color.ink).frame(width: 56, alignment: .trailing)
+                                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                                    Keycaps(keys: k, size: 11).frame(width: 92, alignment: .trailing)
                                     Text(v).font(.system(size: 12)).foregroundStyle(Color.muted)
                                 }
                             }
@@ -283,7 +283,7 @@ struct RootView: View {
                 .padding(.top, clearTitle ? 28 : 0)
                 .padding(.bottom, clearFooter ? 30 : 0)
                 .background(Color.paper)
-                .transition(.opacity.combined(with: .scale(scale: 0.97)))
+                .transition(Motion.pop(0.97))
         }
     }
 
@@ -363,7 +363,7 @@ struct RootView: View {
             .panelChrome()
             .padding(.top, 40)
             Spacer()
-        }.frame(maxWidth: .infinity).transition(.move(edge: .top).combined(with: .opacity))
+        }.frame(maxWidth: .infinity).transition(Motion.slide(.top))
     }
 
     // MARK: Panels
@@ -379,7 +379,7 @@ struct RootView: View {
                         ResizeHandle(width: $sidebarW, range: Self.sidebarRange, defaultWidth: Self.sidebarDefault, growsRight: true,
                                      showLine: true, dragging: $resizing).offset(x: 4.5)
                     }
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(Motion.slide(.leading))
             }
             Spacer(minLength: 0)
             if ws.inspectorVisible {
@@ -398,7 +398,7 @@ struct RootView: View {
                             Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedInspector && !ws.inspectorPinned && !rightEdgeHover && !resizing { hoverSummonedInspector = false; if ws.inspectorVisible { ws.toggleInspector() } } }
                         }
                     }
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(Motion.slide(.trailing))
             }
         }
         .frame(maxHeight: .infinity)
@@ -427,14 +427,14 @@ struct RootView: View {
                             dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .palette:
             dimmer
             VStack {
                 PaletteView(placeholder: "Type a command…", items: { PaletteCommands.filter(PaletteCommands.all(ws, appearance: appearance), $0) }, dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .moveTo:
             dimmer
             VStack {
@@ -454,14 +454,14 @@ struct RootView: View {
                         .padding(.top, 88)
                 }
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .headings:
             dimmer
             VStack {
                 PaletteView(placeholder: "Jump to heading…", items: { PaletteCommands.headings(ws, $0) }, allowSplit: false, dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .merge:
             dimmer
             VStack {
@@ -470,7 +470,7 @@ struct RootView: View {
                             allowSplit: false, dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .extract:
             dimmer
             VStack {
@@ -488,14 +488,14 @@ struct RootView: View {
                             dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .syncLog:
             dimmer
             VStack {
                 SyncLogView(store: ws.syncLog, dismiss: { ws.show(.none) })
                     .padding(.top, 72)
                 Spacer()
-            }.frame(maxWidth: .infinity).transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .graph:
             // Drawn on the focused pane (or the solo page), not over the window.
             EmptyView()
@@ -647,8 +647,9 @@ struct FooterButton: View {
                 .font(.system(size: 11, weight: on ? .medium : .regular))
                 .foregroundStyle(on || hover ? Color.ink : Color.faint)
                 .frame(width: 22, height: 22)
-                .background(hover ? Color.ink.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                .background(hover ? Color.ink.opacity(0.06) : .clear, in: RoundedRectangle(cornerRadius: Radius.small))
                 .contentShape(Rectangle())
+                .animation(Motion.hover, value: hover)
         }
         .buttonStyle(.plain).help(help).onHover { hover = $0 }
     }
@@ -752,8 +753,8 @@ struct GitBadge: View {
             case .pushing: ("arrow.up.circle", Color.faint)
             case .offline: ("wifi.slash", Color.faint)
             case .localOnly: ("circle.dashed", Color.faint)
-            case .conflict: ("exclamationmark.triangle", Color.orange.opacity(0.85))
-            case .failed: ("exclamationmark.circle", Color.orange.opacity(0.85))
+            case .conflict: ("exclamationmark.triangle", Color.warn)
+            case .failed: ("exclamationmark.circle", Color.warn)
         }
         Button(action: action) {
             Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
@@ -784,7 +785,7 @@ struct GraphButton: View {
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(hover ? Color.ink : Color.muted)
                 .frame(width: 20, height: 20)
-                .background(RoundedRectangle(cornerRadius: 4).fill(Color.ink.opacity(hover ? 0.06 : 0)))
+                .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(hover ? 0.06 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -794,7 +795,7 @@ struct GraphButton: View {
             Button("Focus Graph (This Note)  ⌘G") { open(atlas: false) }
             Button("Atlas (Whole Vault)  ⇧⌘G") { open(atlas: true) }
         }
-        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+        .onHover { h in withAnimation(Motion.hover) { hover = h } }
         .help("Focus graph (⌘G) · ⇧-click or right-click for the atlas (⇧⌘G)")
         .accessibilityLabel("Graph")
     }
@@ -826,12 +827,12 @@ struct NavChevronButton: View {
                 .font(.system(size: 10.5, weight: .semibold))
                 .foregroundStyle(enabled ? (hover ? Color.ink : Color.muted) : Color.faint.opacity(0.4))
                 .frame(width: 18, height: 20)
-                .background(RoundedRectangle(cornerRadius: 4).fill(Color.ink.opacity(hover && enabled ? 0.06 : 0)))
+                .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(hover && enabled ? 0.06 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
-        .onHover { h in withAnimation(.easeOut(duration: 0.12)) { hover = h } }
+        .onHover { h in withAnimation(Motion.hover) { hover = h } }
     }
 }
 
@@ -914,7 +915,7 @@ struct SplitPaneDivider: View {
                 .padding(vertical ? .vertical : .horizontal, vertical ? 0 : 24)
             Capsule().fill(Color.ink.opacity(dragging ? 0.34 : hover ? 0.22 : 0))
                 .frame(width: vertical ? 3 : 36, height: vertical ? 36 : 3)
-                .animation(.easeOut(duration: 0.15), value: hover || dragging)
+                .animation(Motion.quick, value: hover || dragging)
         }
         .frame(width: vertical ? 0.8 : nil, height: vertical ? nil : 0.8)
         .frame(maxWidth: vertical ? nil : .infinity, maxHeight: vertical ? .infinity : nil)
@@ -973,7 +974,7 @@ struct ResizeHandle: View {
             Rectangle().fill(showLine ? Color.hairline : .clear).frame(width: 0.8)
             Capsule().fill(Color.ink.opacity(dragging ? 0.34 : hover ? 0.22 : 0))
                 .frame(width: 3, height: 36)
-                .animation(.easeOut(duration: 0.15), value: hover || dragging)
+                .animation(Motion.quick, value: hover || dragging)
         }
         .frame(width: 9)
         .frame(maxHeight: .infinity)
@@ -988,7 +989,7 @@ struct ResizeHandle: View {
                 }
                 .onEnded { _ in start = nil; dragging = false; updateCursor() }
         )
-        .onTapGesture(count: 2) { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { width = defaultWidth } }
+        .onTapGesture(count: 2) { withAnimation(Motion.layout) { width = defaultWidth } }
         .help("Drag to resize · double-click to reset")
         .onDisappear { if cursorPushed { NSCursor.pop(); cursorPushed = false } }
     }

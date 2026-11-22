@@ -334,7 +334,7 @@ struct OnyxApp: App {
                                  disabled: !ws.recorder.isRecording && (ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.recorder.isActive)) { ws.toggleRecording() }
             Divider()
             ShortcutMenus.button("reindex") { ws.reindex() }
-            ShortcutMenus.button("hints") { withAnimation { ws.showHints = true } }
+            ShortcutMenus.button("hints") { withAnimation(Motion.quick) { ws.showHints = true } }
             ShortcutMenus.button("settings") { Workspace.openSettings() }
         }
     }

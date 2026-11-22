@@ -207,7 +207,7 @@ struct ShortcutsSettingsPage: View {
                     .font(.system(size: 12, design: .rounded))
                     .foregroundStyle(recording == spec.id ? Color.cursorBlue : Color.ink)
                     .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(recording == spec.id ? Color.cursorBlue.opacity(0.12) : Color.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: 5))
+                    .background(recording == spec.id ? Color.cursorBlue.opacity(0.12) : Color.ink.opacity(0.06), in: RoundedRectangle(cornerRadius: Radius.control))
             }
             .buttonStyle(.plain)
             .help(recording == spec.id ? "Press a key combination, or Esc to cancel" : "Click to change this shortcut")

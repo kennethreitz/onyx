@@ -7,8 +7,8 @@ struct PanelChrome: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Color.secondaryPaper)
-            .clipShape(RoundedRectangle(cornerRadius: pinned ? 0 : 12, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: pinned ? 0 : 12, style: .continuous).strokeBorder(Color.hairline, lineWidth: pinned ? 0 : 0.8))
+            .clipShape(RoundedRectangle(cornerRadius: pinned ? 0 : Radius.panel, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: pinned ? 0 : Radius.panel, style: .continuous).strokeBorder(Color.hairline, lineWidth: pinned ? 0 : 0.8))
             .shadow(color: .black.opacity(pinned ? 0 : 0.10), radius: 18, x: 0, y: 8)
     }
 }
@@ -27,12 +27,12 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
         // tabs compress (28pt → 17pt each) so the header still fits a 140pt sidebar
         HStack(spacing: 1) {
             ForEach(tabs) { t in
-                Button { withAnimation(.easeOut(duration: 0.15)) { selection = t } } label: {
+                Button { withAnimation(Motion.quick) { selection = t } } label: {
                     Image(systemName: symbol(t))
                         .font(.system(size: 12.5, weight: selection == t ? .semibold : .regular))
                         .frame(minWidth: 17, idealWidth: 28, maxWidth: 28, minHeight: 24, maxHeight: 24)
                         .foregroundStyle(selection == t ? Color.ink : Color.faint)
-                        .background(selection == t ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                        .background(selection == t ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -41,7 +41,7 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
             Spacer(minLength: 0)
             if let accessory { accessory }
             if showsPin {
-                Button { withAnimation(.spring(response: 0.3, dampingFraction: 0.88)) { pinned.toggle() }; onPin?(pinned) } label: {
+                Button { withAnimation(Motion.layout) { pinned.toggle() }; onPin?(pinned) } label: {
                     Image(systemName: pinned ? "pin.fill" : "pin").font(.system(size: 11)).foregroundStyle(Color.faint).frame(width: 20, height: 24)
                 }.buttonStyle(.plain).help(pinned ? "Unpin" : "Pin (three-pane layout)")
             }
@@ -270,9 +270,9 @@ struct FileTreeView: View {
                         .frame(maxWidth: .infinity, minHeight: 80)
                         .contentShape(Rectangle())
                         .background(
-                            RoundedRectangle(cornerRadius: 6)
+                            RoundedRectangle(cornerRadius: Radius.control)
                                 .fill(ws.dropTarget == ""
-                                      ? (ws.dropForbidden ? Color.orange.opacity(0.10) : Color.cursorBlue.opacity(0.10))
+                                      ? (ws.dropForbidden ? Color.warn.opacity(0.10) : Color.cursorBlue.opacity(0.10))
                                       : Color.clear)
                                 .padding(.horizontal, 5)
                         )
@@ -299,7 +299,7 @@ struct FileTreeView: View {
                 let target = ws.renamingPath ?? ws.selectedFolder ?? ws.currentPath
                 guard let f = target else { return }
                 // let the expansion lay out first, then glide to the row
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { withAnimation(.easeInOut(duration: 0.25)) { proxy.scrollTo(f, anchor: .center) } }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { withAnimation(Motion.reduced ? nil : .easeInOut(duration: 0.25)) { proxy.scrollTo(f, anchor: .center) } }
             }
         }
     }
@@ -326,7 +326,7 @@ struct TreeNodeView: View {
     }
     var dropFill: Color {
         if node.isFolder, ws.dropTarget == node.path {
-            return (ws.dropForbidden ? Color.orange : Color.cursorBlue).opacity(fill)
+            return (ws.dropForbidden ? Color.warn : Color.cursorBlue).opacity(fill)
         }
         return Color.ink.opacity(fill)
     }
@@ -370,14 +370,14 @@ struct TreeNodeView: View {
             .padding(.leading, CGFloat(depth) * 13 + 8).padding(.trailing, 8)
             .frame(minHeight: 24, maxHeight: ws.renamingPath == node.path ? 26 : 24)
             .background(
-                RoundedRectangle(cornerRadius: 5)
+                RoundedRectangle(cornerRadius: Radius.control)
                     .fill(dropFill)
                     .padding(.horizontal, 5)
             )
             .overlay {
                 if node.isFolder, ws.dropTarget == node.path {
-                    RoundedRectangle(cornerRadius: 5)
-                        .stroke((ws.dropForbidden ? Color.orange : Color.cursorBlue).opacity(0.55), lineWidth: 1.2)
+                    RoundedRectangle(cornerRadius: Radius.control)
+                        .stroke((ws.dropForbidden ? Color.warn : Color.cursorBlue).opacity(0.55), lineWidth: 1.2)
                         .padding(.horizontal, 5)
                 }
             }
@@ -424,7 +424,7 @@ struct TreeNodeView: View {
             if ws.renamingPath == node.path, let err = ws.renameError, !err.isEmpty {
                 Text(err)
                     .font(.system(size: 10.5))
-                    .foregroundStyle(Color.orange.opacity(0.95))
+                    .foregroundStyle(Color.warn)
                     .padding(.leading, CGFloat(depth) * 13 + 24)
                     .padding(.trailing, 8)
                     .padding(.bottom, 3)
@@ -436,7 +436,7 @@ struct TreeNodeView: View {
     }
 
     func toggle() {
-        withAnimation(.easeOut(duration: 0.12)) {
+        withAnimation(Motion.quick) {
             if isOpen { ws.expanded.remove(node.path) } else { ws.expanded.insert(node.path) }
         }
     }
@@ -568,7 +568,7 @@ struct NoteRow: View {
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 5).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.horizontal, 5))
+        .background(RoundedRectangle(cornerRadius: Radius.control).fill(ws.currentPath == path ? Color.ink.opacity(0.08) : (hover ? Color.ink.opacity(0.04) : .clear)).padding(.horizontal, 5))
         .contentShape(Rectangle())
         .background { if preview { GraphPreviewTrigger(ws: ws, path: path) } }
         .contextMenu { FileMenu(ws: ws, path: path) }
@@ -590,7 +590,7 @@ struct SearchPanel: View {
                 TextField("Search vault  ·  tag:  path:  \"phrase\"", text: $ws.searchQuery)
                     .textFieldStyle(.plain).font(.system(size: 12.5)).focused($focused)
             }
-            .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: 7)).overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.hairline))
+            .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control)).overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(Color.hairline))
             .padding(10)
             if !ws.searchQuery.isEmpty {
                 Text("\(hits.count == 200 ? "200+" : String(hits.count)) results · \(millis) ms").font(.system(size: 10.5)).foregroundStyle(Color.faint)

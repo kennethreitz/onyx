@@ -80,9 +80,9 @@ struct LinkSuggestList: View {
             }
             .onChange(of: model.highlighted) { if let h = model.highlighted { proxy.scrollTo(h) } }
         }
-        .background(RoundedRectangle(cornerRadius: 8).fill(Color.paper))
-        .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.hairline))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(RoundedRectangle(cornerRadius: Radius.card).fill(Color.paper))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: Radius.card))
     }
     func row(_ s: LinkSuggestion, on: Bool) -> some View {
         HStack(spacing: 8) {
@@ -93,7 +93,7 @@ struct LinkSuggestList: View {
             }
         }
         .padding(.horizontal, 9).frame(height: LinkSuggestPanel.rowHeight)
-        .background(RoundedRectangle(cornerRadius: 5).fill(Color.ink.opacity(on ? 0.075 : 0)))
+        .background(RoundedRectangle(cornerRadius: Radius.control).fill(Color.ink.opacity(on ? 0.075 : 0)))
     }
     func highlighted(_ t: String, _ hits: [Int]) -> Text {
         guard !hits.isEmpty else { return Text(t).foregroundColor(Color.ink) }
