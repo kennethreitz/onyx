@@ -46,6 +46,28 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   note show the live text in both.
 - **Focus mode** ⌃⌘F: pure text; the same keys restore exactly what was showing.
 
+## Scales
+
+Chrome (not the page) draws from a few shared scales in `Theme.swift`. New UI should pick from these
+rather than invent numbers; the page itself is typeset by the reader and editor at the user's size.
+
+- **Spacing** (`Space`): 2 · 4 · 6 · 8 · 12 · 16 · 24. Panel rows inset 12–14pt; list washes inset 5–6pt.
+- **Radii** (`Radius`): 4 small (chips, keycaps, ≤22pt icon buttons) · 6 control (rows, tabs, fields) ·
+  8 card (popovers, find bar, completion) · 12 panel (`panelChrome`).
+- **Type** (`TypeScale`, SF points): 9.5 label (UPPERCASE, tracked 0.8) · 10.5 caption · 11.5 small ·
+  12.5 body · 13.5 palette row. Serif (Latin Modern) is for titles, empty states and the page.
+- **Color**: paper, ink, muted, faint, hairline, and slate (`cursorBlue`) for focus and the current
+  note. `warn` (burnt amber) and `danger` (madder red) are the only alarm tints; no system orange/red.
+  `Theme.faint` stays the editor's syntax gray; `Color.faint` (`faintLabel`) is a shade darker in light
+  mode so small chrome labels clear ~4:1 on paper.
+- **States**: hover is an ink wash at ~4% (rows) or 6% (icon buttons); selection ~7–8%; focus is a
+  slate ring. Shortcuts render as `Keycaps` (one cap per modifier, two spaces between chords).
+- **Empty states** (`QuietEmpty`): one italic serif line in muted, plus an optional caption hint.
+- **Motion** (`Motion`): `hover` 0.12s, `quick` 0.15s, `fade` 0.18s, `overlay` spring 0.26/0.9,
+  `layout` spring 0.3/0.88. With Reduce Motion on, springs become ~0.12s dissolves and
+  `Motion.slide` / `Motion.pop` transitions become plain fades; the reader honors
+  `prefers-reduced-motion` the same way.
+
 ## Keys
 
 | Key | Action |

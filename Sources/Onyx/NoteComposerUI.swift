@@ -18,7 +18,7 @@ extension Workspace {
             NSSound.beep(); return
         }
         flushSave()
-        withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .merge }
+        withAnimation(Motion.overlay) { overlay = .merge }
     }
 
     func confirmMerge(into target: String) {
@@ -67,7 +67,7 @@ extension Workspace {
         }
         guard let pending, !pending.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { NSSound.beep(); return }
         pendingExtract = pending
-        withAnimation(.spring(response: 0.26, dampingFraction: 0.9)) { overlay = .extract }
+        withAnimation(Motion.overlay) { overlay = .extract }
     }
 
     func finishExtract(named raw: String) {

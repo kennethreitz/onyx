@@ -10,6 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Note composer, matching Obsidian’s core plugin: Merge Current File With Another File…, Extract Current Selection…, and Extract This Heading…. They’re in the command palette, the Edit menu, and (for the extract commands) the editor’s context menu, and they’re bindable in Settings ▸ Shortcuts, with no default shortcut. Merge asks first, then appends or prepends the open note’s body to a note you pick in the quick switcher, combines frontmatter (target scalars win, lists are unioned), rewrites wikilinks and Markdown links and embeds across the vault so they point at the target, and moves the source to the Trash. Extract writes the selection, or the heading section around the caret, to a new note (or appends it to an existing one), and replaces the original with a link, an embed, or nothing — that’s one undo step in the editor. A selection that starts with a heading offers that heading as the name. Settings ▸ Editor has confirm-before-merge, append vs prepend, where new notes land, and whether to open the extracted note.
 
+### Polish
+- Command palette and quick switcher: the selected row is an inset, rounded wash instead of a full-width bar, rows get a soft hover, and shortcuts are drawn as quiet keycaps (⇧ ⌘ P), as are the ↩ / ⌘↩ / ⇧↩ / esc hints underneath. The first-run hints card and the “Nothing open” page use the same keycaps.
+- Empty states share one voice: a line of italic serif plus a hint of what fills it (outline, linked and unlinked mentions, properties, recent, bookmarks, source control). Search shows a hint before you type and “Nothing matches” when nothing does, instead of a bare “0 results”.
+- The sidebar search field shows a slate focus ring; tag rows get the same hover wash as note rows, with tabular counts.
+- Reduce Motion is respected everywhere: panel and overlay springs become short dissolves, slides and scale-ins become fades, the reader drops its lift-in and smooth heading scrolls.
+- Conflicts, refused drops, sync errors, find with no matches, and the recording dot use inked amber and madder tints from the palette instead of system orange and red.
+- Chrome labels (counts, hints, section labels) are a shade darker in light mode so they clear ~4:1 on paper; editor syntax stays exactly as faint as before.
+- Reader: finer link underlines that skip descenders and fade on hover, a visible keyboard focus ring on links, `<kbd>` drawn as a small keycap, superscripts and subscripts no longer open up their line in plain (non-typeset) reading, and dark-mode selection matches the editor.
+- Under the hood: one spacing scale, four corner radii, a chrome type scale, and named motion curves in `Theme.swift` (see docs/DESIGN.md ▸ Scales).
+
 ## [0.1.6] - 2026-11-21
 
 ### Added
