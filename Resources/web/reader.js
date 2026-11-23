@@ -34,10 +34,22 @@
       `<div class="ae-track"><div class="ae-fill"></div></div><span class="ae-time">0:00</span>${openLink(path, fileName(path))}` +
       `<audio preload="metadata" src="${esc(url)}"></audio></div>`;
   }
+  // Obsidian sizing: the last `|` segment of a wikilink's text or a Markdown image's alt is a size
+  // when it reads `W` or `WxH` (`![[a.png|300]]`, `![[a.png|cap|300x200]]`, `![cap|300](a.png)`).
+  function sizeOf(label) {
+    if (label == null) return { alt: null, w: 0, h: 0 };
+    const bar = label.lastIndexOf('|');
+    const m = /^\s*(\d+)(?:x(\d+))?\s*$/.exec(bar >= 0 ? label.slice(bar + 1) : label);
+    if (!m || !+m[1]) return { alt: label, w: 0, h: 0 };
+    let alt = bar >= 0 ? label.slice(0, bar) : null;
+    if (alt && alt.endsWith('\\')) alt = alt.slice(0, -1);
+    return { alt, w: +m[1], h: m[2] && +m[2] ? +m[2] : 0 };
+  }
+  const sizeAttrs = (s) => s && s.w ? ` width="${s.w}"${s.h ? ` height="${s.h}"` : ''}` : '';
   function mediaEmbedHTML(kind, url, path, width) {
     switch (kind) {
       case 'audio': return audioEmbedHTML(url, path);
-      case 'video': return `<figure class="file-embed"><video controls preload="metadata" src="${esc(url)}"></video><figcaption>${openLink(path, fileName(path))}</figcaption></figure>`;
+      case 'video': return `<figure class="file-embed"><video controls preload="metadata"${width || ''} src="${esc(url)}"></video><figcaption>${openLink(path, fileName(path))}</figcaption></figure>`;
       case 'pdf': return `<figure class="file-embed"><embed class="pdf-embed" src="${esc(url)}" type="application/pdf"><figcaption>${openLink(path, fileName(path))}</figcaption></figure>`;
       default: return `<img src="${esc(url)}"${width || ''} alt="${esc(fileName(path))}" data-path="${esc(path)}">`;
     }
@@ -58,10 +70,11 @@
     const l = parseLink(inner);
     const e = P.embeds[l.target.toLowerCase()];
     if (!e) return linkHTML(inner);
-    const width = l.alias && /^\d+(x\d+)?$/.test(l.alias) ? ` width="${l.alias.split('x')[0]}"` : '';
+    const sz = sizeOf(l.alias);
     switch (e.type) {
-      case 'image': return `<img src="${e.url}"${width} alt="${esc(l.target)}" data-path="${esc(e.path)}">`;
-      case 'audio': case 'video': case 'pdf': return mediaEmbedHTML(e.type, e.url, e.path);
+      case 'image': return `<img src="${e.url}"${sizeAttrs(sz)} alt="${esc(sz.alt || l.target)}" data-path="${esc(e.path)}" data-embed="wiki" data-embed-target="${esc(l.target)}">`;
+      case 'video': return mediaEmbedHTML('video', e.url, e.path, sizeAttrs(sz));
+      case 'audio': case 'pdf': return mediaEmbedHTML(e.type, e.url, e.path);
       case 'note':
         if (embedDepth.n > 1) return linkHTML(inner);
         embedDepth.n++;
@@ -118,10 +131,12 @@
       const vault = /^onyx:\/\/vault\//.test(src) ? (() => { try { return decodeURIComponent(src.slice(13)); } catch (e) { return ''; } })() : '';
       const bare = href.split(/[?#]/)[0];
       if (vault && AUDIO_EXT.test(bare)) return mediaEmbedHTML('audio', src, vault);
-      if (vault && VIDEO_EXT.test(bare)) return mediaEmbedHTML('video', src, vault);
+      const sz = sizeOf(text), alt = sz.w ? (sz.alt || '') : text;
+      if (vault && VIDEO_EXT.test(bare)) return mediaEmbedHTML('video', src, vault, sizeAttrs(sz));
       if (vault && /\.pdf$/i.test(bare)) return mediaEmbedHTML('pdf', src, vault);
-      if (vault) return `<img src="${esc(src)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ''} data-path="${esc(vault)}">`;
-      return `<img src="${esc(src)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ''}>`;
+      const at = `${sizeAttrs(sz)} alt="${esc(alt)}"${title ? ` title="${esc(title)}"` : ''} data-embed="md" data-embed-target="${esc(href)}"`;
+      if (vault) return `<img src="${esc(src)}"${at} data-path="${esc(vault)}">`;
+      return `<img src="${esc(src)}"${at}>`;
     },
     blockquote({ tokens }) {
       const inner = this.parser.parse(tokens);
@@ -611,9 +626,96 @@
     refreshFolds(); postFolds();
   }, true);
 
+  // Drag to resize an embedded image (focused pane only). Each sizable <img> is numbered among the
+  // embeds of the same target in its source block, so Swift rewrites exactly that occurrence.
+  function markEmbeds() {
+    if (!P.editable) return;
+    const seen = new Map();
+    for (const img of page.querySelectorAll('img[data-embed]')) {
+      if (img.closest('.markdown-embed, .kanban, .onyx-dataview, .sidenote, .footnotes, .backlinks, .onyx-dv-inline')) continue;
+      const b = img.closest('[data-line]');
+      if (!b) continue;
+      const t = img.dataset.embedTarget || '';
+      const key = b.dataset.line + '\u0000' + img.dataset.embed + '\u0000' + (img.dataset.embed === 'wiki' ? t.trim().toLowerCase() : t);
+      const n = seen.get(key) || 0;
+      seen.set(key, n + 1);
+      img.dataset.occ = n;
+      img.classList.add('resizable');
+    }
+  }
+  const grip = document.createElement('div');
+  grip.id = 'img-grip';
+  grip.title = 'Drag to resize · double-click for natural size';
+  grip.innerHTML = '<span class="ig-size"></span>';
+  let gripImg = null, drag = null;
+  function placeGrip(img) {
+    if (!grip.isConnected) document.body.appendChild(grip);
+    const r = img.getBoundingClientRect();
+    grip.style.left = (r.right + window.scrollX - 18) + 'px';
+    grip.style.top = (r.bottom + window.scrollY - 18) + 'px';
+  }
+  function hideGrip(force) {
+    if (drag && !force) return;
+    drag = null; gripImg = null;
+    grip.classList.remove('shown', 'dragging');
+    document.body.classList.remove('img-resizing');
+  }
+  function commitSize(img, width) {
+    const b = img.closest('[data-line]');
+    if (!b) return;
+    post({ type: 'imageSize', line: +b.dataset.line, lines: +b.dataset.lines || 1, kind: img.dataset.embed, target: img.dataset.embedTarget || '', occurrence: +img.dataset.occ, width });
+  }
+  document.addEventListener('mouseover', e => {
+    if (drag) return;
+    const img = e.target.closest && e.target.closest('img.resizable');
+    if (img && img.naturalWidth) { gripImg = img; placeGrip(img); grip.classList.add('shown'); }
+    else if (!grip.contains(e.target)) hideGrip();
+  });
+  grip.addEventListener('mousedown', e => {
+    if (!gripImg || e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const img = gripImg, r = img.getBoundingClientRect();
+    const box = img.parentElement || page;
+    // A block image is centered, so its corner moves half as far as its width grows.
+    drag = { img, x: e.clientX, w: r.width, centered: getComputedStyle(img).display === 'block', max: Math.max(32, box.clientWidth || page.clientWidth), moved: false, width: Math.round(r.width) };
+    grip.firstChild.textContent = '';
+    grip.classList.add('dragging');
+    document.body.classList.add('img-resizing');
+  });
+  document.addEventListener('mousemove', e => {
+    if (!drag) return;
+    const dx = (e.clientX - drag.x) * (drag.centered ? 2 : 1);
+    if (!drag.moved && Math.abs(dx) < 3) return;
+    drag.moved = true;
+    const w = Math.round(Math.max(32, Math.min(drag.max, drag.w + dx)));
+    drag.width = w;
+    drag.img.removeAttribute('height');
+    drag.img.style.width = w + 'px'; drag.img.style.height = 'auto';
+    grip.firstChild.textContent = w + ' px';
+    placeGrip(drag.img);
+  });
+  document.addEventListener('mouseup', () => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    grip.classList.remove('dragging');
+    document.body.classList.remove('img-resizing');
+    if (d.moved) commitSize(d.img, d.width);
+  });
+  grip.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); });   // never the image viewer
+  grip.addEventListener('dblclick', e => {
+    e.preventDefault(); e.stopPropagation();
+    const img = gripImg;
+    if (!img) return;
+    img.removeAttribute('width'); img.removeAttribute('height'); img.style.width = ''; img.style.height = '';
+    commitSize(img, null);
+    hideGrip(true);
+  });
+
   window.Onyx = {
     render(payload) {
       P = payload;
+      hideGrip(true);
       document.body.className = (payload.dark ? 'theme-dark' : 'theme-light') + (payload.sidenotes ? ' sidenotes' : '') + (payload.preview ? ' preview' : '') + typesetClasses(payload.typeset);
       document.documentElement.classList.toggle('dark', !!payload.dark);
       const y = window.scrollY;
@@ -637,6 +739,7 @@
         if (h && h.textContent.trim().toLowerCase() === String(payload.name).toLowerCase()) h.remove();
       }
       markLines();
+      markEmbeds();
       decorate();
       if (payload.sidenotes) sidenotes();
       page.querySelectorAll('.footnotes li').forEach(unmark);   // a margin note at the end is just a note

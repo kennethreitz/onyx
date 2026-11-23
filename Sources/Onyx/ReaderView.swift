@@ -247,6 +247,11 @@ struct ReaderView: NSViewRepresentable {
                 }
             case "folds":
                 if let p = renderedPath, let text = renderedText, let lines = body["lines"] as? [Int] { ws.setReaderFolds(path: p, text: text, lines: lines) }
+            case "imageSize":   // drag-to-resize: only the focused pane, and only the text it rendered
+                guard paneID == nil, !preview, renderedPath == ws.currentPath, renderedText == ws.text,
+                      let line = body["line"] as? Int, let kind = body["kind"] as? String, let target = body["target"] as? String else { return }
+                ws.resizeEmbed(line: line, lines: body["lines"] as? Int ?? 1, kind: kind, target: target,
+                               occurrence: body["occurrence"] as? Int ?? 0, width: (body["width"] as? NSNumber)?.intValue)
             case "edit": ws.toggleMode()
             case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
             default: break
@@ -345,7 +350,7 @@ enum ReaderPayload {
             "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
             "links": links, "embeds": embeds, "mdembeds": mdembeds, "dataview": dv, "dvinline": dvinline, "props": props, "kanban": kanban,
-            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
+            "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable, "editable": kanbanEditable,
             "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "folds": folds, "foldable": foldable,

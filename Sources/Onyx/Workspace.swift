@@ -1305,6 +1305,24 @@ final class Workspace {
         return ok
     }
 
+    /// Drag-to-resize from the reader: set (or, with nil, remove) the `|width` on one embed occurrence
+    /// (see ImageSize.edit). Goes through the editor's text system when it holds this note, so ⌘Z undoes it.
+    func resizeEmbed(line: Int, lines: Int, kind: String, target: String, occurrence: Int, width: Int?) {
+        guard !isCanvas, !isBase, !isFile,
+              let e = ImageSize.edit(in: text, line: line, lines: lines, kind: kind, target: target, occurrence: occurrence, width: width) else { renderToken += 1; return }
+        let new = (text as NSString).replacingCharacters(in: e.range, with: e.replacement)
+        guard new != text else { return }
+        if let tv = liveEditor, tv.string == text, tv.isEditable, tv.shouldChangeText(in: e.range, replacementString: e.replacement) {
+            tv.breakUndoCoalescing()
+            tv.replaceCharacters(in: e.range, with: e.replacement)
+            tv.didChangeText()
+            tv.undoManager?.setActionName(width == nil ? "Reset Image Size" : "Resize Image")
+            tv.breakUndoCoalescing()
+        }
+        text = new
+        flushSave()
+    }
+
     func toggleTask(index: Int) {
         let lines = text.components(separatedBy: "\n")
         var out = lines

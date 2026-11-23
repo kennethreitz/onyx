@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Image sizes in embeds, Obsidian-style ([docs](docs/attachments.md#image-size)): `![[photo.png|300]]` (width, height in proportion), `![[photo.png|300x200]]`, `![[photo.png|caption|300]]`, and Markdown `![300](img.png)` / `![alt|300x200](https://…)`. Video embeds take a width too. Images never grow past the text column. Before, only a bare `|300` on a wikilink worked, and the height was ignored.
+- Drag to resize images in the reader: hover an embed for a corner grip, drag to resize with the aspect ratio kept (a live width label shows the size), and let go to write the width into that exact embed, so the same image elsewhere in the note is left alone. Double-click the grip to remove the size. Alt text, `#heading` parts, and table `\|` escaping are kept. It saves through the normal path, as one undo step when the editor holds the note. A plain click still opens the image viewer.
+
 ## [0.1.8] - 2026-11-23
 
 ### Added

@@ -77,7 +77,33 @@ A file that can't be shown, such as an Ogg file AVFoundation won't play or an im
 
 An audio embed (`![[clip.m4a]]` or `![](clip.m4a)`) is a quiet one-line player that uses the chrome's scales: an 8 pt card radius, an ink-wash play button, and a hairline track you click to seek. The time sits next to the file name, and the name opens the full player. Starting one embed pauses the others. Video and PDF embeds play or show inline, with a "name ↗" link under them to their viewer. Clicking an embedded image opens it in the image viewer.
 
+## Image size
+
+Sizes follow Obsidian's syntax. The last `|` part of the embed is the size when it reads `W` or `WxH`, in CSS pixels:
+
+| You write | You get |
+| --- | --- |
+| `![[photo.png\|300]]` | 300 px wide, height in proportion |
+| `![[photo.png\|300x200]]` | 300 × 200 (fitted inside that box, never stretched) |
+| `![[photo.png\|A caption\|300]]` | 300 px wide, with "A caption" as its alt text |
+| `![300](photo.png)` or `![A caption\|300](https://…/photo.jpg)` | the same for Markdown images, local or remote |
+| `![[clip.mp4\|480]]` or `![480](clip.mp4)` | a 480 px wide video embed |
+
+An image is never drawn wider than the text column, whatever its size says. Text after `|` that isn't a size, such as `![[photo.png|Doug]]`, is alt text, as before. A sized image sits inline in its paragraph, the way Obsidian shows it.
+
+### Drag to resize
+
+In the reader, hover an embedded image and a small corner grip appears at its bottom-right. Drag it to resize. The aspect ratio is kept, a label shows the width as you go, and the image can't grow past the column or shrink below 32 px. When you let go, Onyx writes the width into that embed in the note: `![[photo.png]]` becomes `![[photo.png|412]]`, `![[photo.png|300x200]]` becomes `![[photo.png|412]]`, and `![alt](photo.png)` becomes `![alt|412](photo.png)`. Alt text and `#heading` parts are kept. Double-click the grip to go back to the natural size, which removes the size.
+
+Only the embed you dragged changes. When the same image appears several times, Onyx finds the right one by its block's source line and its position among that image's embeds in the block. Inside a table, the `|` is written as `\|` so the cell stays whole. The edit saves through the normal save path (git and Obsidian Sync see it). When the editor holds the note, it's one undo step, so ⌘Z in the editor takes it back.
+
+A click on the image without dragging still opens it in the image viewer. Grips appear only in the focused pane, never in a hover preview, an unfocused split, an embedded note, a dataview result, or a canvas card. Those images belong to another note or are generated.
+
 ## Limits
+
+- Height-only sizes (`x200`) aren't an Obsidian form, so they're read as alt text. Dragging always writes a width only.
+- Images in footnotes (sidenotes) and in embedded notes can't be drag-resized. Edit their size in the source.
+- The editor shows embeds as text, so sizes apply in the reader only.
 
 - Transcripts have no timestamps (Record Audio writes plain paragraphs), so you can't click a sentence to seek to it.
 - The audio waveform is skipped for files over three hours, which show a plain track instead.

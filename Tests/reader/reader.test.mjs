@@ -284,3 +284,32 @@ test('bad TeX shows an inline error instead of breaking the page', () => {
   assert.match(page, /math-error/);
   assert.match(page, /and more/);
 });
+
+test('image sizing follows Obsidian: |W, |WxH, alt|W, and Markdown alt sizes', () => {
+  const img = (n) => ({ type: 'image', path: `att/${n}`, url: `onyx://vault/att/${n}` });
+  const ctxE = { links: {}, embeds: { 'a.png': img('a.png'), 'v.mp4': { type: 'video', path: 'v.mp4', url: 'onyx://vault/v.mp4' } }, mdembeds: {}, base: 'onyx://vault/' };
+  const f = (md) => ctx.window.Onyx.fragment(md, ctxE);
+  assert.match(f('![[a.png|300]]'), /<img src="onyx:\/\/vault\/att\/a\.png" width="300" alt="a\.png" data-path="att\/a\.png" data-embed="wiki" data-embed-target="a\.png">/);
+  assert.match(f('![[a.png|300x200]]'), / width="300" height="200" /);
+  const cap = f('![[a.png|A cap|120]]');
+  assert.match(cap, / width="120" alt="A cap"/);
+  assert.doesNotMatch(cap, /height=/);
+  assert.match(f('![[a.png|Just a caption]]'), /<img [^>]*alt="Just a caption"/);
+  assert.doesNotMatch(f('![[a.png|Just a caption]]'), /width=/);
+  assert.doesNotMatch(f('![[a.png|300px]]'), /width=/);
+  assert.match(f('![[v.mp4|320]]'), /<video controls preload="metadata" width="320" src=/);
+  assert.match(f('![250](https://example.com/e.jpg)'), /<img src="https:\/\/example\.com\/e\.jpg" width="250" alt="" data-embed="md" data-embed-target="https:\/\/example\.com\/e\.jpg">/);
+  assert.match(f('![Doug|100x145](https://example.com/e.jpg)'), / width="100" height="145" alt="Doug"/);
+  assert.match(f('![Plain alt](https://example.com/e.jpg)'), /alt="Plain alt" data-embed="md"/);
+});
+
+test('sized images keep their block line anchors (drag-to-resize writes back by source line)', () => {
+  const out = ctx.window.Onyx._html('intro\n\n![[a.png|300]] and ![[a.png]]\n');
+  assert.match(out, /<!--L2:1--><p>/);
+});
+
+test('image CSS never upscales past the column, and the resize grip is styled', () => {
+  const css = fs.readFileSync(path.join(web, 'reader.css'), 'utf8');
+  assert.match(css, /img \{[^}]*max-width: 100%/);
+  assert.match(css, /#img-grip \{[^}]*cursor: nwse-resize/);
+});
