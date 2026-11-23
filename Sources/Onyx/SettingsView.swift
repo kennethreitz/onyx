@@ -112,7 +112,7 @@ struct SettingsView: View {
             DailySettingsPage(ws: ws)
                 .tabItem { Label(SettingsTab.daily.title, systemImage: SettingsTab.daily.symbol) }
                 .tag(SettingsTab.daily)
-            EditorSettingsPage()
+            EditorSettingsPage(ws: ws)
                 .tabItem { Label(SettingsTab.editor.title, systemImage: SettingsTab.editor.symbol) }
                 .tag(SettingsTab.editor)
             LinterSettingsPage()
@@ -206,6 +206,7 @@ struct GeneralSettingsPage: View {
 }
 
 struct EditorSettingsPage: View {
+    @Bindable var ws: Workspace
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.escToReading) private var escToReading = true
     @AppStorage(EditorPrefs.spellcheck) private var spellcheck = true
@@ -242,6 +243,17 @@ struct EditorSettingsPage: View {
                 Toggle("Esc returns to reading view", isOn: $escToReading)
                 Text("When nothing else is open, Esc in the editor saves and shows the reader. Esc never leaves reading view.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
+                if ws.root != nil {
+                    Toggle("Smart indent lists", isOn: Binding(
+                        get: {
+                            _ = ws.obsidianConfigRevision
+                            return (ws.obsidianJSON("app.json") as? [String: Any])?["smartIndentList"] as? Bool ?? true
+                        },
+                        set: { ws.setObsidianConfig("app.json", ["smartIndentList": $0]) }
+                    ))
+                    Text("Return in a list starts the next item with the same marker, or the next number. Return on an empty item ends the list, or outdents a nested one. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items. Saved as smartIndentList in the vault’s app.json, the same key Obsidian uses.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
             } header: { settingsHeader("Keys") }
 
             Section {

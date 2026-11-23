@@ -36,6 +36,8 @@
 | <kbd>⌘=</kbd> · <kbd>⌘-</kbd> · <kbd>⌘0</kbd> | Zoom text in · out · actual size (editor and reader together) |
 | <kbd>Esc</kbd> | Put away whatever’s on top. In the editor, when nothing else would consume it, also saves and returns to reading view (Settings ▸ Editor; on by default). Never the other way |
 
+In the editor, <kbd>↩</kbd> in a bulleted, numbered, or task list starts the next item with the same marker (or the next number). Return on an empty item ends the list, or outdents a nested one. <kbd>⇧↩</kbd> inserts a plain newline. <kbd>⇥</kbd> and <kbd>⇧⇥</kbd> indent and outdent list items. This follows `smartIndentList` in the vault’s `app.json` (on by default), also in Settings ▸ Editor.
+
 Open Random Note is in the command palette and the Go menu; it has no default shortcut.
 
 Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading. Record Audio (Stop Recording while recording) is there too, also without a default shortcut.

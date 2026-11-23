@@ -49,6 +49,8 @@ final class OnyxTextView: NSTextView {
     // Files, images and vault paths dropped or pasted in become attachments (AttachmentDrop.swift).
     var onAttach: (([DroppedItem]) -> [String]?)?
     var vaultRoot: () -> URL? = { nil }
+    /// Obsidian's `smartIndentList` (default on): Return continues a list.
+    var smartIndentList: () -> Bool = { true }
     override var acceptableDragTypes: [NSPasteboard.PasteboardType] { super.acceptableDragTypes + Self.attachmentDragTypes }
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let op = super.draggingEntered(sender)
@@ -333,6 +335,41 @@ final class OnyxTextView: NSTextView {
         if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
     }
 
+    /// Apply a core `TextEdit` as one undoable change.
+    @discardableResult
+    func apply(_ e: TextEdit) -> Bool {
+        guard shouldChangeText(in: e.range, replacementString: e.replacement) else { return false }
+        textStorage?.replaceCharacters(in: e.range, with: e.replacement)
+        didChangeText()
+        setSelectedRange(e.selection)
+        scrollRangeToVisible(e.selection)
+        return true
+    }
+
+    override func insertNewline(_ sender: Any?) {
+        // IME composition and Shift-Return get a plain newline.
+        if !hasMarkedText(), smartIndentList(),
+           !(NSApp.currentEvent?.modifierFlags.contains(.shift) ?? false),
+           let e = ListContinue.newline(string, selectedRange()) {
+            apply(e); return
+        }
+        super.insertNewline(sender)
+    }
+
+    override func insertTab(_ sender: Any?) {
+        if !hasMarkedText(), ListContinue.isListSelection(string, selectedRange()) {
+            apply(EditCommands.indent(string, selectedRange())); return
+        }
+        super.insertTab(sender)
+    }
+
+    override func insertBacktab(_ sender: Any?) {
+        if !hasMarkedText(), ListContinue.isListSelection(string, selectedRange()) {
+            apply(EditCommands.outdent(string, selectedRange())); return
+        }
+        super.insertBacktab(sender)
+    }
+
     override func keyDown(with event: NSEvent) {
         let mods = event.modifierFlags.intersection([.command, .option, .control])
         // No matching rows is still a valid link. ↩/⇥ leaves the typed name untouched.
@@ -467,6 +504,9 @@ struct EditorView: NSViewRepresentable {
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
         tv.onExtract = { [weak ws] in ws?.beginExtract() }
         tv.vaultRoot = { [weak ws] in ws?.root }
+        tv.smartIndentList = { [weak ws] in
+            (ws?.obsidianJSON("app.json") as? [String: Any])?["smartIndentList"] as? Bool ?? true
+        }
         tv.onAttach = { [weak ws, weak c = context.coordinator] items in ws?.attachmentLinks(items, note: c?.parent.path) }
         tv.onExtractHeading = { [weak ws] in ws?.beginExtract(heading: true) }
         tv.onComposerMenu = { [weak tv] menu in

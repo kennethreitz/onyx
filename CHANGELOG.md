@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Return in a list continues it: the same `-` / `*` / `+` bullet, the next number (`1.` / `1)`), or a new unchecked task (`- [ ]`, even after `- [x]`). Indent is kept, and a blockquoted list keeps its `> ` prefix. Return in the middle of an item splits the text onto the new item. Return on an empty item ends the list, or outdents one level if it’s nested, the way Obsidian does. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items. It is one undo step, and it does not fire during IME composition, inside a fenced code block, or in frontmatter. Honors `smartIndentList` in `.obsidian/app.json` (on when the key is missing), also in Settings ▸ Editor.
+
 ## [0.1.9] - 2026-11-23
 
 ### Added

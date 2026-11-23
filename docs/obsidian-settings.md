@@ -21,6 +21,7 @@ Two Settings tabs, **Files & Links** and **Daily Notes**, edit Obsidian's own co
 | Default location for new attachments | `attachmentFolderPath` | Vault folder (`/`), same folder as the current file (`./`), a subfolder under the current folder (`./attachments`), or a folder you name. Dropped, pasted, and recorded files go there ([details](attachments.md#where-files-go)). |
 | Automatically update internal links | `alwaysUpdateLinks` | On: renaming or moving a file updates links to it without asking. Off or unset: Onyx asks first, like Obsidian, and **Always Update** turns this on ([details](attachments.md#renaming-and-moving)). |
 | Default view for new tabs | `defaultViewMode` (`preview`, `source`) | The mode Onyx opens a vault in. |
+| Smart indent lists | `smartIndentList` | Return in a list continues the marker (or ends / outdents an empty item). Off writes a plain newline. Missing means on, as in Obsidian. The toggle is in Settings ▸ Editor. |
 | Excluded files | `userIgnoreFilters` | One folder or path per line. These files are hidden from search, the graph, and the sidebar. **Apply** re-indexes the vault. |
 
 ## Daily Notes (`.obsidian/daily-notes.json`)

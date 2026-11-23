@@ -153,6 +153,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 
 - Format commands work on the editor. From the reader, they switch to editing first. Each one is a single undo step.
 - Toggles are reversible: running Toggle Bold on `**bold**` (selected with or without its markers) removes the markers. List, checklist, and quote toggles apply to every selected line, and remove the prefix when every line already has it. A heading command on a line at that level turns it back into text.
+- Return in a list continues it: the same `-`, `*`, or `+` bullet, the next number (`1.` or `1)`), or a new unchecked checkbox. A Return in the middle of an item splits the text onto the new item. Return on an empty item ends the list, or outdents one level if the item is nested. Shift-Return is a plain newline. Tab and Shift-Tab indent and outdent list items (the Indent and Outdent commands do the same, and have no default shortcut). This is off when `smartIndentList` is `false` in the vault’s `app.json`; Settings ▸ Editor has the toggle. Return does not continue a list inside a fenced code block or frontmatter, or while an IME is composing.
 - Cycle Checkbox (<kbd>⌘L</kbd>) turns a line into `- [ ] `, then toggles it between `[ ]` and `[x]`.
 - Move Line Up/Down, Duplicate Line, and Delete Line act on every line the selection touches.
 - Today’s Daily Note and Previous/Next Daily Note were already there. Previous/Next step between existing daily notes when one is open. Yesterday’s and Tomorrow’s always go by the calendar, and create the note if needed.
