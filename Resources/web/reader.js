@@ -88,7 +88,8 @@
       return `<a class="internal-link" data-target="${esc(clean)}" data-heading="${esc(href.split('#')[1] || '')}">${text}</a>`;
     },
     image({ href, title, text }) {
-      const src = /^(https?|data|onyx):/i.test(href) ? href : P.base + href.replace(/^\.\//, '');
+      const mdEmbed = h => { const m = P.mdembeds || {}; if (m[h]) return m[h]; try { return m[decodeURI(h)]; } catch (e) { return undefined; } };
+      const src = /^(https?|data|onyx):/i.test(href) ? href : (mdEmbed(href) || P.base + href.replace(/^\.\//, ''));
       return `<img src="${esc(src)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ''}>`;
     },
     blockquote({ tokens }) {

@@ -46,6 +46,25 @@ final class OnyxTextView: NSTextView {
         return menu
     }
 
+    // Files, images and vault paths dropped or pasted in become attachments (AttachmentDrop.swift).
+    var onAttach: (([DroppedItem]) -> [String]?)?
+    var vaultRoot: () -> URL? = { nil }
+    override var acceptableDragTypes: [NSPasteboard.PasteboardType] { super.acceptableDragTypes + Self.attachmentDragTypes }
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let op = super.draggingEntered(sender)
+        return isAttachmentDrag(sender) && op.isEmpty ? attachmentDragOperation(sender) : op
+    }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let op = super.draggingUpdated(sender)
+        return isAttachmentDrag(sender) && op.isEmpty ? attachmentDragOperation(sender) : op
+    }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        performAttachmentDrop(sender) || super.performDragOperation(sender)
+    }
+    override func paste(_ sender: Any?) {
+        if !pasteAttachments() { super.paste(sender) }
+    }
+
     @objc func composeExtract() { onExtract?() }
     @objc func composeExtractHeading() { onExtractHeading?() }
 
@@ -445,6 +464,8 @@ struct EditorView: NSViewRepresentable {
         tv.fieldSuggest = { [weak ws] part, q in ws?.fieldSuggestions(part, q) ?? [] }
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
         tv.onExtract = { [weak ws] in ws?.beginExtract() }
+        tv.vaultRoot = { [weak ws] in ws?.root }
+        tv.onAttach = { [weak ws, weak c = context.coordinator] items in ws?.attachmentLinks(items, note: c?.parent.path) }
         tv.onExtractHeading = { [weak ws] in ws?.beginExtract(heading: true) }
         tv.onComposerMenu = { [weak tv] menu in
             guard let tv, tv.isEditable else { return }

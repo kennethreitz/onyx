@@ -16,6 +16,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Typeset reading** — small caps, collision-free sidenotes, hyphenation, `$` / `$$` math, the page as a book
 - **Linter** — tidy Markdown like Obsidian Linter: one undoable edit for the current note, a preview before linting a folder, and optional lint on save ([docs](docs/linter.md))
 - **Read Aloud** — the current note or your selection, from the command palette, with macOS voices
+- **Drag, drop, and paste attachments.** Drop files from Finder, drop images from a browser, or paste a screenshot. Each one is copied to your attachments folder and linked as `![[…]]`, following Obsidian's Files and links settings ([docs](docs/attachments.md))
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
 - **Custom shortcuts** — every bindable command in Settings ▸ Shortcuts; click a row to record a new combination
 - **Obsidian’s core commands** — formatting, headings, lists and checkboxes, move/duplicate/delete line, jump to heading, duplicate note, zoom, spellcheck, and more, all in the command palette ([list](docs/commands.md))
@@ -50,6 +51,7 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 - [Bases](docs/bases.md)
 - [Canvas and Kanban](docs/boards.md)
 - [Getting around](docs/navigation.md)
+- [Attachments](docs/attachments.md): drag, drop, and paste
 - [Sync](docs/sync.md)
 - [Linter](docs/linter.md)
 - [Keyboard shortcuts](docs/shortcuts.md)

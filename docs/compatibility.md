@@ -18,7 +18,7 @@ macOS 14 (Sonoma) or later, Apple silicon or Intel. The official download is a u
 
 ## Obsidian compatibility
 
-Onyx is built to open an Obsidian vault without converting anything. It understands wikilinks (aliases, headings, embeds), frontmatter, nested tags, folder notes, `%%comments%%`, callouts, footnotes, and Mermaid. It reads a few things out of `.obsidian`: the daily-notes folder, default view mode, user ignore filters, bookmarks, and the Homepage plugin’s start note. Rename and move rewrite wikilinks and standard Markdown links and embeds. Note composer merge uses the same link rewriting, then moves the source to the Trash. Kanban boards, `.canvas` files, and `.base` files open in place.
+Onyx is built to open an Obsidian vault without converting anything. It understands wikilinks (aliases, headings, embeds), frontmatter, nested tags, folder notes, `%%comments%%`, callouts, footnotes, and Mermaid. It reads a few things out of `.obsidian`: the daily-notes folder, default view mode, user ignore filters, attachment folder and link format (for [dropped and pasted files](attachments.md)), bookmarks, and the Homepage plugin’s start note. Rename and move rewrite wikilinks and standard Markdown links and embeds. Note composer merge uses the same link rewriting, then moves the source to the Trash. Kanban boards, `.canvas` files, and `.base` files open in place.
 
 It is not a plugin host, and it does not implement Templates or Excalidraw. [Bases](bases.md) are supported for viewing (read-only). You can keep using Obsidian for the rest, and “Open in Obsidian” is one click away.
 

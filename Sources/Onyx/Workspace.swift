@@ -220,7 +220,7 @@ final class Workspace {
 
     private func key(_ k: String) -> String { "onyx.\(root?.path ?? "").\(k)" }
 
-    private func obsidianJSON(_ name: String) -> Any? {
+    func obsidianJSON(_ name: String) -> Any? {
         guard let root, let d = try? Data(contentsOf: root.appendingPathComponent(".obsidian/\(name)")) else { return nil }
         return try? JSONSerialization.jsonObject(with: d)
     }

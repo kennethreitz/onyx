@@ -313,6 +313,15 @@ enum ReaderPayload {
             }
         }
         resolveAll(body, from: path, depth: 0)
+        // Markdown image embeds (`![](x.png)`) resolve like Obsidian: next to the note, from the vault root, or by name.
+        var mdembeds: [String: String] = [:]
+        for href in Attachments.markdownImageTargets(in: body) where mdembeds[href] == nil {
+            if let r = Attachments.resolveMarkdownTarget(href, from: path, exists: { snap.attachments[$0] != nil }, resolve: { snap.resolve($0, from: path) }) {
+                let url = "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)
+                mdembeds[href] = url
+                if let d = href.removingPercentEncoding { mdembeds[d] = url }
+            }
+        }
 
         let fields = InlineFields.parse(text)
         let props = fm.properties.map { p -> [String: String] in
@@ -336,7 +345,7 @@ enum ReaderPayload {
         let obj: [String: Any] = [
             "backlinks": mentions,
             "markdown": body, "path": path, "name": name, "folder": folder,
-            "links": links, "embeds": embeds, "dataview": dv, "dvinline": dvinline, "props": props, "kanban": kanban,
+            "links": links, "embeds": embeds, "mdembeds": mdembeds, "dataview": dv, "dvinline": dvinline, "props": props, "kanban": kanban,
             "dark": dark, "sidenotes": sidenotes, "keepScroll": keepScroll, "preview": preview, "kanbanEditable": kanbanEditable,
             "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,

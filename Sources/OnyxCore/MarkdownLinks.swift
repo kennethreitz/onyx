@@ -46,7 +46,7 @@ public enum MarkdownLinks {
         return (Array(repeating: "..", count: a.count - i) + b[i...]).joined(separator: "/")
     }
 
-    static let encodeAllowed: CharacterSet = {
+    public static let encodeAllowed: CharacterSet = {
         var s = CharacterSet.alphanumerics; s.insert(charactersIn: "-._~/!$&'*+,;=:@"); return s
     }()
 

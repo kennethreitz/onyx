@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Drag, drop, and paste attachments into the editor, as in Obsidian ([docs](docs/attachments.md)).
+  - What you can add:
+    - files from Finder, several at once;
+    - images dragged from a browser, Photos, or Mail;
+    - an image on the clipboard, saved as `Pasted image YYYYMMDDHHmmss.png`;
+    - files copied in Finder.
+  - Each file is copied into the folder set by `.obsidian/app.json`'s `attachmentFolderPath`: the vault root, `./`, `./sub`, or a fixed folder. A taken name gets a number (`photo 1.png`).
+  - The link goes in at the drop point and honors `useMarkdownLinks` and `newLinkFormat` (shortest, relative, or absolute). Images, audio, video, and PDFs are embedded with `!`. Notes and other files are linked.
+  - Files already in the vault aren't copied. A ⌘-drag from the sidebar, or a Finder drag of a file inside the vault, inserts a link to the existing file.
+
 ### Changed
 - The title-bar graph button (and ⌘G, the footer graph icon, and the command palette) is a toggle: click it again while the graph overlay is open to close it and return to the note. Shift-click or ⇧⌘G still opens the atlas, and closes it if the atlas is already showing. The title-bar button stays marked while the graph is open.
+
+### Fixed
+- Markdown image embeds (`![](…)`) in the reader resolve as Obsidian resolves them: next to the note, then from the vault root, then by name. Before, they only worked relative to the note.
 
 ## [0.1.7] - 2026-11-23
 
