@@ -14,7 +14,10 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   note (`Folder/Folder.md`, the folder-notes convention) when one exists. The last segment
   copies `[[Note]]`.
 - **Footer** (auto-dims to ~40%, full on hover): files, switcher, graph, three-pane,
-  read/edit, focus mode · word count · inspector.
+  read/edit, focus mode · word count · inspector. Hovering reveals character and
+  backlink counts in width already reserved, so the Read Aloud pause and stop
+  controls don't slide under the pointer. The Reading/Paused chip keeps a fixed
+  width; footer buttons are 22pt.
 - **Sidebar** is always docked. First launch shows it; ⌘K shows or hides it. Visibility is
   remembered (`onyx.sidebarOpen`). There is no pin button, floating overlay, or left-edge peek.
 - **Resizable panels**: drag the inner edge of the sidebar or inspector (a hairline that shows

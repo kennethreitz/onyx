@@ -146,49 +146,69 @@ struct RootView: View {
                     FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
                 }
                 .opacity(footerHover ? 1 : 0.55)
-                Spacer()
-                if let t = ws.toast {
-                    Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).lineLimit(1)
-                        .transition(.opacity)
-                        .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation(Motion.quick) { ws.toast = nil } }
-                    Spacer()
-                }
+                .animation(.easeOut(duration: 0.2), value: footerHover)
+                Spacer(minLength: 8)
                 if ws.speech.isActive {
                     SpeechBadge(speech: ws.speech).padding(.trailing, 6)
                 }
                 if ws.recorder.isActive {
                     RecordingBadge(recorder: ws.recorder) { ws.stopRecording() }.padding(.trailing, 6)
                 }
+                // Always in the layout, faded when idle, so a pulse doesn't shove the reading controls.
                 syncDot.padding(.trailing, 6)
                 if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.padding(.trailing, 6) }
                 if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.padding(.trailing, 6) }
                 if ws.currentPath != nil {
-                    Text(countText).font(.system(size: 11).monospacedDigit()).foregroundStyle(Color.faint).padding(.trailing, 8)
+                    let counts = countText
+                    // Reserve the hover (full) width so " · N characters · N backlinks" doesn't
+                    // slide pause and stop out from under the pointer.
+                    ZStack(alignment: .trailing) {
+                        Text(counts.full)
+                            .hidden()
+                            .accessibilityHidden(true)
+                        Text(footerHover ? counts.full : counts.short)
+                            .foregroundStyle(Color.faint)
+                    }
+                    .font(.system(size: 11).monospacedDigit())
+                    .padding(.trailing, 8)
                 }
                 FooterButton(symbol: "sidebar.right", help: "Inspector (⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
                     .opacity(footerHover ? 1 : 0.55)
+                    .animation(.easeOut(duration: 0.2), value: footerHover)
             }
             .padding(.horizontal, 8)
             .frame(height: 28)
             .background(Color.secondaryPaper)
             .overlay(alignment: .top) { Rectangle().fill(Color.hairline).frame(height: 0.8) }
-            .animation(.easeOut(duration: 0.2), value: footerHover)
+            .overlay {
+                if let t = ws.toast {
+                    Text(t).font(.system(size: 11.5)).foregroundStyle(Color.muted).lineLimit(1)
+                        .padding(.horizontal, 10)
+                        .background(Color.secondaryPaper)
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                        .task(id: t) { try? await Task.sleep(nanoseconds: 2_800_000_000); withAnimation(Motion.quick) { ws.toast = nil } }
+                }
+            }
             .onHover { footerHover = $0 }
         }
     }
 
-    var countText: String {
+    /// Short form at rest ("691 words"); full form on hover. The footer always
+    /// lays out `full` so the reading controls stay put when the extra stats appear.
+    var countText: (short: String, full: String) {
         if ws.isFile, let p = ws.currentPath {   // an attachment: its kind and the notes that link here
             let c = ws.snapshot?.backlinks[p]?.count ?? 0
-            return AttachmentKind.of(p).label + (c > 0 ? " · \(c) backlink\(c == 1 ? "" : "s")" : "")
+            let s = AttachmentKind.of(p).label + (c > 0 ? " · \(c) backlink\(c == 1 ? "" : "s")" : "")
+            return (s, s)
         }
         let words = NoteParser.countWords(ws.settledText)
-        var s = "\(words.formatted()) words"
-        if footerHover {
-            s += " · \(ws.settledText.count.formatted()) characters"
-            if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 { s += " · \(c) backlinks" }
+        let short = "\(words.formatted()) words"
+        var full = short + " · \(ws.settledText.count.formatted()) characters"
+        if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 {
+            full += " · \(c) backlinks"
         }
-        return s
+        return (short, full)
     }
 
     var toastLayer: some View {
@@ -765,7 +785,7 @@ struct GitBadge: View {
             case .failed: ("exclamationmark.circle", Color.warn)
         }
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
+            Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 22, height: 22).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(git.help + "\nClick for the sync log")

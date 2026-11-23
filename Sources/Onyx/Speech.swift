@@ -119,7 +119,9 @@ final class SpeechReader: NSObject, AVSpeechSynthesizerDelegate {
     }
 }
 
-/// The footer's quiet "Reading" chip, with pause and stop.
+/// The footer's quiet "Reading" chip, with pause and stop. The label and
+/// speaker icon keep a fixed width so pause/stop don't slide when the
+/// state flips between Reading and Paused, or when play.fill replaces pause.fill.
 struct SpeechBadge: View {
     var speech: SpeechReader
     var body: some View {
@@ -127,15 +129,21 @@ struct SpeechBadge: View {
             Image(systemName: speech.state == .paused ? "pause.fill" : "speaker.wave.2.fill")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.muted)
-            Text(speech.state == .paused ? "Paused" : "Reading")
-                .font(.system(size: 11.5))
-                .foregroundStyle(Color.muted)
+                .frame(width: 22, height: 22)
+            ZStack(alignment: .leading) {
+                Text("Reading").hidden().accessibilityHidden(true)
+                Text("Paused").hidden().accessibilityHidden(true)
+                Text(speech.state == .paused ? "Paused" : "Reading")
+                    .foregroundStyle(Color.muted)
+            }
+            .font(.system(size: 11.5))
             FooterButton(symbol: speech.state == .paused ? "play.fill" : "pause.fill",
                          help: speech.state == .paused ? "Resume reading" : "Pause reading") {
                 speech.togglePause()
             }
             FooterButton(symbol: "stop.fill", help: "Stop reading") { speech.stop() }
         }
+        .fixedSize()
         .accessibilityElement(children: .contain)
         .accessibilityLabel(speech.state == .paused ? "Paused reading" : "Reading aloud")
     }

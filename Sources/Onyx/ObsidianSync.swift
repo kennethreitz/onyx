@@ -189,7 +189,7 @@ struct SyncBadge: View {
             case .error, .needsAttention: ("exclamationmark.icloud", Color.warn)
         }
         Button(action: action) {
-            Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 16, height: 16)
+            Image(systemName: symbol).font(.system(size: 10.5)).foregroundStyle(color).frame(width: 22, height: 22).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .help(sync.help + "\nClick for the sync log")
