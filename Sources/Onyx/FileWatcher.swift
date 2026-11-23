@@ -1,5 +1,6 @@
 import Foundation
 import CoreServices
+import OnyxCore
 
 /// FSEvents on the vault root, file-level, coalesced. Works for Obsidian
 /// Sync, git, iCloud and other bots writing into the same folder.
@@ -45,6 +46,10 @@ final class FileWatcher {
             var rel = String(p.dropFirst(r.count))
             if rel.hasPrefix("/") { rel.removeFirst() }
             if rel.isEmpty { continue }
+            // Hidden paths are skipped, except the Obsidian config files Onyx reads (Settings ▸ Files & Links, Daily Notes).
+            if rel.hasPrefix(".obsidian/"), !rel.dropFirst(10).contains("/"), ObsidianConfig.watchedFiles.contains(String(rel.dropFirst(10))) {
+                rels.insert(rel); continue
+            }
             if rel.split(separator: "/").contains(where: { $0.hasPrefix(".") }) { continue }
             rels.insert(rel)
         }

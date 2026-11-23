@@ -42,6 +42,12 @@ extension Workspace {
         applyEdit { EditCommands.insert($0, $1, s) }
     }
 
+    /// Insert now in a moment.js format (Templates' date and time formats, like Obsidian's insert commands).
+    func insertMoment(_ format: String) {
+        let s = MomentFormat.format(Date(), format)
+        applyEdit { EditCommands.insert($0, $1, s) }
+    }
+
     /// Run an editing command by catalog id. Returns false for ids that aren't editing commands.
     @discardableResult
     func runEditCommand(_ id: String) -> Bool {
@@ -63,8 +69,8 @@ extension Workspace {
         case "hr": applyEdit { EditCommands.horizontalRule($0, $1) }
         case "table": applyEdit { EditCommands.table($0, $1) }
         case "codeblock": applyEdit { EditCommands.codeBlock($0, $1) }
-        case "date": insertNow("yyyy-MM-dd")
-        case "time": insertNow("HH:mm")
+        case "date": insertMoment(templateSettings.dateFormat)
+        case "time": insertMoment(templateSettings.timeFormat)
         case "indent": applyEdit { EditCommands.indent($0, $1) }
         case "outdent": applyEdit { EditCommands.outdent($0, $1) }
         case "lineup": applyEdit { EditCommands.moveLines($0, $1, up: true) }
@@ -95,8 +101,8 @@ extension Workspace {
     func openDaily(days: Int) {
         guard snapshot != nil else { return }
         let date = Calendar.current.date(byAdding: .day, value: days, to: Date()) ?? Date()
-        let path = DailyNotes.path(for: date, folder: dailyFolder)
-        if snapshot?.notes[path] == nil { _ = write(DailyNotes.template(for: date), to: path, create: true) }
+        let path = DailyNotes.path(for: date, settings: daily)
+        if snapshot?.notes[path] == nil { _ = write(dailyNoteText(for: date, path: path), to: path, create: true) }
         openNote(path)
         mode = .edit
     }

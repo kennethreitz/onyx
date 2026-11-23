@@ -27,6 +27,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **`partOf::` relationships** — an ancestry path in the title bar, a parts tree and link-valued fields in the inspector, field and note completion after `key::`, and a hierarchy-only graph
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
+- **Obsidian's core settings, in Onyx** — Settings ▸ Files & Links (new-note and attachment locations, link format, wikilinks, excluded files) and Settings ▸ Daily Notes (date format, folder, template, open on startup, Templates date and time formats). They read and write the vault's own `.obsidian` files, so Obsidian stays in sync ([docs](docs/obsidian-settings.md))
 - **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N. Open Random Note is in the command palette and the Go menu
 - **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync
 - **Dataview** — `dataview` and `dataviewjs` blocks in the reader, plus `= expr` and `$=` inline queries; unsupported queries show an error box

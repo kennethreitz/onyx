@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Obsidian's core settings are editable in Onyx's Settings, and they write to the vault's own `.obsidian` files so Obsidian and Onyx stay in sync ([docs](docs/obsidian-settings.md)).
+  - **Files & Links** (`app.json`): default location for new notes, new link format, Use [[Wikilinks]], default location for new attachments (vault folder, same folder, a subfolder under the current folder, or a named folder), default view, and excluded files.
+  - **Daily Notes** (`daily-notes.json`, `templates.json`): date format with a live preview, new file location, template file, open daily note on startup, and the Templates folder, date format, and time format.
+  - Only changed keys are written. Unknown keys keep their order and exact text. Writes are atomic, a missing file is created, and invalid JSON is left alone. Changes from Obsidian or Sync are picked up live. Folder and file fields have a picker limited to the vault, and typed paths are checked.
+- Onyx now honors more of Obsidian's settings:
+  - The daily-note date `format` is a moment.js format, including `/` for dated folders. Before, it was always `YYYY-MM-DD`.
+  - The daily-note `template` is used, with `{{date}}`, `{{title}}`, `{{time}}`, and `{{date:FORMAT}}` filled in. An empty template keeps Onyx's built-in daily note.
+  - `autorun` opens today's note when the vault opens.
+  - Templates' `dateFormat` and `timeFormat` set what Insert Current Date and Insert Current Time insert.
+  - `newFileLocation` and `newFileFolderPath` decide where ⌘N, the quick switcher's create, and unresolved-link clicks put new notes. With no setting, Onyx's old behavior stays.
 - Attachments open in the pane, like notes ([docs](docs/attachments.md#opening-attachments)). Click an embed or link in the reader, ⌘-click `[[file]]`, `![[file]]` or `[text](file)` in the editor, or open the file from the sidebar, the quick switcher (attachments are listed by full file name), Recent, a canvas, or a base. ⌘[ (or the header's back chevron) goes back to the note. Before, they opened in another app or did nothing.
   - **Audio**: Onyx's own player. It has a waveform scrubber (click or drag to seek), elapsed and remaining time, play/pause (Space), 15-second skips (← →), speed from 0.75× to 2× (remembered, pitch kept), and volume. When Record Audio left a transcript under the embed, the player shows it with a link back to that note. Playback stops when you leave the file. It plays m4a, mp3, aac, wav, aiff, caf, flac, and 3gp. Formats AVFoundation can't play (Ogg, Opus) get a file card instead.
   - **Images**: fit to the pane by default (never enlarged past 100%), zoom in/out from the header or by pinching, actual size, drag to pan, and double-click to switch between fit and actual size. GIFs animate. The header shows pixel dimensions.

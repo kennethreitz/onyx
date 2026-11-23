@@ -45,12 +45,14 @@ enum Typeset {
 
 /// Pages in the Settings window. `ONYX_SETTINGS_TAB` opens one at launch (screenshots).
 enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
-    case general, editor, linter, shortcuts, reading, graph, sync, updates
+    case general, files, daily, editor, linter, shortcuts, reading, graph, sync, updates
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .general: "General"
+        case .files: "Files & Links"
+        case .daily: "Daily Notes"
         case .linter: "Linter"
         case .editor: "Editor"
         case .shortcuts: "Shortcuts"
@@ -63,6 +65,8 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
     var symbol: String {
         switch self {
         case .general: "gearshape"
+        case .files: "folder"
+        case .daily: "calendar"
         case .linter: "checkmark.seal"
         case .editor: "character.cursor.ibeam"
         case .shortcuts: "keyboard"
@@ -79,6 +83,8 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
         switch raw {
         case "", "general", "appearance", "vault", "focus": return .general
+        case "files", "links", "files-and-links", "attachments", "obsidian-settings": return .files
+        case "daily", "daily-notes", "dailynotes", "templates": return .daily
         case "linter", "lint": return .linter
         case "editor", "composer", "notecomposer", "note-composer": return .editor
         case "shortcuts", "keys", "keyboard", "hotkeys", "hotkey": return .shortcuts
@@ -100,6 +106,12 @@ struct SettingsView: View {
             GeneralSettingsPage(ws: ws)
                 .tabItem { Label(SettingsTab.general.title, systemImage: SettingsTab.general.symbol) }
                 .tag(SettingsTab.general)
+            FilesSettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.files.title, systemImage: SettingsTab.files.symbol) }
+                .tag(SettingsTab.files)
+            DailySettingsPage(ws: ws)
+                .tabItem { Label(SettingsTab.daily.title, systemImage: SettingsTab.daily.symbol) }
+                .tag(SettingsTab.daily)
             EditorSettingsPage()
                 .tabItem { Label(SettingsTab.editor.title, systemImage: SettingsTab.editor.symbol) }
                 .tag(SettingsTab.editor)

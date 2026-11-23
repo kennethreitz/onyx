@@ -14,7 +14,7 @@ Dragging text, or a plain web link, still works as ordinary text.
 
 ## Where files go
 
-Onyx reads **Default location for new attachments** (`attachmentFolderPath` in `.obsidian/app.json`). That setting is in Obsidian under Settings ▸ Files and links.
+Onyx reads **Default location for new attachments** (`attachmentFolderPath` in `.obsidian/app.json`). You can change it in Onyx under Settings ▸ Files & Links, or in Obsidian under Settings ▸ Files and links. Both apps write the same file ([Obsidian settings](obsidian-settings.md)).
 
 | Setting | Files land in |
 | --- | --- |
@@ -27,7 +27,7 @@ When a name is taken, Onyx adds a number before the extension, as Obsidian does:
 
 ## The link
 
-Onyx writes the link in the format your app.json asks for:
+Onyx writes the link in the format your app.json asks for. **New link format** and **Use [[Wikilinks]]** are in Settings ▸ Files & Links.
 
 - **`useMarkdownLinks`** is false by default, which gives wikilinks such as `![[photo.png]]`. When it's true, you get Markdown links such as `![](photo.png)`, with spaces encoded as `%20`.
 - **`newLinkFormat`** controls the path in the link:

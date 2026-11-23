@@ -38,7 +38,11 @@ final class Workspace {
     let graphStore = GraphStore()
     private(set) var isIndexing = false
     private(set) var indexMillis = 0
-    var dailyFolder = "Daily"
+    /// Obsidian's Daily notes settings, re-read when daily-notes.json changes. `folder` falls back to
+    /// "Daily" when the file doesn't name one (Onyx's long-standing default).
+    var daily = DailyNotes.Settings(folder: "Daily")
+    /// Bumped whenever Onyx writes or notices a change to a watched `.obsidian` config file.
+    var obsidianConfigRevision = 0
     var homePath = "Home.md"
 
     // Open note
@@ -206,6 +210,10 @@ final class Workspace {
                 self.indexMillis = ms
                 self.isIndexing = false
                 if let n = initialNote { self.openNote(n) }
+                else if self.daily.autorun {   // Daily notes "Open daily note on startup"
+                    if restoreSplits { _ = self.restoreSplitLayout() }
+                    self.openDaily()
+                }
                 else if restoreSplits && self.restoreSplitLayout() { }
                 else if self.currentPath == nil {
                     self.openHome()
@@ -235,7 +243,7 @@ final class Workspace {
         set { UserDefaults.standard.set(newValue, forKey: key("atlasOnStartup")) }
     }
     private func loadObsidianSettings() {
-        if let d = obsidianJSON("daily-notes.json") as? [String: Any], let f = d["folder"] as? String { dailyFolder = f }
+        loadDailySettings()
         if let a = obsidianJSON("app.json") as? [String: Any], let m = a["defaultViewMode"] as? String { mode = m == "source" ? .edit : .read }
         if let h = obsidianJSON("plugins/homepage/data.json") as? [String: Any],
            let hp = (h["homepages"] as? [String: Any])?.values.first as? [String: Any], let v = hp["value"] as? String {
@@ -243,6 +251,59 @@ final class Workspace {
             obsidianHomeIsGraph = (hp["kind"] as? String) == "Graph view" && (hp["openOnStartup"] as? Bool ?? false)
         }
     }
+    private func loadDailySettings() {
+        let json = obsidianJSON("daily-notes.json") as? [String: Any]
+        var d = DailyNotes.Settings(json: json)
+        if json?["folder"] == nil { d.folder = "Daily" }
+        daily = d
+    }
+    var templateSettings: TemplateSettings { TemplateSettings(json: obsidianJSON("templates.json") as? [String: Any]) }
+
+    /// Write `changes` into `.obsidian/<file>` (keeping every other key as it is), then re-read.
+    @discardableResult
+    func setObsidianConfig(_ file: String, _ changes: [String: Any?]) -> Bool {
+        guard let root else { return false }
+        let url = root.appendingPathComponent(".obsidian/\(file)")
+        let ignoreBefore = obsidianIgnore()
+        do {
+            guard try ObsidianConfig.update(url, changes: changes) else { return true }
+        } catch {
+            toast = "Couldn’t save .obsidian/\(file): it isn’t valid JSON, so Onyx left it alone."
+            return false
+        }
+        obsidianConfigChanged([file])
+        if file == "app.json", obsidianIgnore() != ignoreBefore { reindex() }
+        git?.edited()
+        obsidianSync?.edited()
+        return true
+    }
+
+    /// Obsidian (or Sync) changed a config file under `.obsidian`: pick up the new values.
+    func obsidianConfigChanged(_ files: [String]) {
+        if files.contains("daily-notes.json") { loadDailySettings() }
+        obsidianConfigRevision += 1
+    }
+
+    /// Folder a new note goes in, honoring app.json's "Default location for new notes". With no
+    /// setting, `contextual` (Onyx's own choice) is used.
+    func newNoteFolder(contextual: String) -> String {
+        let a = obsidianJSON("app.json") as? [String: Any]
+        return NewNoteLocation.folder(location: a?["newFileLocation"] as? String,
+                                      folderPath: a?["newFileFolderPath"] as? String, contextual: contextual)
+    }
+
+    /// The text of a new daily note: the daily-notes.json template when set and present, filled in
+    /// like Obsidian does, else Onyx's built-in shape.
+    func dailyNoteText(for date: Date, path: String) -> String {
+        if let t = daily.templatePath, let root,
+           let body = (snapshot?.notes[t]?.content) ?? (try? String(contentsOf: root.appendingPathComponent(t), encoding: .utf8)) {
+            let title = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            return DailyNotes.expand(template: body, date: date, title: title, dateFormat: daily.format,
+                                     timeFormat: templateSettings.timeFormat)
+        }
+        return DailyNotes.template(for: date)
+    }
+
     /// For files written outside `write` (recordings): let the index, git and sync know.
     func fileAdded(_ rel: String) {
         snapshot?.refresh(paths: [rel])
@@ -285,7 +346,7 @@ final class Workspace {
         if let p = snap.resolve(link.target, from: source ?? currentPath) {
             openNote(p, heading: link.heading)
         } else if !link.target.isEmpty {
-            createNote(named: link.target, folder: "")   // like Obsidian: clicking an unresolved link creates it
+            createNote(named: link.target, folder: newNoteFolder(contextual: ""))   // like Obsidian: clicking an unresolved link creates it
         }
     }
 
@@ -501,9 +562,10 @@ final class Workspace {
 
     func openDaily(offset: Int = 0) {
         guard snapshot != nil else { return }
-        if offset != 0, let cur = currentPath, cur.hasPrefix(dailyFolder + "/") {
+        if offset != 0, let cur = currentPath, DailyNotes.date(ofPath: cur, settings: daily) != nil {
             // previous / next existing daily note, like daily-notes:goto-prev/next
-            let all = snapshot!.notes.keys.filter { $0.hasPrefix(dailyFolder + "/") && DailyNotes.date(fromFileName: ($0 as NSString).lastPathComponent) != nil }.sorted()
+            let all = snapshot!.notes.keys.compactMap { p in DailyNotes.date(ofPath: p, settings: daily).map { (p, $0) } }
+                .sorted { $0.1 < $1.1 }.map(\.0)
             if let i = all.firstIndex(of: cur) {
                 let j = i + offset
                 if all.indices.contains(j) { openNote(all[j]) }
@@ -511,8 +573,8 @@ final class Workspace {
             }
         }
         let date = Calendar.current.date(byAdding: .day, value: offset, to: Date()) ?? Date()
-        let path = DailyNotes.path(for: date, folder: dailyFolder)
-        if snapshot?.notes[path] == nil { _ = write(DailyNotes.template(for: date), to: path, create: true) }
+        let path = DailyNotes.path(for: date, settings: daily)
+        if snapshot?.notes[path] == nil { _ = write(dailyNoteText(for: date, path: path), to: path, create: true) }
         openNote(path)
         mode = .edit
     }
@@ -539,11 +601,11 @@ final class Workspace {
     }
 
     func newNote() {
-        let folder = NoteNaming.folderForNewNote(
+        let folder = newNoteFolder(contextual: NoteNaming.folderForNewNote(
             selected: treeSelection.selected,
             folders: snapshot?.folders ?? [],
             selectedFolder: selectedFolder,
-            currentPath: currentPath)
+            currentPath: currentPath))
         createNote(named: "Untitled", folder: folder)
     }
 
@@ -1288,6 +1350,10 @@ final class Workspace {
     // MARK: External changes
 
     private func filesChanged(_ paths: [String]) {
+        let config = paths.filter { $0.hasPrefix(".obsidian/") }
+        if !config.isEmpty { obsidianConfigChanged(config.map { ($0 as NSString).lastPathComponent }) }
+        let paths = paths.filter { !$0.hasPrefix(".obsidian/") }
+        if paths.isEmpty { return }
         pendingPaths.formUnion(paths)
         reindexTask?.cancel()
         reindexTask = Task { [weak self] in

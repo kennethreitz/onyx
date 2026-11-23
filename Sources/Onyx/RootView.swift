@@ -431,7 +431,7 @@ struct RootView: View {
             dimmer
             VStack {
                 PaletteView(placeholder: "Find or create a note…", items: { PaletteCommands.notes(ws, $0) },
-                            onCreate: { _ = ws.createNote(named: $0, folder: "") }, exists: { ws.quickIndex.hasExact($0) },
+                            onCreate: { _ = ws.createNote(named: $0, folder: ws.newNoteFolder(contextual: "")) }, exists: { ws.quickIndex.hasExact($0) },
                             dismiss: { ws.show(.none) })
                     .padding(.top, 88)
                 Spacer()
