@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-11-23
+
 ### Fixed
 - ⌘⌫ in the editor (and in any text field) is once again the standard Mac delete-to-beginning-of-line, or it deletes the selection if there is one. It had been bound to Delete Note…, so typing it tried to trash the whole note. ⌘⌫ still deletes the selected file(s) when the file tree has focus, like Finder, after a confirm. ⌥⌫ was not bound and still deletes the previous word. Delete Note… has no default shortcut (File menu and command palette still have it); Settings ▸ Shortcuts treats ⌘⌫ and ⌥⌫ as reserved, and will not put them on a menu item.
 
@@ -226,7 +228,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.10...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.11...HEAD
+[0.1.11]: https://github.com/kennethreitz/onyx/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/kennethreitz/onyx/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kennethreitz/onyx/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kennethreitz/onyx/compare/v0.1.7...v0.1.8
