@@ -205,7 +205,7 @@ struct UpdateSheet: View {
                 Text("You have \(current.description).")
                     .font(.system(size: 12))
                     .foregroundStyle(Color.muted)
-                notes(rel.body)
+                notes(rel.body, tag: rel.tag)
                 if case .failed(let err) = phase {
                     Text(err).font(.system(size: 12)).foregroundStyle(Color.danger).fixedSize(horizontal: false, vertical: true)
                 } else if case .working(let s) = phase {
@@ -229,19 +229,116 @@ struct UpdateSheet: View {
     var isWorking: Bool { if case .working = phase { return true }; return false }
 
     @ViewBuilder
-    func notes(_ body: String) -> some View {
+    func notes(_ body: String, tag: String) -> some View {
         let text = body.trimmingCharacters(in: .whitespacesAndNewlines)
         ScrollView {
-            Text(text.isEmpty ? "No release notes." : text)
-                .font(.system(size: 12.5))
-                .foregroundStyle(Color.ink)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
+            Group {
+                if text.isEmpty {
+                    Text("No release notes.")
+                        .font(.system(size: TypeScale.body))
+                        .foregroundStyle(Color.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    ReleaseNotesView(blocks: ReleaseNotes.blocks(from: text, tag: tag))
+                }
+            }
+            .textSelection(.enabled)
         }
         .padding(10)
         .background(Color.paperAlt)
         .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Color.hairline, lineWidth: 1))
         .clipShape(RoundedRectangle(cornerRadius: Radius.card))
         .frame(maxHeight: .infinity)
+        .environment(\.openURL, OpenURLAction { url in
+            NSWorkspace.shared.open(url)
+            return .handled
+        })
+    }
+}
+
+/// Formatted GitHub release notes: section labels, nested lists, and inline Markdown.
+struct ReleaseNotesView: View {
+    let blocks: [ReleaseNotes.Block]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { i, block in
+                blockView(block)
+                    .padding(.top, topPad(i))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    func topPad(_ i: Int) -> CGFloat {
+        if i == 0 { return 0 }
+        switch (blocks[i - 1], blocks[i]) {
+        case (.listItem, .listItem): return Space.xs
+        case (_, .heading): return Space.l
+        default: return Space.s
+        }
+    }
+
+    @ViewBuilder
+    func blockView(_ block: ReleaseNotes.Block) -> some View {
+        switch block {
+        case .heading(_, let text):
+            Text(text)
+                .font(.system(size: TypeScale.label, weight: .semibold))
+                .foregroundStyle(Color.muted)
+                .tracking(0.6)
+                .textCase(.uppercase)
+        case .paragraph(let text):
+            inline(text)
+        case .listItem(let depth, let ordered, let marker, let text):
+            HStack(alignment: .firstTextBaseline, spacing: Space.s) {
+                Text(ordered ? "\(marker)." : "•")
+                    .font(.system(size: TypeScale.body).monospacedDigit())
+                    .foregroundStyle(depth == 0 ? Color.ink : Color.muted)
+                    .frame(width: ordered ? 18 : 12, alignment: .trailing)
+                inline(text)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.leading, CGFloat(depth) * 18)
+        case .rule:
+            Divider().overlay(Color.hairline).padding(.vertical, Space.xs)
+        }
+    }
+
+    func inline(_ markdown: String) -> some View {
+        Text(Self.styled(ReleaseNotes.attributed(markdown)))
+            .font(.system(size: TypeScale.body))
+            .foregroundStyle(Color.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Ink, slate links, and a quiet wash behind inline code.
+    static func styled(_ raw: AttributedString) -> AttributedString {
+        var s = raw
+        let body = Font.system(size: TypeScale.body)
+        let code = Font.system(size: TypeScale.small, design: .monospaced)
+        let strong = Font.system(size: TypeScale.body, weight: .semibold)
+        let emphasis = Font.system(size: TypeScale.body).italic()
+        for run in s.runs {
+            let r = run.range
+            s[r].foregroundColor = Color.ink
+            s[r].font = body
+            let intent = run.inlinePresentationIntent ?? []
+            if intent.contains(.code) {
+                s[r].font = code
+                s[r].backgroundColor = Color.ink.opacity(0.06)
+            } else if intent.contains(.stronglyEmphasized) && intent.contains(.emphasized) {
+                s[r].font = Font.system(size: TypeScale.body, weight: .semibold).italic()
+            } else if intent.contains(.stronglyEmphasized) {
+                s[r].font = strong
+            } else if intent.contains(.emphasized) {
+                s[r].font = emphasis
+            }
+            if run.link != nil {
+                s[r].foregroundColor = Color.cursorBlue
+                s[r].underlineStyle = .single
+            }
+        }
+        return s
     }
 }

@@ -412,7 +412,10 @@ runs), then writes the plan, moves the file, and commits once. Tests are in Link
 On launch (after a short delay) and every six hours, and from **Onyx ▸ Check for Updates…**, the app asks
 `https://api.github.com/repos/kennethreitz/onyx/releases/latest` for a later semver tag than
 `CFBundleShortVersionString`. A non-modal prompt shows the release notes and **Install and Relaunch**,
-**Later**, or **Skip This Version**. Skip is remembered for automatic checks only; a manual check still
+**Later**, or **Skip This Version**. The notes are formatted (section labels, nested lists, bold, italic,
+inline code, and links), not raw Markdown. Relative links such as `[docs](docs/obsidian-settings.md)`
+open the file at that tag on GitHub (`https://github.com/kennethreitz/onyx/blob/v<version>/…`).
+Skip is remembered for automatic checks only; a manual check still
 offers that version. Settings ▸ Updates can turn automatic checks off (`onyx.updates.automatic`; default on).
 
 Install downloads the `Onyx-<ver>-macOS.zip` asset, unpacks it with `ditto`, checks that the bundle id is
@@ -422,4 +425,4 @@ running `.app` atomically (the outgoing bundle is moved to the Trash), and relau
 `ONYX_UPDATE_API_URL`, `ONYX_UPDATE_VERSION`, and `ONYX_UPDATE_APP` override the endpoint, current version,
 and destination for tests; `ONYX_UPDATE_DISABLE` and the screenshot/self-test hooks skip automatic checks.
 If the app is translocated (opened from Downloads), the install is refused until it is moved to Applications
-and opened from there. Logic lives in `Updater` (OnyxCore), with tests against a fake local release in `/tmp`.
+and opened from there. Logic lives in `Updater` and `ReleaseNotes` (OnyxCore), with tests against a fake local release in `/tmp`.

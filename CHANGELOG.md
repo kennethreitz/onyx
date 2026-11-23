@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renaming the attachment open in the viewer keeps it open, instead of showing "This file is gone".
 - Relative wikilinks (`[[../Note]]`, written by Obsidian's relative link format) resolve.
 - Renaming or moving a file no longer risks dropping the last second of typing in the open note when that note's links get rewritten.
+- The update window showed GitHub release notes as raw Markdown. They now render as formatted text: section labels, nested lists, bold, italic, inline code, and clickable links. Relative links such as `[docs](docs/obsidian-settings.md)` open the file at that tag on GitHub.
 
 ## [0.1.8] - 2026-11-23
 
