@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-23
+
 ### Added
 - Obsidian's core settings are editable in Onyx's Settings, and they write to the vault's own `.obsidian` files so Obsidian and Onyx stay in sync ([docs](docs/obsidian-settings.md)).
   - **Files & Links** (`app.json`): default location for new notes, new link format, Use [[Wikilinks]], default location for new attachments (vault folder, same folder, a subfolder under the current folder, or a named folder), default view, and excluded files.
@@ -195,7 +197,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.7...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/kennethreitz/onyx/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/kennethreitz/onyx/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/kennethreitz/onyx/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/kennethreitz/onyx/compare/v0.1.4...v0.1.5
