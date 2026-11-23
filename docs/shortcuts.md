@@ -16,7 +16,7 @@
 | <kbd>⌥⌘[</kbd> · <kbd>⌥⌘]</kbd> | Previous / next daily note |
 | <kbd>⇧⌘H</kbd> | Homepage |
 | <kbd>⌘D</kbd> · <kbd>⇧⌘D</kbd> | Split side by side · stacked. Layout (ratios, axis, open notes) is remembered per vault. |
-| <kbd>⌘W</kbd> | Close the focused pane (the window, when there’s one pane) |
+| <kbd>⌘W</kbd> | Close the focused pane (the window, when there’s one pane). Closing the last window leaves Onyx running; the Dock icon or File ▸ New Window restores it. ⌘Q quits |
 | <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane |
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
 | <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm). After clicking in the sidebar, deletes the selection |

@@ -17,6 +17,7 @@ import OnyxCore
     var scrubbing = false
     @ObservationIgnored private var tick: Any?
     @ObservationIgnored private var endObserver: NSObjectProtocol?
+    @ObservationIgnored private var stopObserver: NSObjectProtocol?
 
     init(url: URL) {
         self.url = url
@@ -31,6 +32,9 @@ import OnyxCore
         }
         endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.playing = false; if let d = self?.duration { self?.time = d } }
+        }
+        stopObserver = NotificationCenter.default.addObserver(forName: WindowLifecycle.stopPlaybackNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.pause() }
         }
     }
 
@@ -73,6 +77,8 @@ import OnyxCore
         tick = nil
         if let endObserver { NotificationCenter.default.removeObserver(endObserver) }
         endObserver = nil
+        if let stopObserver { NotificationCenter.default.removeObserver(stopObserver) }
+        stopObserver = nil
     }
 
     /// Peak amplitude every ~20 ms, decoded at 8 kHz mono (cheap, and plenty for a 480-bar waveform).

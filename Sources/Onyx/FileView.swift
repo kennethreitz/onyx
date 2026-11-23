@@ -304,17 +304,35 @@ struct VideoViewer: NSViewRepresentable {
     @Binding var unsupported: Bool
     @Binding var meta: String
 
+    func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> AVPlayerView {
         let v = AVPlayerView()
         v.controlsStyle = .inline
         v.showsFullScreenToggleButton = true
+        context.coordinator.view = v
         load(v)
         return v
     }
     func updateNSView(_ v: AVPlayerView, context: Context) {
+        context.coordinator.view = v
         if (v.player?.currentItem?.asset as? AVURLAsset)?.url != url { load(v) }
     }
-    static func dismantleNSView(_ v: AVPlayerView, coordinator: ()) { v.player?.pause(); v.player = nil }
+    static func dismantleNSView(_ v: AVPlayerView, coordinator: Coordinator) {
+        v.player?.pause(); v.player = nil
+        coordinator.view = nil
+    }
+    final class Coordinator {
+        weak var view: AVPlayerView?
+        private var observer: NSObjectProtocol?
+        init() {
+            observer = NotificationCenter.default.addObserver(forName: WindowLifecycle.stopPlaybackNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.view?.player?.pause() }
+            }
+        }
+        deinit {
+            if let observer { NotificationCenter.default.removeObserver(observer) }
+        }
+    }
     func load(_ v: AVPlayerView) {
         v.player?.pause()
         let asset = AVURLAsset(url: url)

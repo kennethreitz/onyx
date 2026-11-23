@@ -90,7 +90,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌘E, ⌘↩ | Read ⇄ edit; ⌘↩ also saves immediately |
 | ⌘T, ⌘\\ | Today's daily note (⌘D is no longer bound to it) |
 | ⌘D / ⇧⌘D | Split side by side / stacked |
-| ⌘W | Close the focused pane; with one pane, close the window |
+| ⌘W | Close the focused pane; with one pane, close the window (the app stays running; Dock or File ▸ New Window restores it; ⌘Q quits) |
 | ⌃⇥ / ⌃⇧⇥ | Next / previous pane (click also focuses) |
 | ⌘[ ⌘] | Back / forward through this pane's history (also mouse buttons 4/5, swipe) |
 | ⌥⌘[ ⌥⌘] | Previous / next daily note |

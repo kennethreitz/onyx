@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relative wikilinks (`[[../Note]]`, written by Obsidian's relative link format) resolve.
 - Renaming or moving a file no longer risks dropping the last second of typing in the open note when that note's links get rewritten.
 - The update window showed GitHub release notes as raw Markdown. They now render as formatted text: section labels, nested lists, bold, italic, inline code, and clickable links. Relative links such as `[docs](docs/obsidian-settings.md)` open the file at that tag on GitHub.
+- Closing the last window with ⌘W or the red button no longer quits Onyx. The app stays running with no windows; click the Dock icon or choose File ▸ New Window to restore the vault window with the previous notes and layout. Closing still saves unsaved notes and the split layout. Obsidian Sync and git autocommit keep running. Reading aloud, audio and video playback, and an in-progress recording stop (the recording is saved). ⌘Q still quits, and launching a second packaged Onyx still asks the running copy to quit and save first.
+
+
 
 ## [0.1.8] - 2026-11-23
 

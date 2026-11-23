@@ -129,7 +129,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | --- | --- |
 | Split Side by Side | <kbd>⌘D</kbd> |
 | Split Stacked | <kbd>⇧⌘D</kbd> |
-| Close Pane | <kbd>⌘W</kbd> |
+| Close Pane | <kbd>⌘W</kbd> (closes the window when there is only one pane; that leaves Onyx running) |
 | Next Pane | <kbd>⌃⇥</kbd> |
 | Previous Pane | <kbd>⌃⇧⇥</kbd> |
 | New Note in New Pane | — |

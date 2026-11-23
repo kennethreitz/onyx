@@ -52,8 +52,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         walk(NSApp.mainMenu)
     }
-    func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ app: NSApplication) -> Bool {
+        WindowLifecycle.terminateAfterLastWindowClosed
+    }
+    func applicationShouldHandleReopen(_ app: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        MainWindow.reveal()
+        return false
+    }
 }
+
 
 struct LaunchOptions {
     var vault: URL?
@@ -123,7 +130,7 @@ struct OnyxApp: App {
     }
 
     var body: some Scene {
-        WindowGroup("Onyx") {
+        Window("Onyx", id: WindowLifecycle.mainWindowIdentifier) {
             RootView(ws: ws, appearance: { appearance = $0; apply($0) })
                 .frame(minWidth: 640, minHeight: 420)
                 .onAppear(perform: boot)
@@ -132,7 +139,7 @@ struct OnyxApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: options.size?.width ?? 1180, height: options.size?.height ?? 820)
-        .commands { let _ = shortcutRevision; menus }
+        .commands { let _ = shortcutRevision; MainWindowCommands(); menus }
 
         Settings {
             SettingsView(ws: ws)
@@ -147,20 +154,9 @@ struct OnyxApp: App {
     func boot() {
         apply(appearance)
         TypeSelfTest.ws = ws
-        // git: leaving the app commits at once, coming back pulls, quitting commits and pushes
-        let nc = NotificationCenter.default
-        nc.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.commitNow() }
-        }
-        nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.git?.syncNow(); ws.obsidianSync?.syncNow() }
-        }
-        // terminate() from a new Onyx (and Quit) lands here: flush unsaved
-        // notes and session state before the process exits, so the new copy
-        // can restore them. Never skip this for a "just quit" path.
-        nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
-            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
-        }
+        // Observers are installed once: closing and reopening the window
+        // runs boot() again, but the vault (and Workspace) is already live.
+        AppLifecycle.install(ws: ws)
         guard ws.root == nil else { return }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
         guard let url = options.vault ?? OnyxApp.defaultVault() else { return }
@@ -219,7 +215,7 @@ struct OnyxApp: App {
         CommandGroup(replacing: .newItem) {
             ShortcutMenus.button("new") { ws.newNote() }
             ShortcutMenus.button("newfolder") { ws.newFolder() }
-            ShortcutMenus.button("openvault") { openVault() }
+            ShortcutMenus.button("openvault", needsWindow: false) { openVault() }
             Divider()
             ShortcutMenus.button("switcher") { ws.show(.switcher) }
             ShortcutMenus.button("palette") { ws.show(.palette) }
@@ -348,13 +344,49 @@ struct OnyxApp: App {
             Divider()
             ShortcutMenus.button("reindex") { ws.reindex() }
             ShortcutMenus.button("hints") { withAnimation(Motion.quick) { ws.showHints = true } }
-            ShortcutMenus.button("settings") { Workspace.openSettings() }
+            ShortcutMenus.button("settings", needsWindow: false) { Workspace.openSettings() }
         }
     }
     func openVault() {
         let p = NSOpenPanel()
         p.canChooseDirectories = true; p.canChooseFiles = false; p.prompt = "Open Vault"
-        if p.runModal() == .OK, let u = p.url { OnyxApp.remember(u); ws.open(vault: u) }
+        if p.runModal() == .OK, let u = p.url {
+            OnyxApp.remember(u)
+            ws.open(vault: u)
+            MainWindow.revealIfNeeded()
+        }
+    }
+}
+
+/// App-wide observers that must survive the vault window closing and reopening.
+@MainActor enum AppLifecycle {
+    private static var installed = false
+
+    static func install(ws: Workspace) {
+        guard !installed else { return }
+        installed = true
+        let nc = NotificationCenter.default
+        // git: leaving the app commits at once, coming back pulls, quitting commits and pushes
+        nc.addObserver(forName: NSApplication.didResignActiveNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.commitNow() }
+        }
+        nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.git?.syncNow(); ws.obsidianSync?.syncNow() }
+        }
+        // terminate() from a new Onyx (and Quit) lands here: flush unsaved
+        // notes and session state before the process exits, so the new copy
+        // can restore them. Never skip this for a "just quit" path.
+        nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
+            MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
+        }
+        nc.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { [ws] note in
+            guard let w = note.object as? NSWindow else { return }
+            MainActor.assumeIsolated {
+                guard MainWindow.isVaultWindow(w) else { return }
+                if MainWindow.current === w { MainWindow.current = nil }
+                ws.prepareForWindowClose()
+            }
+        }
     }
 
 }

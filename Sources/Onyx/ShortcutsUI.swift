@@ -65,16 +65,20 @@ extension View {
 /// Menu items that show and fire the live binding from `ShortcutStore`.
 enum ShortcutMenus {
     @ViewBuilder
-    static func button(_ id: String, title: String? = nil, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+    static func button(_ id: String, title: String? = nil, disabled: Bool = false, needsWindow: Bool = true, action: @escaping () -> Void) -> some View {
         let chords = ShortcutStore.shared.chords(for: id)
         let title = title ?? CommandCatalog.title(id)
+        let run = { @MainActor in
+            if needsWindow { MainWindow.revealIfNeeded() }
+            action()
+        }
         // Close Pane keeps ⌘W off the menu item so a single pane still closes the window.
         if id == "closepane", chords.count == 1, chords.first == .command("w") {
-            Button("Close Pane  (⌘W)", action: action).disabled(disabled)
+            Button("Close Pane  (⌘W)", action: run).disabled(disabled)
         } else {
-            Button(title, action: action).commandShortcut(chords.first).disabled(disabled)
+            Button(title, action: run).commandShortcut(chords.first).disabled(disabled)
             if chords.count > 1 {
-                Button(title + " ", action: action).commandShortcut(chords[1]).disabled(disabled)
+                Button(title + " ", action: run).commandShortcut(chords[1]).disabled(disabled)
             }
         }
     }

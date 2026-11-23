@@ -692,7 +692,56 @@ enum ShortcutHints {
 }
 
 /// The window hosting the workspace (not Settings, not a panel), for window-scoped shortcuts.
-@MainActor enum MainWindow { static weak var current: NSWindow? }
+@MainActor enum MainWindow {
+    static let identifier = NSUserInterfaceItemIdentifier(WindowLifecycle.mainWindowIdentifier)
+    static weak var current: NSWindow?
+    /// SwiftUI `openWindow` for the vault window, registered from the File menu commands.
+    static var openNew: () -> Void = {}
+
+    static func registerOpen(_ action: OpenWindowAction) {
+        openNew = { action(id: WindowLifecycle.mainWindowIdentifier) }
+    }
+
+    static func isVaultWindow(_ w: NSWindow) -> Bool {
+        WindowLifecycle.kind(isPanel: w is NSPanel, identifier: w.identifier?.rawValue, title: w.title) == .vault
+    }
+
+    static var existing: NSWindow? {
+        if let w = current, isVaultWindow(w) { return w }
+        return NSApp.windows.first(where: isVaultWindow)
+    }
+
+    /// Dock icon and File ▸ New Window: show the vault window, creating it if needed.
+    static func reveal() {
+        switch WindowLifecycle.reopenPlan(hasVaultWindow: existing != nil) {
+        case .focusExisting:
+            guard let w = existing else { openNew(); return }
+            if w.isMiniaturized { w.deminiaturize(nil) }
+            w.makeKeyAndOrderFront(nil)
+        case .openNew:
+            openNew()
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// Menu commands that need a window: open one if none exists, without
+    /// stealing focus from Settings when the vault window is already up.
+    static func revealIfNeeded() {
+        if existing != nil { return }
+        openNew()
+    }
+}
+
+/// File ▸ New Window, and the hook that lets the Dock icon reopen the vault window.
+struct MainWindowCommands: Commands {
+    @Environment(\.openWindow) private var openWindow
+    var body: some Commands {
+        let _ = MainWindow.registerOpen(openWindow)
+        CommandGroup(after: .newItem) {
+            Button("New Window") { MainWindow.reveal() }
+        }
+    }
+}
 
 /// Transparent, hidden titlebar; the traffic lights only appear when you reach for them.
 struct WindowConfigurator: NSViewRepresentable {
@@ -705,6 +754,7 @@ struct WindowConfigurator: NSViewRepresentable {
     func updateNSView(_ v: NSView, context: Context) { DispatchQueue.main.async { configure(v.window) } }
     func configure(_ w: NSWindow?) {
         guard let w else { return }
+        w.identifier = MainWindow.identifier
         MainWindow.current = w
         w.titlebarAppearsTransparent = true
         w.titleVisibility = .hidden

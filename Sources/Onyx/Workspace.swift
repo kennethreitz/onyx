@@ -1605,6 +1605,18 @@ final class Workspace {
         speakCurrentNote()
     }
 
+    /// Closing the vault window (not quitting): save, stop playback, keep Sync and git running.
+    func prepareForWindowClose() {
+        let plan = WindowLifecycle.closePlan(kind: .vault, isQuit: false)
+        if plan.flushUnsavedNotes { flushSave() }
+        if plan.persistSplitLayout { persistSplitLayout() }
+        if plan.stopSpeech { speech.stop() }
+        if plan.finishRecording, recorder.isRecording { stopRecording() }
+        if plan.stopAudioPlayback {
+            NotificationCenter.default.post(name: WindowLifecycle.stopPlaybackNotification, object: nil)
+        }
+    }
+
     func toggleSpeechPause() { if speech.isActive { speech.togglePause() } }
 
     func stopSpeech() { speech.stop() }
