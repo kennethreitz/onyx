@@ -90,6 +90,7 @@ These are for development and screenshots. Don’t set them in normal use unless
 | `ONYX_CANVAS_FIXTURES=<folder>` | Optional canvas fixture tests; defaults to `/tmp/onyx-canvas-vault`, skipped when the folder isn’t there. |
 | `ONYX_BENCH_VAULT=~/Notes` | Optional read-only smoke check against a real vault: `ONYX_BENCH_VAULT=~/Notes swift test --filter RealVault`. Skipped if unset. Never write to this vault. |
 | `ONYX_BASES_VAULT=~/Notes` | Optional read-only check of `.base` files: `ONYX_BASES_VAULT=~/Notes swift test --filter testRealBasesReadOnly`. Skipped if unset. Never write to this vault. |
+| `ONYX_UPDATE_LINKS=update` / `skip` | Answer the "Update links?" prompt for scripted rename and move runs in a test vault whose `alwaysUpdateLinks` is off. |
 | `ONYX_BASES_EDIT=filter` | Open the Bases filter popover at launch (also `column`, `rename`). For screenshots; use with `ONYX_SHOT_QUIET=1`. Never writes the window frame. |
 
 ### Launch arguments

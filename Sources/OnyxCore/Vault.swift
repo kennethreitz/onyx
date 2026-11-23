@@ -80,6 +80,11 @@ public struct VaultSnapshot: Sendable {
         var target = rawTarget.trimmingCharacters(in: .whitespaces)
         if target.isEmpty { return source }
         if target.utf8.contains(UInt8(ascii: "%")) { target = target.removingPercentEncoding ?? target }
+        // relative wikilinks (`[[../Folder/Note]]`, Obsidian's "Relative path to file" format)
+        if target.hasPrefix("./") || target.hasPrefix("../"), let src = source {
+            let dir = (src as NSString).deletingLastPathComponent
+            if let n = MarkdownLinks.normalize(dir.isEmpty ? target : dir + "/" + target), !n.isEmpty { target = n }
+        }
         var lower = target.lowercased()
         if lower.hasPrefix("/") { lower.removeFirst() }
         let noExt = lower.hasSuffix(".md") ? String(lower.dropLast(3)) : lower

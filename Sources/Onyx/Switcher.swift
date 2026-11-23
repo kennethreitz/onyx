@@ -251,7 +251,7 @@ enum PaletteCommands {
         }
         return [
             item("switcher", title: "Quick switcher") { DispatchQueue.main.async { ws.show(.switcher) } },
-            item("rename", title: "Rename note…") { DispatchQueue.main.async { ws.confirmRenameCurrent() } },
+            item("rename", title: "Rename file…") { DispatchQueue.main.async { ws.confirmRenameCurrent() } },
             item("move", title: "Move note to…") { DispatchQueue.main.async { ws.beginMoveCurrent() } },
             item("delete", title: "Delete note…") { DispatchQueue.main.async { ws.confirmTrashCurrent() } },
             item("split") { ws.split(.vertical) },

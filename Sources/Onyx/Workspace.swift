@@ -875,6 +875,8 @@ final class Workspace {
         let roots = TreeSelection.roots(paths)
         guard roots.count > 1 else { if let p = roots.first { move(p, toFolder: folder) }; return }
         batchDepth += 1
+        batchLinkDecision = nil
+        defer { batchLinkDecision = nil }
         var moved: [String] = [], changed: [String] = []
         for p in roots where (p as NSString).deletingLastPathComponent != folder {
             let name = (p as NSString).lastPathComponent
@@ -890,6 +892,42 @@ final class Workspace {
     }
     /// >0 while a batch runs: structural changes are reported once, at the end.
     @ObservationIgnored private var batchDepth = 0
+    /// The answer to "Update links?" for the rest of a multi-item move, so it's asked once.
+    @ObservationIgnored private var batchLinkDecision: Bool? = nil
+
+    /// Obsidian's "Automatically update internal links" (`alwaysUpdateLinks` in app.json):
+    /// on, links follow silently; off or unset, ask first, like Obsidian does.
+    func shouldUpdateLinks(_ plan: LinkUpdater.Plan, from: String, to dest: String) -> Bool {
+        if promotingUntitled { return true }
+        if (obsidianJSON("app.json") as? [String: Any])?["alwaysUpdateLinks"] as? Bool == true { return true }
+        if let d = batchLinkDecision { return d }
+        switch ProcessInfo.processInfo.environment["ONYX_UPDATE_LINKS"] {   // scripted runs can't answer a dialog
+        case "update"?: return true
+        case "skip"?: return false
+        default: break
+        }
+        let n = plan.linkCount, m = plan.edits.count
+        let a = NSAlert()
+        a.messageText = "Update \(n) link\(n == 1 ? "" : "s") in \(m) file\(m == 1 ? "" : "s")?"
+        let name = (from as NSString).lastPathComponent, newName = (dest as NSString).lastPathComponent
+        a.informativeText = name == newName
+            ? "“\(name)” is moving to \((dest as NSString).deletingLastPathComponent.isEmpty ? "the vault root" : (dest as NSString).deletingLastPathComponent)."
+            : "“\(name)” is being renamed to “\(newName)”."
+        a.addButton(withTitle: "Update")
+        a.addButton(withTitle: "Don’t Update")
+        a.addButton(withTitle: "Always Update")
+        let r = a.runModal()
+        let answer: Bool
+        switch r {
+        case .alertFirstButtonReturn: answer = true
+        case .alertThirdButtonReturn:
+            answer = true
+            setObsidianConfig("app.json", ["alwaysUpdateLinks": true])
+        default: answer = false
+        }
+        if batchDepth > 0 { batchLinkDecision = answer }
+        return answer
+    }
 
     func move(_ path: String, toFolder folder: String) {
         let name = (path as NSString).lastPathComponent
@@ -1021,11 +1059,9 @@ final class Workspace {
     func promptRename(_ path: String) {
         guard let root else { return }
         let isDir = (try? root.appendingPathComponent(path).resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        let last = (path as NSString).lastPathComponent
-        let isNote = last.lowercased().hasSuffix(".md")
         let a = NSAlert()
         a.messageText = isDir ? "Rename folder" : "Rename"
-        a.informativeText = isNote ? "Links to it are updated across the vault." : ""
+        a.informativeText = "Links to it across the vault are updated."
         let field = NSTextField(string: InlineRename.fieldValue(path: path))
         field.frame = NSRect(x: 0, y: 0, width: 300, height: 24)
         a.accessoryView = field
@@ -1044,15 +1080,13 @@ final class Workspace {
         }
     }
 
-    /// Move or rename a note, file or folder. Wikilinks elsewhere that point at a moved note or
-    /// attachment are rewritten: path links ([[Folder/Note]]) always, name links ([[Note]]) when the
-    /// name changed; #heading, |alias and embeds are kept. Standard Markdown links and embeds are
-    /// rewritten too (relative, vault-absolute or by name; %20-encoded or raw; anchors kept), including
-    /// the relative links inside the notes that move. The note stays open in its panes and
-    /// history. Commits right away via `vaultMutated`.
+    /// Move or rename a note, file or folder. `LinkUpdater` works out every link that has to follow
+    /// (wikilinks, embeds, Markdown links, frontmatter, canvas cards); with `alwaysUpdateLinks` off
+    /// the user is asked first. The note stays open in its panes and history. One commit, right
+    /// away, via `vaultMutated`.
     @discardableResult
     func relocate(_ from: String, to dest: String, reason: String) -> Bool {
-        guard let root, var snap = snapshot else { return false }
+        guard let root, snapshot != nil else { return false }
         let fm = FileManager.default
         let src = root.appendingPathComponent(from), dst = root.appendingPathComponent(dest).standardizedFileURL
         guard dst.path.hasPrefix(root.path + "/"), !dest.contains("..") else { return false }
@@ -1060,69 +1094,22 @@ final class Workspace {
             toast = "“\((dest as NSString).lastPathComponent)” already exists there"; return false
         }
         flushSave()
-        // old → new for every note that moves
-        var map: [String: String] = [:]
-        if snap.notes[from] != nil || snap.canvases[from] != nil || snap.bases[from] != nil { map[from] = dest }
-        for p in snap.notes.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
-        for p in snap.canvases.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
-        for p in snap.bases.keys where p.hasPrefix(from + "/") { map[p] = dest + String(p.dropFirst(from.count)) }
-        // rewrite links (in the files as they are now, before the move)
-        func noExt(_ p: String) -> String { p.lowercased().hasSuffix(".md") ? String(p.dropLast(3)) : p }
-        func title(_ p: String) -> String { (noExt(p) as NSString).lastPathComponent }
-        var edited: [String] = []
-        // attachments move too (an image, a PDF, a folder of them): links to them follow
-        var fileMap = map
-        if snap.attachments[from] != nil { fileMap[from] = dest }
-        for p in snap.attachments.keys where p.hasPrefix(from + "/") { fileMap[p] = dest + String(p.dropFirst(from.count)) }
-        let snap0 = snap
-        for (path, note) in snap.notes {
-            var text = note.content as NSString
-            var changed = false
-            for l in note.summary.links.sorted(by: { $0.range.location > $1.range.location }) {
-                guard let target = snap.resolve(l.target, from: path), let newPath = fileMap[target] else { continue }
-                let usesPath = l.target.contains("/")
-                let newTarget: String
-                if usesPath { newTarget = l.target.lowercased().hasSuffix(".md") ? newPath : noExt(newPath) }
-                else if title(target) != title(newPath) {
-                    let clash = (snap.namesIndex[title(newPath).lowercased()]?.filter { $0 != target }.isEmpty == false)
-                    newTarget = clash ? noExt(newPath) : title(newPath)
-                } else { continue }
-                guard NSMaxRange(l.range) <= text.length else { continue }
-                let tStart: Int
-                if l.isBare { tStart = l.range.location }   // `partOf:: Knowledge` or YAML `partOf: Knowledge`
-                else {
-                    let whole = text.substring(with: l.range) as NSString
-                    let open = whole.range(of: "[[")
-                    guard open.location != NSNotFound else { continue }
-                    tStart = l.range.location + NSMaxRange(open)
-                }
-                let rawTarget = (text.substring(from: tStart) as NSString)
-                let tLen = (l.target as NSString).length
-                guard tLen <= rawTarget.length, rawTarget.substring(to: tLen) == l.target else { continue }
-                text = text.replacingCharacters(in: NSRange(location: tStart, length: tLen), with: newTarget) as NSString
-                changed = true
-            }
-            // standard Markdown links and embeds: [t](../x.md#h), ![](a%20b.png), <…>; a moved note's own relative links too
-            if let md = MarkdownLinks.rewrite(text as String, oldNote: path, newNote: map[path] ?? path,
-                                              exists: { snap0.notes[$0] != nil || snap0.attachments[$0] != nil },
-                                              resolveName: { snap0.resolve($0, from: path) },
-                                              moved: { fileMap[$0] }) {
-                text = md as NSString; changed = true
-            }
-            if changed, write(text as String, to: path, create: false) {
-                snap.update(path: path, content: text as String); edited.append(path)
-                if path == currentPath { suppressTextChange = true; self.text = text as String; lastSaved = text as String; suppressTextChange = false; renderToken += 1 }
-            }
+        guard var snap = snapshot else { return false }   // after the save, so the open note's latest text is what's rewritten
+        // every link edit the move needs, worked out from the vault as it is now
+        let format = Attachments.Settings(appJSON: obsidianJSON("app.json") as? [String: Any] ?? [:]).linkFormat
+        let plan = LinkUpdater.plan(snap, from: from, to: dest, linkFormat: format) { c in
+            try? String(contentsOf: root.appendingPathComponent(c), encoding: .utf8)
         }
-        // canvas file cards follow the notes (and images, PDFs) they show
-        for c in snap.canvases.keys {
-            let url = root.appendingPathComponent(c)
-            guard let old = try? String(contentsOf: url, encoding: .utf8),
-                  let new = CanvasFile.rewriteFiles(old, { f in snap.resolve(f, from: c).flatMap { fileMap[$0] } }) else { continue }
-            if c == currentPath, isDirty { continue }   // never write under unsaved canvas edits
-            if write(new, to: c, create: false) {
-                snap.update(path: c, content: new); edited.append(c)
-                if c == currentPath { suppressTextChange = true; self.text = new; lastSaved = new; suppressTextChange = false; renderToken += 1 }
+        let map = plan.noteMoves
+        var edited: [String] = []
+        let update = plan.isEmpty ? true : shouldUpdateLinks(plan, from: from, to: dest)
+        if update {
+            for e in plan.edits {
+                if e.path == currentPath, e.path.isCanvasPath, isDirty { continue }   // never write under unsaved canvas edits
+                guard write(e.text, to: e.path, create: false) else { continue }
+                snap.update(path: e.path, content: e.text); edited.append(e.path)
+                if e.path == currentPath { suppressTextChange = true; self.text = e.text; lastSaved = e.text; suppressTextChange = false; renderToken += 1 }
+                for i in panes.indices where i != focusedPane && panes[i].path == e.path { panes[i].text = e.text }   // other split panes stay in sync
             }
         }
         do {
@@ -1138,10 +1125,10 @@ final class Workspace {
             snapshot = snap
             return false
         }
-        snap.refresh(paths: Array(map.keys) + Array(map.values) + [from, dest] + edited)
+        snap.refresh(paths: Array(plan.fileMoves.keys) + Array(plan.fileMoves.values) + [from, dest] + edited)
         snapshot = snap
         // keep it open everywhere
-        func remap(_ p: String) -> String { map[p] ?? p }
+        func remap(_ p: String) -> String { plan.fileMoves[p] ?? p }   // an open attachment viewer follows too
         func remapHistory(_ h: [NavEntry]) -> [NavEntry] {
             h.map { e in var e = e; if case .note(let p) = e.place { e.place = .note(remap(p)) }; return e }
         }
@@ -1161,7 +1148,8 @@ final class Workspace {
         foldStore?.remapPaths(map)   // folds follow the note
         var parent = (dest as NSString).deletingLastPathComponent
         while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
-        if edited.isEmpty { toast = reason } else { toast = "\(reason) · updated links in \(edited.count) note\(edited.count == 1 ? "" : "s")" }
+        if !update { toast = "\(reason) · links not updated" }
+        else if edited.isEmpty { toast = reason } else { toast = "\(reason) · updated links in \(edited.count) note\(edited.count == 1 ? "" : "s")" }
         vaultMutated(reason, paths: [from, dest] + edited)
         return true
     }

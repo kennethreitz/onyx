@@ -61,6 +61,7 @@ struct FileView: View {
             if !unsupported, kind == .image { imageControls }
             if !unsupported, kind == .pdf { pdfControls }
             LinkedFromMenu(ws: ws, path: path)
+            FooterButton(symbol: "pencil.line", help: "Rename…") { ws.confirmRename(path) }
             FooterButton(symbol: "arrow.up.forward.app", help: "Open in Default App") { if let url { NSWorkspace.shared.open(url) } }
             FooterButton(symbol: "folder", help: "Reveal in Finder") { ws.revealInFinder(path) }
         }

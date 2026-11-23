@@ -44,7 +44,7 @@ public enum CommandCatalog {
         cmd("switcher", "Quick Switcher…", .file, [.command("o")], "doc.text.magnifyingglass"),
         cmd("palette", "Command Palette…", .file, [.command("p"), .command("p", shift: true)], "command"),
         cmd("save", "Save", .file, [.command("s")]),
-        cmd("rename", "Rename Note…", .file, [], "pencil.line"),
+        cmd("rename", "Rename File…", .file, [], "pencil.line"),
         cmd("move", "Move Note to…", .file, [.command("m", shift: true)], "folder"),
         cmd("delete", "Delete Note…", .file, [.command("\u{7F}")], "trash"),
         cmd("exportpdf", "Export as PDF…", .file, [.command("e", shift: true)], "doc.richtext"),

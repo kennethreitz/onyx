@@ -399,6 +399,13 @@ of them) updates both `![[path]]` wikilinks and Markdown embeds. Links are resol
 note, then from the vault root, then by name. External URLs, same-note `#anchors`, code and comments are left alone. All
 edits and the move land in one git commit. The logic is in `MarkdownLinks` (OnyxCore), with tests in MarkdownLinksTests.
 
+`LinkUpdater.plan` (OnyxCore) works out every edit a move needs before anything is written: wikilinks, embeds,
+frontmatter and field links, Markdown links (through `MarkdownLinks`), and canvas file cards. A bare-name link is checked
+against a small post-move name index (`PostIndex`, the same rules as `VaultSnapshot.resolve`), so it stays a name only while
+it still resolves to the same file, including when the source note itself moves or another file with that name moves in.
+`Workspace.relocate` asks first unless `alwaysUpdateLinks` is true (`ONYX_UPDATE_LINKS=update|skip` answers for scripted
+runs), then writes the plan, moves the file, and commits once. Tests are in LinkUpdaterTests.
+
 
 ## Updates from GitHub Releases
 

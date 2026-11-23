@@ -16,9 +16,10 @@ Two Settings tabs, **Files & Links** and **Daily Notes**, edit Obsidian's own co
 | Setting | Key | What Onyx does with it |
 | --- | --- | --- |
 | Default location for new notes | `newFileLocation` (`root`, `current`, `folder`) and `newFileFolderPath` | Used for ⌘N, creating a note from the quick switcher, and clicking a link to a note that doesn't exist. **Onyx default** (no key) keeps Onyx's own choice: ⌘N uses the selected folder or the open note's folder, and links and the switcher use the vault root. Obsidian treats no key as the vault root. New Note Here in the sidebar always uses that folder. |
-| New link format | `newLinkFormat` | Shortest, relative, or absolute paths in links to [dropped and pasted files](attachments.md#the-link). |
+| New link format | `newLinkFormat` | Shortest, relative, or absolute paths in links to [dropped and pasted files](attachments.md#the-link), and in links that rename has to turn from a name into a path. |
 | Use [[Wikilinks]] | `useMarkdownLinks` (inverted) | When it's off, attachment links are Markdown links: `![](photo.png)`. |
 | Default location for new attachments | `attachmentFolderPath` | Vault folder (`/`), same folder as the current file (`./`), a subfolder under the current folder (`./attachments`), or a folder you name. Dropped, pasted, and recorded files go there ([details](attachments.md#where-files-go)). |
+| Automatically update internal links | `alwaysUpdateLinks` | On: renaming or moving a file updates links to it without asking. Off or unset: Onyx asks first, like Obsidian, and **Always Update** turns this on ([details](attachments.md#renaming-and-moving)). |
 | Default view for new tabs | `defaultViewMode` (`preview`, `source`) | The mode Onyx opens a vault in. |
 | Excluded files | `userIgnoreFilters` | One folder or path per line. These files are hidden from search, the graph, and the sidebar. **Apply** re-indexes the vault. |
 
@@ -52,5 +53,5 @@ Previous and Next Daily Note step through every note that matches the folder and
 - Onyx has no Insert Template command yet, so the template folder only affects the template picker.
 - Formats with ordinals (`Do`) or Unix time (`X`, `x`) work for creating notes. Onyx can't read the date back out of those names, so Previous and Next Daily Note skip them. The Date format field warns about this.
 - Moment's localized tokens (`L`, `LL`, `LT`) and lowercase `a` aren't supported. `a` gives `AM`/`PM`, just like `A`.
-- Onyx always updates links when you rename or move a note. It doesn't read `alwaysUpdateLinks` or `promptDelete`.
+- Onyx doesn't read `promptDelete`.
 - Unique note creator (`zk-prefixer.json`) isn't supported.

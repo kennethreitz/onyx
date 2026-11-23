@@ -12,7 +12,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Quick Switcher… | <kbd>⌘O</kbd> |
 | Command Palette… | <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> |
 | Save | <kbd>⌘S</kbd> |
-| Rename Note… | — |
+| Rename File… | — |
 | Move Note to… | <kbd>⇧⌘M</kbd> |
 | Delete Note… | <kbd>⌘⌫</kbd> |
 | Export as PDF… | <kbd>⇧⌘E</kbd> |

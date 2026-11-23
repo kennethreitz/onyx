@@ -10,10 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Image sizes in embeds, Obsidian-style ([docs](docs/attachments.md#image-size)): `![[photo.png|300]]` (width, height in proportion), `![[photo.png|300x200]]`, `![[photo.png|caption|300]]`, and Markdown `![300](img.png)` / `![alt|300x200](https://…)`. Video embeds take a width too. Images never grow past the text column. Before, only a bare `|300` on a wikilink worked, and the height was ignored.
 - Drag to resize images in the reader: hover an embed for a corner grip, drag to resize with the aspect ratio kept (a live width label shows the size), and let go to write the width into that exact embed, so the same image elsewhere in the note is left alone. Double-click the grip to remove the size. Alt text, `#heading` parts, and table `\|` escaping are kept. It saves through the normal path, as one undo step when the editor holds the note. A plain click still opens the image viewer.
+- Renaming or moving any file keeps every link to it working: attachments (images, audio, PDFs, anything), notes, canvases, and whole folders ([docs](docs/attachments.md#renaming-and-moving)). It works from sidebar rename, drag and Move to…, the new **Rename…** button in the attachment viewer header, and Command Palette ▸ Rename File… (was Rename Note…).
+  - Rewritten: `[[name]]`, `![[name]]`, `[[name|alias]]`, `[[name#heading]]`, `![[img.png|300]]` (suffixes kept), path and relative wikilinks, Markdown links and embeds (`%20` kept), frontmatter and field links, and canvas file cards. Code, `%%comments%%`, `.obsidian`, and excluded files are left alone.
+  - Bare-name links stay bare while the name is still unique. Otherwise they become a path in the vault's New link format.
+  - Follows Obsidian's **Automatically update internal links** (`alwaysUpdateLinks`), now in Settings ▸ Files & Links. When it's off or unset, Onyx asks "Update N links in M files?" with Update, Don't Update, and Always Update. A multi-file move asks once.
 
 ### Fixed
 - The footer's Read Aloud pause and stop controls slid sideways when you hovered the bar to click them: hover expands the word count with character and backlink counts, and that width change (animated with the rest of the footer) shoved the chip. The count now reserves the expanded width, the Reading/Paused label and speaker icon keep a fixed width, and a toast no longer shares the bar's layout. Pause and stop stay put, with 22-pt hit targets.
-
+- A bare `[[Name]]` link no longer silently starts pointing at a different note after a move. That could happen when its note moved away from a same-named neighbor, or when another file with that name moved to the vault root. Onyx now writes the path it needs.
+- Renaming the attachment open in the viewer keeps it open, instead of showing "This file is gone".
+- Relative wikilinks (`[[../Note]]`, written by Obsidian's relative link format) resolve.
+- Renaming or moving a file no longer risks dropping the last second of typing in the open note when that note's links get rewritten.
 
 ## [0.1.8] - 2026-11-23
 

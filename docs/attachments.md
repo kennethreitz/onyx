@@ -73,6 +73,22 @@ Every file view has a header with the file's kind, size, and details (pixel dime
 
 A file that can't be shown, such as an Ogg file AVFoundation won't play or an image NSImage can't decode, falls back to the file card with a short note.
 
+## Renaming and moving
+
+Rename an attachment from the sidebar (Return or Rename… on the row), with **Rename…** (the pencil) in the viewer header, or with Command Palette ▸ Rename File…. Drag it, or use Move to…, to put it in another folder. Every link to it follows, across the vault, and the same goes for notes and whole folders:
+
+- Wikilinks and embeds: `[[photo.png]]`, `![[photo.png|300]]`, `[[Note|alias]]`, `[[Note#Heading]]`, `[[Note#^block]]`. The size, alias, and heading are kept.
+- Path links: `[[Folder/Note]]`, `[[/Folder/Note]]`, and relative `[[../Note]]`.
+- Markdown links and embeds: `[text](Folder/Note.md#Heading)`, `![](../assets/Beach%20Day.png)`, `<angle>` destinations. Relative, vault-absolute, or by name, encoded or not, the way each link was written.
+- Frontmatter and field links: `partOf: "[[Note]]"`, list items, `up:: [[Note]]`, and bare relation fields like `partOf: Note`.
+- Canvas file cards (the `file` of each card in a `.canvas`).
+
+A link written as a bare name stays a bare name while that name still finds the file. If the new name is also used by another file, or a move makes the name point at a different file, the link becomes a path in your **New link format**: the vault path for shortest and absolute, or a path relative to the note for relative.
+
+Whether Onyx asks first follows Obsidian's **Automatically update internal links** (`alwaysUpdateLinks` in `.obsidian/app.json`), which is also in Settings ▸ Files & Links. When it's on, links follow silently. When it's off or not set, Onyx asks "Update N links in M files?" with **Update**, **Don't Update**, and **Always Update**. Always Update turns the setting on. Moving several files at once asks once.
+
+Links in fenced code, inline code, and `%%comments%%` are never changed. Neither is anything in `.obsidian` or your excluded files. The edits save atomically, open notes and split panes pick them up, and the rename and every edit land in one git commit, which shows up in the sync log.
+
 ### Embeds in the reader
 
 An audio embed (`![[clip.m4a]]` or `![](clip.m4a)`) is a quiet one-line player that uses the chrome's scales: an 8 pt card radius, an ink-wash play button, and a hairline track you click to seek. The time sits next to the file name, and the name opens the full player. Starting one embed pauses the others. Video and PDF embeds play or show inline, with a "name ↗" link under them to their viewer. Clicking an embedded image opens it in the image viewer.
@@ -110,4 +126,6 @@ A click on the image without dragging still opens it in the image viewer. Grips 
 - Split panes each have their own viewer. A file view in an unfocused pane doesn't take the audio keys.
 - Dropped folders are skipped. Only files are added.
 - There's no Onyx-side setting. Change the behavior in Obsidian's Files and links settings, or edit `.obsidian/app.json`.
+- Rename has no ⌘Z. Undo it by renaming back, or by reverting its git commit.
+- Links in canvas text cards aren't rewritten, only canvas file cards.
 - Moving the original in Finder by holding ⌘ isn't supported. Outside files are always copied.

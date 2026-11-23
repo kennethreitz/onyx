@@ -55,9 +55,16 @@ public enum MarkdownLinks {
     /// finds a bare file name, `moved` maps old vault paths to new ones. nil = nothing changed.
     public static func rewrite(_ text: String, oldNote: String, newNote: String,
                                exists: (String) -> Bool, resolveName: (String) -> String?, moved: (String) -> String?) -> String? {
+        rewriteCounting(text, oldNote: oldNote, newNote: newNote, exists: exists, resolveName: resolveName, moved: moved)?.text
+    }
+
+    /// `rewrite`, also saying how many links changed.
+    public static func rewriteCounting(_ text: String, oldNote: String, newNote: String,
+                                       exists: (String) -> Bool, resolveName: (String) -> String?,
+                                       moved: (String) -> String?) -> (text: String, count: Int)? {
         let oldDir = (oldNote as NSString).deletingLastPathComponent, newDir = (newNote as NSString).deletingLastPathComponent
         var out = text as NSString
-        var changed = false
+        var count = 0
         for r in destinations(in: text).reversed() {
             let raw = out.substring(with: r)
             let angle = raw.hasPrefix("<") && raw.hasSuffix(">")
@@ -112,8 +119,8 @@ public enum MarkdownLinks {
             let rebuilt = angle ? "<" + np + anchor + ">" : np + anchor
             guard rebuilt != raw else { continue }
             out = out.replacingCharacters(in: r, with: rebuilt) as NSString
-            changed = true
+            count += 1
         }
-        return changed ? out as String : nil
+        return count > 0 ? (out as String, count) : nil
     }
 }

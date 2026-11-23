@@ -141,6 +141,10 @@ struct FilesSettingsPage: View {
                 get: { !(app["useMarkdownLinks"] as? Bool ?? false) },
                 set: { set("useMarkdownLinks", !$0) }))
             caption("Off writes Markdown links, like ![](photo.png), for dropped and pasted files.")
+            Toggle("Automatically update internal links", isOn: Binding(
+                get: { app["alwaysUpdateLinks"] as? Bool ?? false },
+                set: { set("alwaysUpdateLinks", $0) }))
+            caption("When you rename or move a note, attachment, or folder. Off asks first, the way Obsidian does.")
         } header: { settingsHeader("Files and links") }
 
         Section {
