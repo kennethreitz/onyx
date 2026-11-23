@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-11-23
+
 ### Added
 - Return in a list continues it: the same `-` / `*` / `+` bullet, the next number (`1.` / `1)`), or a new unchecked task (`- [ ]`, even after `- [x]`). Indent is kept, and a blockquoted list keeps its `> ` prefix. Return in the middle of an item splits the text onto the new item. Return on an empty item ends the list, or outdents one level if it’s nested, the way Obsidian does. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items. It is one undo step, and it does not fire during IME composition, inside a fenced code block, or in frontmatter. Honors `smartIndentList` in `.obsidian/app.json` (on when the key is missing), also in Settings ▸ Editor.
 
@@ -221,7 +223,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.10...HEAD
+[0.1.10]: https://github.com/kennethreitz/onyx/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kennethreitz/onyx/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/kennethreitz/onyx/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/kennethreitz/onyx/compare/v0.1.6...v0.1.7
