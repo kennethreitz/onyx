@@ -36,7 +36,7 @@
 | <kbd>⌘=</kbd> · <kbd>⌘-</kbd> · <kbd>⌘0</kbd> | Zoom text in · out · actual size (editor and reader together) |
 | <kbd>Esc</kbd> | Put away whatever’s on top. In the editor, when nothing else would consume it, also saves and returns to reading view (Settings ▸ Editor; on by default). Never the other way |
 
-In the editor, <kbd>↩</kbd> in a bulleted, numbered, or task list starts the next item with the same marker (or the next number). Return on an empty item ends the list, or outdents a nested one. <kbd>⇧↩</kbd> inserts a plain newline. <kbd>⇥</kbd> and <kbd>⇧⇥</kbd> indent and outdent list items. This follows `smartIndentList` in the vault’s `app.json` (on by default), also in Settings ▸ Editor.
+In the editor, <kbd>↩</kbd> in a bulleted, numbered, or task list starts the next item with the same marker (or the next number). Return on an empty item ends the list, or outdents a nested one. <kbd>⇧↩</kbd> inserts a plain newline. <kbd>⇥</kbd> and <kbd>⇧⇥</kbd> indent and outdent list items. This follows `smartIndentList` in the vault’s `app.json` (on by default), also in Settings ▸ Editor. Typing a bracket or quote inserts its closer; a selection can be wrapped with those or with `*` `_` `~` `=` (`autoPairBrackets` and `autoPairMarkdown`, also in Settings ▸ Editor).
 
 Open Random Note is in the command palette and the Go menu; it has no default shortcut.
 

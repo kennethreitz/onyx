@@ -22,6 +22,8 @@ Two Settings tabs, **Files & Links** and **Daily Notes**, edit Obsidian's own co
 | Automatically update internal links | `alwaysUpdateLinks` | On: renaming or moving a file updates links to it without asking. Off or unset: Onyx asks first, like Obsidian, and **Always Update** turns this on ([details](attachments.md#renaming-and-moving)). |
 | Default view for new tabs | `defaultViewMode` (`preview`, `source`) | The mode Onyx opens a vault in. |
 | Smart indent lists | `smartIndentList` | Return in a list continues the marker (or ends / outdents an empty item). Off writes a plain newline. Missing means on, as in Obsidian. The toggle is in Settings ▸ Editor. |
+| Auto pair brackets | `autoPairBrackets` | Typing `(`, `[`, `{`, or a quote inserts the closer, with the caret in between. A selection is wrapped. Missing means on. The toggle is in Settings ▸ Editor. |
+| Auto pair Markdown syntax | `autoPairMarkdown` | Typing `*`, `_`, `~`, or `=` wraps a selection (so `**` makes bold). They are not paired without a selection, and not inside fenced code. Missing means on. The toggle is in Settings ▸ Editor. |
 | Excluded files | `userIgnoreFilters` | One folder or path per line. These files are hidden from search, the graph, and the sidebar. **Apply** re-indexes the vault. |
 
 ## Daily Notes (`.obsidian/daily-notes.json`)

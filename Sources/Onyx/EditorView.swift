@@ -51,6 +51,8 @@ final class OnyxTextView: NSTextView {
     var vaultRoot: () -> URL? = { nil }
     /// Obsidian's `smartIndentList` (default on): Return continues a list.
     var smartIndentList: () -> Bool = { true }
+    /// Obsidian's `autoPairBrackets` / `autoPairMarkdown` (default on).
+    var smartPairs: () -> SmartPairs.Settings = { SmartPairs.Settings() }
     override var acceptableDragTypes: [NSPasteboard.PasteboardType] { super.acceptableDragTypes + Self.attachmentDragTypes }
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         let op = super.draggingEntered(sender)
@@ -194,7 +196,6 @@ final class OnyxTextView: NSTextView {
     private var linkLineStart = 0
     private var dismissedOpen: Int?       // absolute offset of the `[[` Esc closed
     private var lastQuery: String?
-    private var typedBracket = false
     private var refreshing = false
 
     var suggestionsVisible: Bool { panel.isVisible }
@@ -314,15 +315,6 @@ final class OnyxTextView: NSTextView {
 
     override func didChangeText() {
         super.didChangeText()
-        let sel = selectedRange()
-        let ns = string as NSString
-        if typedBracket, sel.length == 0, sel.location >= 2, ns.substring(with: NSRange(location: sel.location - 2, length: 2)) == "[[",
-           !(sel.location + 2 <= ns.length && ns.substring(with: NSRange(location: sel.location, length: 2)) == "]]") {
-            typedBracket = false
-            insertText("]]", replacementRange: sel)   // auto-pair
-            setSelectedRange(sel)
-        }
-        typedBracket = false
         refreshSuggestions()
         DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() }
     }
@@ -344,6 +336,30 @@ final class OnyxTextView: NSTextView {
         setSelectedRange(e.selection)
         scrollRangeToVisible(e.selection)
         return true
+    }
+
+    func apply(_ action: SmartPairsAction) {
+        switch action {
+        case .replace(let e): apply(e)
+        case .move(let r): setSelectedRange(r); scrollRangeToVisible(r)
+        }
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        if !hasMarkedText(), let typed = insertString as? String {
+            let range = replacementRange.location == NSNotFound ? selectedRange() : replacementRange
+            if let action = SmartPairs.insert(string, range, typed: typed, settings: smartPairs()) {
+                apply(action); return
+            }
+        }
+        super.insertText(insertString, replacementRange: replacementRange)
+    }
+
+    override func deleteBackward(_ sender: Any?) {
+        if !hasMarkedText(), let e = SmartPairs.deleteBackward(string, selectedRange(), settings: smartPairs()) {
+            apply(e); return
+        }
+        super.deleteBackward(sender)
     }
 
     override func insertNewline(_ sender: Any?) {
@@ -406,12 +422,6 @@ final class OnyxTextView: NSTextView {
             case .pass: break
             }
         }
-        // typing `]` over the auto-paired `]]` steps over it instead of adding a third bracket
-        if mods.isEmpty, event.characters == "]", selectedRange().length == 0, insideOpenLinkBeforeClose() {
-            setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0))
-            return
-        }
-        typedBracket = mods.isEmpty && event.characters == "["
         baseKeyDown(event)
     }
 
@@ -431,20 +441,6 @@ final class OnyxTextView: NSTextView {
         case 126: cmd ? moveToBeginningOfDocument(nil) : moveUp(nil)
         default: if let c = e.characters, !c.isEmpty, !cmd { insertText(c, replacementRange: selectedRange()) }
         }
-    }
-
-    /// True when the caret sits just before a `]` that closes an open `[[` on this line
-    /// (`[[Name¦]]` or `[[Name]¦]`).
-    private func insideOpenLinkBeforeClose() -> Bool {
-        let ns = string as NSString
-        let loc = selectedRange().location
-        guard loc < ns.length, ns.character(at: loc) == 0x5D else { return false }
-        let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
-        let line = ns.substring(with: NSRange(location: lr.location, length: loc - lr.location))
-        if LinkCompletion.context(line: line + "x", caret: line.utf16.count) != nil { return true }
-        // second bracket: `[[Name]¦]`
-        if line.hasSuffix("]"), LinkCompletion.context(line: String(line.dropLast()), caret: line.utf16.count - 1) != nil { return true }
-        return false
     }
 
     override func scrollWheel(with event: NSEvent) { if panel.isVisible { hideSuggestions() }; super.scrollWheel(with: event) }
@@ -506,6 +502,9 @@ struct EditorView: NSViewRepresentable {
         tv.vaultRoot = { [weak ws] in ws?.root }
         tv.smartIndentList = { [weak ws] in
             (ws?.obsidianJSON("app.json") as? [String: Any])?["smartIndentList"] as? Bool ?? true
+        }
+        tv.smartPairs = { [weak ws] in
+            SmartPairs.Settings.from(appJSON: ws?.obsidianJSON("app.json") as? [String: Any])
         }
         tv.onAttach = { [weak ws, weak c = context.coordinator] items in ws?.attachmentLinks(items, note: c?.parent.path) }
         tv.onExtractHeading = { [weak ws] in ws?.beginExtract(heading: true) }

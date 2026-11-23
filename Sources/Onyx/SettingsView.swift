@@ -253,6 +253,22 @@ struct EditorSettingsPage: View {
                     ))
                     Text("Return in a list starts the next item with the same marker, or the next number. Return on an empty item ends the list, or outdents a nested one. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items. Saved as smartIndentList in the vault’s app.json, the same key Obsidian uses.")
                         .font(.system(size: 11)).foregroundStyle(Color.faint)
+                    Toggle("Auto pair brackets", isOn: Binding(
+                        get: {
+                            _ = ws.obsidianConfigRevision
+                            return (ws.obsidianJSON("app.json") as? [String: Any])?["autoPairBrackets"] as? Bool ?? true
+                        },
+                        set: { ws.setObsidianConfig("app.json", ["autoPairBrackets": $0]) }
+                    ))
+                    Toggle("Auto pair Markdown syntax", isOn: Binding(
+                        get: {
+                            _ = ws.obsidianConfigRevision
+                            return (ws.obsidianJSON("app.json") as? [String: Any])?["autoPairMarkdown"] as? Bool ?? true
+                        },
+                        set: { ws.setObsidianConfig("app.json", ["autoPairMarkdown": $0]) }
+                    ))
+                    Text("Brackets and quotes insert their closer, with the caret in between; [[ becomes [[|]]. A selection is wrapped, including * _ ~ = (so ** makes bold). Typing the closer steps over it, and Backspace in an empty pair deletes both. Quotes do not pair mid-word, so don’t is unchanged. Markdown markers are not paired inside fenced code. Saved as autoPairBrackets and autoPairMarkdown in app.json, the same keys Obsidian uses.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
                 }
             } header: { settingsHeader("Keys") }
 
