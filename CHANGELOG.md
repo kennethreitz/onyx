@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-11-23
+
 ### Performance
 - Faster everywhere on a large vault. Timings below are from `onyx-bench` against a copy of a 2,561-note vault (release build, best of 5, Apple silicon). Results are the same as before: search hits, backlinks, Dataview rows, the ⌘O ranking, and every note's parsed links, fields, and headings were diffed old against new on that vault, and they match.
   - Saving a note no longer reindexes the whole vault. Only that note's links, tags, and relations are swapped out: 141 → 2.7 ms per autosave. The file-watcher echo of the save is 117 → 2.8 ms, and 50 files changed one at a time (a sync burst) is 3.2 s → 0.19 s.
@@ -156,7 +158,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/kennethreitz/onyx/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/kennethreitz/onyx/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/kennethreitz/onyx/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/kennethreitz/onyx/compare/v0.1.3...v0.1.4
