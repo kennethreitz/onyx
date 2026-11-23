@@ -312,15 +312,18 @@ Folders sort by their newest modification / oldest creation inside. Saved per va
 
 ## Title-bar graph button
 
-Right of the forward chevron: click opens the focus graph for the current note (⌘G); ⇧-click or
-the right-click menu opens the atlas (⇧⌘G). Hovering it for 400 ms shows the current note's graph
-card. The footer's graph icon remains.
+Right of the forward chevron: click opens the focus graph for the current note (⌘G), and click
+again (or ⌘G again) closes it and returns to the note; ⇧-click or the right-click menu opens the
+atlas (⇧⌘G), and does the same toggle when the atlas is already showing. The button is marked
+while the overlay is open. Hovering it for 400 ms shows the current note's graph card. The
+footer's graph icon remains, and toggles the same way.
 
 
 ## Graph pane and startup atlas
 
 ⌘G / ⇧⌘G (and the title-bar graph button) open the graph as an overlay that covers only the
-focused pane. In a split, the other panes stay visible; Esc or the overlay's close button
+focused pane, and close it if that same graph is already showing (⌘G, or a regular click, also
+closes the atlas). In a split, the other panes stay visible; Esc or the overlay's close button
 puts the graph away and focuses the note that was under it. The overlay is pinned to the
 pane it was opened from, so focusing another pane doesn't move it.
 

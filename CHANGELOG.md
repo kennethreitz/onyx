@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- The title-bar graph button (and ⌘G, the footer graph icon, and the command palette) is a toggle: click it again while the graph overlay is open to close it and return to the note. Shift-click or ⇧⌘G still opens the atlas, and closes it if the atlas is already showing. The title-bar button stays marked while the graph is open.
+
 ## [0.1.7] - 2026-11-23
 
 ### Performance

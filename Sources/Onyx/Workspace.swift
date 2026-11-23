@@ -1360,6 +1360,20 @@ final class Workspace {
     func show(_ o: Overlay) {
         withAnimation(Motion.overlay) { overlay = overlay == o ? .none : o }
     }
+
+    /// Open the graph overlay, or close it if that same graph is already showing.
+    /// A focus-graph request (⌘G, the title-bar button) closes any open graph overlay
+    /// and returns to the note. An atlas request (⇧⌘G, shift-click) switches to the
+    /// atlas if the focus graph is showing, and closes the overlay if the atlas already is.
+    func toggleGraph(atlas: Bool) {
+        if overlay == .graph, !atlas || graphAtlas {
+            show(.none)
+            return
+        }
+        graphAtlas = atlas
+        if overlay != .graph { show(.graph) }
+    }
+
     /// Apply Esc according to `EscPrecedence`. Returns true if the event should be swallowed.
     @discardableResult
     func handleEscape(eventWindow: NSWindow?) -> Bool {

@@ -139,7 +139,7 @@ struct RootView: View {
                 HStack(spacing: 1) {
                     FooterButton(symbol: "sidebar.left", help: "Files (⌘K)", on: ws.sidebarVisible) { ws.toggleDockedSidebar(.files) }
                     FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
-                    FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G)", on: ws.overlay == .graph) { ws.graphAtlas = false; ws.show(.graph) }
+                    FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G) · click again to close", on: ws.overlay == .graph) { ws.toggleGraph(atlas: false) }
                     FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
                     FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarVisible && ws.inspectorPinned && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
                     FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
@@ -659,7 +659,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph overlay · ⇧⌘G atlas · Esc closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
+        ("⌘G", "Focus graph overlay · click or ⌘G again to close · ⇧⌘G atlas · Esc also closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
     ]
 }
 
@@ -770,22 +770,22 @@ struct GitBadge: View {
 }
 
 /// The title bar's graph button, right of the forward chevron: click for the focus graph of this
-/// note (⌘G), ⇧-click or right-click for the atlas (⇧⌘G); hovering shows this note's graph card.
-/// The footer's graph icon stays.
+/// note (⌘G), click again to close it and return to the note; ⇧-click or right-click for the atlas
+/// (⇧⌘G); hovering shows this note's graph card. The footer's graph icon stays.
 struct GraphButton: View {
     @Bindable var ws: Workspace
     @State private var hover = false
+    var on: Bool { ws.overlay == .graph }
     func open(atlas: Bool) {
-        ws.graphAtlas = atlas
-        if ws.overlay != .graph { ws.show(.graph) }
+        ws.toggleGraph(atlas: atlas)
     }
     var body: some View {
         Button { GraphPreviewController.shared.close(); open(atlas: NSEvent.modifierFlags.contains(.shift)) } label: {
             Image(systemName: "point.3.connected.trianglepath.dotted")
                 .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(hover ? Color.ink : Color.muted)
+                .foregroundStyle(on || hover ? Color.ink : Color.muted)
                 .frame(width: 20, height: 20)
-                .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(hover ? 0.06 : 0)))
+                .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(on || hover ? 0.06 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -796,8 +796,9 @@ struct GraphButton: View {
             Button("Atlas (Whole Vault)  ⇧⌘G") { open(atlas: true) }
         }
         .onHover { h in withAnimation(Motion.hover) { hover = h } }
-        .help("Focus graph (⌘G) · ⇧-click or right-click for the atlas (⇧⌘G)")
+        .help("Focus graph (⌘G) · click again to close · ⇧-click or right-click for the atlas (⇧⌘G)")
         .accessibilityLabel("Graph")
+        .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
 

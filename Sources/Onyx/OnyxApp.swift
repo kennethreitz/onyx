@@ -253,8 +253,8 @@ struct OnyxApp: App {
             ShortcutMenus.button("headings", disabled: ws.currentPath == nil) { ws.show(.headings) }
             ShortcutMenus.button("revealtree", disabled: ws.currentPath == nil) { ws.revealInSidebar() }
             Divider()
-            ShortcutMenus.button("graph") { ws.graphAtlas = false; ws.overlay == .graph ? ws.show(.none) : ws.show(.graph) }
-            ShortcutMenus.button("atlas") { ws.graphAtlas = true; if ws.overlay != .graph { ws.show(.graph) } }
+            ShortcutMenus.button("graph") { ws.toggleGraph(atlas: false) }
+            ShortcutMenus.button("atlas") { ws.toggleGraph(atlas: true) }
             ShortcutMenus.button("graphpane", title: ws.graphPaneIndex == nil ? "Graph in a Pane" : "Close Graph Pane") {
                 ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane()
             }
