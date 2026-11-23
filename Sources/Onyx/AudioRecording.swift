@@ -195,7 +195,7 @@ extension Workspace {
     }
 
     func startRecording() {
-        guard let root, let note = currentPath, !isCanvas, !isBase else {
+        guard let root, let note = currentPath, !isCanvas, !isBase, !isFile else {
             toast = "Open a note to record into"
             return
         }

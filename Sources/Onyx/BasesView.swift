@@ -400,11 +400,7 @@ struct BasesView: View {
     }
 
     func open(_ row: BaseRowView) {
-        if row.isNote || row.path.isCanvasPath || row.path.isBasePath {
-            ws.openNote(row.path)
-        } else if let root = ws.root {
-            NSWorkspace.shared.open(root.appendingPathComponent(row.path))
-        }
+        ws.openNote(row.path)   // attachments open in FileView
     }
 
     // MARK: Editing

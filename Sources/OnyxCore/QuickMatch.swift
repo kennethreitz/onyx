@@ -270,6 +270,9 @@ public struct QuickIndex: Sendable {
         let all = made.map { $0! } + (Array(snap.canvases.keys) + Array(snap.bases.keys)).map { p in   // canvases and bases open from ⌘O too
             QuickEntry(path: p, name: MatchKey(((p as NSString).lastPathComponent as NSString).deletingPathExtension), folder: MatchKey((p as NSString).deletingLastPathComponent),
                        aliases: [], mtime: snap.attachments[p] ?? .distantPast, dated: nil)
+        } + snap.attachments.filter { $0.key.opensInFileView }.map { p, mtime in   // attachments too, by full file name (as Obsidian lists them)
+            QuickEntry(path: p, name: MatchKey((p as NSString).lastPathComponent), folder: MatchKey((p as NSString).deletingLastPathComponent),
+                       aliases: [], mtime: mtime, dated: nil)
         }
         entries = all.sorted { $0.path < $1.path }
     }

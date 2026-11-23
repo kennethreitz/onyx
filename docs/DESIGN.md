@@ -44,6 +44,12 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   editor/reader state; unfocused panes keep their own path, text and mode and render
   read-only (dimmed a touch) until clicked or reached with ⌃⇥. Two panes on the same
   note show the live text in both.
+- **File views** (`FileView.swift`, `AudioPlayer.swift`): attachments take the pane like a note does. A 30pt header
+  sits under the title path with kind · size · details in small muted type, then the type's controls and
+  `FooterButton`s for linked notes, Open in Default App, and Reveal in Finder. Under it is the viewer: an NSScrollView
+  image view (fit ≤ 100%), PDFKit on `paperAlt`, AVKit, or the audio player, which is serif title, a 72pt
+  waveform (ink played, faint ahead, a slate playhead), and round ink-wash transport buttons. Reader audio embeds
+  echo it as one line in an 8px card.
 - **Focus mode** ⌃⌘F: pure text; the same keys restore exactly what was showing.
 
 ## Scales

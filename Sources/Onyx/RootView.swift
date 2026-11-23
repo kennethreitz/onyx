@@ -178,6 +178,10 @@ struct RootView: View {
     }
 
     var countText: String {
+        if ws.isFile, let p = ws.currentPath {   // an attachment: its kind and the notes that link here
+            let c = ws.snapshot?.backlinks[p]?.count ?? 0
+            return AttachmentKind.of(p).label + (c > 0 ? " · \(c) backlink\(c == 1 ? "" : "s")" : "")
+        }
         let words = NoteParser.countWords(ws.settledText)
         var s = "\(words.formatted()) words"
         if footerHover {
@@ -265,7 +269,9 @@ struct RootView: View {
     }
 
     @ViewBuilder var soloNote: some View {
-        if ws.isCanvas {
+        if ws.isFile, let p = ws.currentPath {
+            FileView(ws: ws, path: p).id("file-" + p).transition(.opacity)
+        } else if ws.isCanvas {
             CanvasView(ws: ws).transition(.opacity)
         } else if ws.isBase {
             BasesView(ws: ws).transition(.opacity)
@@ -337,7 +343,9 @@ struct RootView: View {
         let focused = i == ws.focusedPane
         let mode = focused ? ws.mode : pane.mode
         let src: (path: String?, text: String)? = focused ? nil : (pane.path, ws.displayText(pane))
-        if (focused ? ws.currentPath : pane.path)?.isCanvasPath == true {
+        if let p = focused ? ws.currentPath : pane.path, p.opensInFileView {
+            FileView(ws: ws, path: p, focused: focused).id("\(pane.id)-f-\(p)")
+        } else if (focused ? ws.currentPath : pane.path)?.isCanvasPath == true {
             CanvasView(ws: ws, source: src).id("\(pane.id)-c")
         } else if (focused ? ws.currentPath : pane.path)?.isBasePath == true {
             BasesView(ws: ws, source: src).id("\(pane.id)-b")
@@ -596,7 +604,7 @@ struct RootView: View {
                 if e.deltaX > 0 { ws.goBack(); return nil }
                 if e.deltaX < 0 { ws.goForward(); return nil }
             case .scrollWheel:
-                guard ws.overlay == .none, !ws.isCanvas, e.phase == .began, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
+                guard ws.overlay == .none, !ws.isCanvas, !ws.isFile, e.phase == .began, NSEvent.isSwipeTrackingFromScrollEventsEnabled,
                       abs(e.scrollingDeltaX) > abs(e.scrollingDeltaY) * 2, ws.canGoBack || ws.canGoForward else { return e }
                 var fired = false
                 e.trackSwipeEvent(options: [.lockDirection, .clampGestureAmount],

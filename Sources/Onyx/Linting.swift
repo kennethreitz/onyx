@@ -17,7 +17,7 @@ extension Workspace {
     /// Lint on save (Settings ▸ Linter, off by default): only explicit saves (⌘S, Save and Read,
     /// Esc to reading, switching notes), never the typing autosave, so a space you just typed survives.
     func lintOnSave() {
-        guard UserDefaults.standard.bool(forKey: LinterKeys.onSave), editedSinceLint, !isCanvas, !isBase else { return }
+        guard UserDefaults.standard.bool(forKey: LinterKeys.onSave), editedSinceLint, !isCanvas, !isBase, !isFile else { return }
         lintCurrentNote(touched: true, announce: false)
         editedSinceLint = false
     }

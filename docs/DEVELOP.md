@@ -111,6 +111,7 @@ key <code> [cmd|shift|opt]
 wait <seconds>
 dump                  # print the note text
 open <path>
+link <target>         # follow [[target]] like a click (attachments open in FileView)
 openat <line> <path>  # open a note scrolled to a source line
 exportpdf <path>      # write the book-page PDF quietly
 split

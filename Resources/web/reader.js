@@ -26,6 +26,33 @@
     return `<a class="internal-link${unresolved ? ' is-unresolved' : ''}" data-path="${esc(path)}" data-target="${esc(l.target)}" data-heading="${esc(l.heading || '')}">${esc(label)}</a>`;
   }
 
+  // Attachment embeds. Each links to Onyx's in-pane viewer (↗); audio gets a quiet player of its own.
+  const fileName = (p) => String(p || '').split('/').pop();
+  const openLink = (path, label) => `<a class="internal-link file-open" data-path="${esc(path)}" data-target="${esc(path)}" title="Open in Onyx">${esc(label)} ↗</a>`;
+  function audioEmbedHTML(url, path) {
+    return `<div class="audio-embed" data-path="${esc(path)}"><button class="ae-play" aria-label="Play"></button>` +
+      `<div class="ae-track"><div class="ae-fill"></div></div><span class="ae-time">0:00</span>${openLink(path, fileName(path))}` +
+      `<audio preload="metadata" src="${esc(url)}"></audio></div>`;
+  }
+  function mediaEmbedHTML(kind, url, path, width) {
+    switch (kind) {
+      case 'audio': return audioEmbedHTML(url, path);
+      case 'video': return `<figure class="file-embed"><video controls preload="metadata" src="${esc(url)}"></video><figcaption>${openLink(path, fileName(path))}</figcaption></figure>`;
+      case 'pdf': return `<figure class="file-embed"><embed class="pdf-embed" src="${esc(url)}" type="application/pdf"><figcaption>${openLink(path, fileName(path))}</figcaption></figure>`;
+      default: return `<img src="${esc(url)}"${width || ''} alt="${esc(fileName(path))}" data-path="${esc(path)}">`;
+    }
+  }
+  const AUDIO_EXT = /\.(mp3|m4a|m4b|aac|wav|aiff?|caf|flac|ogg|oga|opus|3gp)$/i, VIDEO_EXT = /\.(mp4|m4v|mov|webm|mkv|ogv)$/i;
+  const fmtTime = (s) => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, '0'); return h ? `${h}:${String(m).padStart(2, '0')}:${x}` : `${m}:${x}`; };
+  function aeSync(a) {
+    const box = a.closest('.audio-embed'); if (!box) return;
+    const d = isFinite(a.duration) ? a.duration : 0;
+    box.querySelector('.ae-fill').style.width = d ? (100 * a.currentTime / d) + '%' : '0';
+    box.querySelector('.ae-time').textContent = a.paused || !d ? (a.currentTime > 0 ? fmtTime(a.currentTime) + ' / ' : '') + fmtTime(d) : fmtTime(a.currentTime) + ' / ' + fmtTime(d);
+    box.classList.toggle('is-playing', !a.paused && !a.ended);
+  }
+  ['loadedmetadata', 'timeupdate', 'play', 'pause', 'ended'].forEach(t => document.addEventListener(t, (e) => { if (e.target.tagName === 'AUDIO') aeSync(e.target); }, true));
+
   const embedDepth = { n: 0 };
   function embedHTML(inner) {
     const l = parseLink(inner);
@@ -33,10 +60,8 @@
     if (!e) return linkHTML(inner);
     const width = l.alias && /^\d+(x\d+)?$/.test(l.alias) ? ` width="${l.alias.split('x')[0]}"` : '';
     switch (e.type) {
-      case 'image': return `<img src="${e.url}"${width} alt="${esc(l.target)}">`;
-      case 'audio': return `<audio controls src="${e.url}"></audio>`;
-      case 'video': return `<video controls src="${e.url}"></video>`;
-      case 'pdf': return `<embed class="pdf-embed" src="${e.url}" type="application/pdf">`;
+      case 'image': return `<img src="${e.url}"${width} alt="${esc(l.target)}" data-path="${esc(e.path)}">`;
+      case 'audio': case 'video': case 'pdf': return mediaEmbedHTML(e.type, e.url, e.path);
       case 'note':
         if (embedDepth.n > 1) return linkHTML(inner);
         embedDepth.n++;
@@ -90,6 +115,12 @@
     image({ href, title, text }) {
       const mdEmbed = h => { const m = P.mdembeds || {}; if (m[h]) return m[h]; try { return m[decodeURI(h)]; } catch (e) { return undefined; } };
       const src = /^(https?|data|onyx):/i.test(href) ? href : (mdEmbed(href) || P.base + href.replace(/^\.\//, ''));
+      const vault = /^onyx:\/\/vault\//.test(src) ? (() => { try { return decodeURIComponent(src.slice(13)); } catch (e) { return ''; } })() : '';
+      const bare = href.split(/[?#]/)[0];
+      if (vault && AUDIO_EXT.test(bare)) return mediaEmbedHTML('audio', src, vault);
+      if (vault && VIDEO_EXT.test(bare)) return mediaEmbedHTML('video', src, vault);
+      if (vault && /\.pdf$/i.test(bare)) return mediaEmbedHTML('pdf', src, vault);
+      if (vault) return `<img src="${esc(src)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ''} data-path="${esc(vault)}">`;
       return `<img src="${esc(src)}" alt="${esc(text)}"${title ? ` title="${esc(title)}"` : ''}>`;
     },
     blockquote({ tokens }) {
@@ -720,7 +751,13 @@
     if (dv) { e.preventDefault(); post({ type: 'dvtask', path: dv.dataset.path || '', index: +dv.dataset.index }); return; }
     const cb = e.target.closest('input[type=checkbox][data-task]');
     if (cb) { e.preventDefault(); post({ type: 'task', index: +cb.dataset.task }); return; }
+    const play = e.target.closest('.ae-play');
+    if (play) { const au = play.parentElement.querySelector('audio'); if (au) { if (au.paused) { document.querySelectorAll('.audio-embed audio').forEach(o => { if (o !== au) o.pause(); }); au.play(); } else au.pause(); } return; }
+    const track = e.target.closest('.ae-track');
+    if (track) { const au = track.parentElement.querySelector('audio'); const r = track.getBoundingClientRect(); if (au && isFinite(au.duration)) { au.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * au.duration; aeSync(au); } return; }
     const a = e.target.closest('a');
+    const img = !a && e.target.closest('img[data-path]');
+    if (img && img.dataset.path) { post({ type: 'open', path: img.dataset.path, target: img.dataset.path }); return; }   // an image opens in the viewer
     if (!a) return;
     if (a.classList.contains('tag')) { e.preventDefault(); post({ type: 'tag', tag: a.dataset.tag }); return; }
     if (a.classList.contains('internal-link')) {

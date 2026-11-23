@@ -14,7 +14,7 @@ extension Workspace {
 
     /// Merge the open note into a note the user picks in the quick switcher.
     func beginMerge() {
-        guard currentPath != nil, !isCanvas, !isBase, currentPath?.lowercased().hasSuffix(".md") == true else {
+        guard currentPath != nil, !isCanvas, !isBase, !isFile, currentPath?.lowercased().hasSuffix(".md") == true else {
             NSSound.beep(); return
         }
         flushSave()
@@ -41,7 +41,7 @@ extension Workspace {
 
     /// Extract the current selection, or a heading section, into a new or existing note.
     func beginExtract(heading: Bool = false) {
-        guard currentPath != nil, !isCanvas, !isBase else { NSSound.beep(); return }
+        guard currentPath != nil, !isCanvas, !isBase, !isFile else { NSSound.beep(); return }
         flushSave()
         if mode != .edit {
             withAnimation(.easeInOut(duration: 0.18)) { mode = .edit }

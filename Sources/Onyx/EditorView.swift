@@ -167,6 +167,8 @@ final class OnyxTextView: NSTextView {
         if let m = MarkdownHighlighter.url.matches(in: string, range: lr).first(where: { NSLocationInRange(idx, $0.range) }), let u = URL(string: ns.substring(with: m.range)) {
             NSWorkspace.shared.open(u); return nil
         }
+        // [text](file.pdf) / ![](img.png): local Markdown links follow like wikilinks
+        if let t = MarkdownLinkHit.target(in: ns.substring(with: lr), at: idx - lr.location) { return t }
         return nil
     }
 

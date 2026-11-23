@@ -387,13 +387,14 @@ enum PaletteCommands {
         }
         if q.trimmingCharacters(in: .whitespaces).isEmpty {
             // recent notes; a fresh vault falls back to the most recently edited
-            var paths = ws.recent.filter { snap.notes[$0] != nil || snap.canvases[$0] != nil || snap.bases[$0] != nil }
+            var paths = ws.recent.filter { snap.notes[$0] != nil || snap.attachments[$0] != nil }
             if paths.count < 12 {
                 let edited = snap.notes.values.sorted { $0.mtime > $1.mtime }.map(\.path)
                 for p in edited where !paths.contains(p) { paths.append(p); if paths.count >= 12 { break } }
             }
             return paths.prefix(12).compactMap { p in
                 if let n = snap.notes[p] { return item(p, n.name, n.folder) }
+                if p.opensInFileView, snap.attachments[p] != nil { return item(p, (p as NSString).lastPathComponent, (p as NSString).deletingLastPathComponent) }
                 if snap.canvases[p] != nil || snap.bases[p] != nil {
                     return item(p, ((p as NSString).lastPathComponent as NSString).deletingPathExtension, (p as NSString).deletingLastPathComponent)
                 }

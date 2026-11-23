@@ -116,8 +116,7 @@ struct CanvasView: NSViewRepresentable {
                 if ws.text != formatted { ws.text = formatted }
             case "openFile":
                 guard let p = body["path"] as? String, !p.isEmpty else { return }
-                if ws.snapshot?.notes[p] != nil || ws.snapshot?.canvases[p] != nil { ws.openNote(p) }
-                else if let r = ws.root, FileManager.default.fileExists(atPath: r.appendingPathComponent(p).path) { NSWorkspace.shared.open(r.appendingPathComponent(p)) }
+                if ws.snapshot?.notes[p] != nil || ws.snapshot?.attachments[p] != nil { ws.openNote(p) }
             case "open":
                 if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil { ws.openNote(p, heading: body["heading"] as? String) }
                 else if let t = body["target"] as? String, !t.isEmpty { ws.openLink(t, from: path) }

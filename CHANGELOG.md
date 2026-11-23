@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Attachments open in the pane, like notes ([docs](docs/attachments.md#opening-attachments)). Click an embed or link in the reader, ⌘-click `[[file]]`, `![[file]]` or `[text](file)` in the editor, or open the file from the sidebar, the quick switcher (attachments are listed by full file name), Recent, a canvas, or a base. ⌘[ (or the header's back chevron) goes back to the note. Before, they opened in another app or did nothing.
+  - **Audio**: Onyx's own player. It has a waveform scrubber (click or drag to seek), elapsed and remaining time, play/pause (Space), 15-second skips (← →), speed from 0.75× to 2× (remembered, pitch kept), and volume. When Record Audio left a transcript under the embed, the player shows it with a link back to that note. Playback stops when you leave the file. It plays m4a, mp3, aac, wav, aiff, caf, flac, and 3gp. Formats AVFoundation can't play (Ogg, Opus) get a file card instead.
+  - **Images**: fit to the pane by default (never enlarged past 100%), zoom in/out from the header or by pinching, actual size, drag to pan, and double-click to switch between fit and actual size. GIFs animate. The header shows pixel dimensions.
+  - **PDFs**: PDFKit with continuous pages, page n / N with previous and next, zoom and fit-width, and find (↩ next match, ⇧↩ previous, highlighting every hit).
+  - **Video**: AVKit's player, with duration and dimensions in the header.
+  - **Anything else**: a file card with its icon, type, size and date, plus Open in Default App and Reveal in Finder.
+  - Every file view's header shows the file's kind and size, the notes that link to it, Open in Default App, and Reveal in Finder.
+- Reader audio embeds are a quiet one-line player in Onyx's chrome scales, replacing WebKit's default control: play/pause, a hairline progress track you click to seek, time, and the file name, which opens the full player. Starting one embed pauses the others. Video and PDF embeds get the same "name ↗" link to their viewer, and clicking an embedded image opens it in the image viewer. Markdown embeds of audio, video and PDFs (`![](clip.mp3)`) render as players and PDFs too, where before they showed a broken image.
 - Drag, drop, and paste attachments into the editor, as in Obsidian ([docs](docs/attachments.md)).
   - What you can add:
     - files from Finder, several at once;

@@ -9,7 +9,7 @@ extension Workspace {
     var foldStore: FoldStore? { FoldStores.store(for: root) }
 
     func runFold(_ id: String) {
-        guard currentPath != nil, !isCanvas, !isBase else { NSSound.beep(); return }
+        guard currentPath != nil, !isCanvas, !isBase, !isFile else { NSSound.beep(); return }
         if mode == .edit, let tv = (MainWindow.current?.firstResponder as? OnyxTextView) ?? liveEditor {
             let f = tv.folds
             var ok = true

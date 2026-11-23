@@ -140,10 +140,13 @@ final class Workspace {
     var isCanvas: Bool { currentPath?.isCanvasPath == true }
     /// The open file is an Obsidian Base (shown by BasesView, read-only YAML).
     var isBase: Bool { currentPath?.isBasePath == true }
+    /// The open file is an attachment (image, audio, video, PDF or anything else), shown by FileView.
+    var isFile: Bool { currentPath?.opensInFileView == true }
     /// Folder and name for the title path (notes, canvases and bases).
     var titleParts: (folder: String, name: String)? {
         if let n = currentNote { return (n.folder, n.name) }
-        guard let p = currentPath, isCanvas || isBase else { return nil }
+        guard let p = currentPath, isCanvas || isBase || isFile else { return nil }
+        if isFile { return ((p as NSString).deletingLastPathComponent, (p as NSString).lastPathComponent) }   // attachments keep their extension
         return ((p as NSString).deletingLastPathComponent, ((p as NSString).lastPathComponent as NSString).deletingPathExtension)
     }
     /// Title-bar crumbs: the `partOf` ancestry when the note has one, else its folders.
@@ -280,7 +283,6 @@ final class Workspace {
         guard let snap = snapshot else { return }
         let link = NoteParser.makeLink(inner: target, embed: false, range: NSRange())
         if let p = snap.resolve(link.target, from: source ?? currentPath) {
-            if snap.isAttachment(p), !p.isCanvasPath, !p.isBasePath, let root { NSWorkspace.shared.open(root.appendingPathComponent(p)); return }
             openNote(p, heading: link.heading)
         } else if !link.target.isEmpty {
             createNote(named: link.target, folder: "")   // like Obsidian: clicking an unresolved link creates it
@@ -296,6 +298,8 @@ final class Workspace {
             content = (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? ""
         } else if path.isBasePath, snap.bases[path] != nil, let root {
             content = snap.bases[path] ?? (try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)) ?? ""
+        } else if path.opensInFileView, let root, snap.attachments[path] != nil || FileManager.default.fileExists(atPath: root.appendingPathComponent(path).path) {
+            content = ""   // an attachment: FileView reads the file itself; the text buffer stays empty and is never saved
         } else { return }
         if currentPath != path { lintOnSave() }
         flushSave()
@@ -423,7 +427,7 @@ final class Workspace {
         let j = historyIndex + step
         guard history.indices.contains(j) else { return }
         // a note that's gone (trashed, renamed elsewhere) is skipped
-        if case .note(let p) = history[j].place, snapshot?.notes[p] == nil, snapshot?.canvases[p] == nil, snapshot?.bases[p] == nil {
+        if case .note(let p) = history[j].place, snapshot?.notes[p] == nil, snapshot?.canvases[p] == nil, snapshot?.bases[p] == nil, snapshot?.attachments[p] == nil {
             history.remove(at: j)
             if step < 0 { historyIndex = j } // current entry slid down into j
             return go(step)
@@ -1162,7 +1166,7 @@ final class Workspace {
     /// Conflict-safe save. If the file changed on disk since we loaded it
     /// (Obsidian Sync, git, another bot) we never overwrite it blindly.
     func save() {
-        guard let path = currentPath, let root, isDirty else { return }
+        guard let path = currentPath, let root, isDirty, !path.opensInFileView else { return }   // never write text over an attachment
         let url = root.appendingPathComponent(path)
         if let disk = try? String(contentsOf: url, encoding: .utf8), disk != lastSaved, disk != text {
             conflict = disk
@@ -1321,7 +1325,7 @@ final class Workspace {
             snap.refresh(paths: stale + others)
             snapshot = snap
         }
-        if let cur = currentPath, snap.notes[cur] == nil, snap.canvases[cur] == nil, snap.bases[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
+        if let cur = currentPath, snap.notes[cur] == nil, snap.canvases[cur] == nil, snap.bases[cur] == nil, snap.attachments[cur] == nil, !FileManager.default.fileExists(atPath: root.appendingPathComponent(cur).path) {
             toast = "“\((cur as NSString).lastPathComponent)” was moved or deleted elsewhere"
         }
         if external { externalPulse = Date(); lastExternalChange = Date(); git?.edited() }
@@ -1507,7 +1511,7 @@ final class Workspace {
 
     /// Speaks the current selection, or the whole note if there isn't one.
     func readAloud() {
-        guard currentPath != nil, !isCanvas, !isBase else {
+        guard currentPath != nil, !isCanvas, !isBase, !isFile else {
             toast = "Nothing to read"
             return
         }

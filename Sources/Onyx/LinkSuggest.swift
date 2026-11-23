@@ -169,6 +169,7 @@ enum TypeSelfTest {
         let arg = line.split(separator: " ", maxSplits: 1).dropFirst().first.map(String.init) ?? ""
         switch line.split(separator: " ").first ?? "" {
         case "open": ws.openNote(arg)
+        case "link": ws.openLink(arg)   // follow [[arg]] the way a click does (attachments open in FileView)
         case "newfolder":
             let p = ws.createFolder(in: arg.isEmpty ? nil : arg, prompt: false)
             print("[newfolder] \(p ?? "failed") folders=\(ws.snapshot?.folders.sorted().joined(separator: ",") ?? "-") selected=\(ws.selectedFolder ?? "-")")
@@ -198,7 +199,7 @@ enum TypeSelfTest {
             if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
         case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view
             let m: NSEvent.ModifierFlags = line.hasPrefix("shift") ? .shift : line.hasPrefix("cmd") ? .command : []
-            ws.treeClick(arg, modifiers: m) { if arg.lowercased().hasSuffix(".md") || arg.isCanvasPath || arg.isBasePath { ws.openNote(arg) } }
+            ws.treeClick(arg, modifiers: m) { ws.openNote(arg) }
         case "rowhit", "rowhitcmd", "rowhitshift":
             // A real mouseDown on the sidebar row (not a shortcut into treeClick), so this
             // exercises the same path as a pointer click, including modifier flags.

@@ -78,7 +78,7 @@ struct SidebarView: View {
                 switch ws.sidebarTab {
                 case .files: FileTreeView(ws: ws)
                 case .search: SearchPanel(ws: ws)
-                case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.canvases[$0] != nil }, empty: "Nothing opened yet.", hint: "Notes you open land here, newest first.")
+                case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.attachments[$0] != nil }, empty: "Nothing opened yet.", hint: "Notes you open land here, newest first.")
                 case .bookmarks: BookmarksPanel(ws: ws)
                 case .tags: TagsPanel(ws: ws)
                 case .git: GitPanel(ws: ws)
@@ -463,8 +463,7 @@ struct TreeNodeView: View {
             let a = FolderTreeClick.action(.row, hasFolderNote: node.folderNote != nil)
             if a.toggleExpansion { toggle() }
             if a.openFolderNote, let fn = node.folderNote { ws.openNote(fn, revealInTree: false) }
-        } else if node.isNote || node.path.isCanvasPath || node.path.isBasePath { ws.openNote(node.path) }
-        else if let r = ws.root { NSWorkspace.shared.open(r.appendingPathComponent(node.path)) }
+        } else { ws.openNote(node.path) }   // notes, canvases, bases, and attachments (FileView)
     }
 }
 

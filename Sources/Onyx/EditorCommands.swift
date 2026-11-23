@@ -16,7 +16,7 @@ extension Workspace {
     /// Run a transform on the live editor and apply it as one undoable change. From the reader,
     /// switch to editing first.
     func applyEdit(retry: Bool = true, _ f: @escaping (String, NSRange) -> TextEdit?) {
-        guard currentPath != nil, !isCanvas, !isBase else { NSSound.beep(); return }
+        guard currentPath != nil, !isCanvas, !isBase, !isFile else { NSSound.beep(); return }
         if mode != .edit {
             guard retry else { NSSound.beep(); return }
             withAnimation(Motion.fade) { mode = .edit }
@@ -150,7 +150,7 @@ extension Workspace {
 
     /// Copy the open note next to itself as “Name 2.md” and open the copy.
     func duplicateCurrent() {
-        guard let p = currentPath, !isCanvas, !isBase else { NSSound.beep(); return }
+        guard let p = currentPath, !isCanvas, !isBase, !isFile else { NSSound.beep(); return }
         flushSave()
         let base = String(p.dropLast(3))
         var n = 2, dest = "\(base) \(n).md"

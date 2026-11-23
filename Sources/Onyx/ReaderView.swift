@@ -214,7 +214,7 @@ struct ReaderView: NSViewRepresentable {
             if preview, !["open", "url", "tag"].contains(type) { return }   // a preview only navigates
             switch type {
             case "open":
-                if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil || ws.snapshot?.canvases[p] != nil {
+                if let p = body["path"] as? String, !p.isEmpty, ws.snapshot?.notes[p] != nil || ws.snapshot?.attachments[p] != nil {
                     GraphPreviewController.shared.close()
                     if let line = body["line"] as? Int { ws.openNote(p, line: line) }
                     else { ws.openNote(p, heading: body["heading"] as? String) }
@@ -305,8 +305,7 @@ enum ReaderPayload {
                         embeds[key] = ["type": "note", "path": r, "markdown": pretty, "name": note.name]
                         if depth < 1 { resolveAll(md, from: r, depth: depth + 1) }
                     } else {
-                        let ext = (r as NSString).pathExtension.lowercased()
-                        let kind = ["png", "jpg", "jpeg", "gif", "webp", "svg", "avif", "heic", "bmp"].contains(ext) ? "image" : (ext == "pdf" ? "pdf" : (["mp3", "m4a", "wav", "ogg", "flac"].contains(ext) ? "audio" : (["mp4", "mov", "webm"].contains(ext) ? "video" : "file")))
+                        let k = AttachmentKind.of(r), kind = k == .other ? "file" : k.rawValue
                         embeds[key] = ["type": kind, "path": r, "url": "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)]
                     }
                 }

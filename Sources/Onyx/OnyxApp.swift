@@ -223,7 +223,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("rename", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmRenameCurrent() }
             ShortcutMenus.button("move", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.beginMoveCurrent() }
             ShortcutMenus.button("delete", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmTrashCurrent() }
-            ShortcutMenus.button("duplicate", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.duplicateCurrent() }
+            ShortcutMenus.button("duplicate", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile) { ws.duplicateCurrent() }
             Divider()
             ShortcutMenus.button("copypath", disabled: ws.currentPath == nil) { ws.copyFilePath() }
             ShortcutMenus.button("openexternal", disabled: ws.currentPath == nil) { ws.openInDefaultApp() }
@@ -274,7 +274,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("focus", title: ws.focusMode ? "Leave Focus Mode" : "Focus Mode") { ws.toggleFocusMode() }
             Menu("Folding") {
                 ForEach(Workspace.foldMenu, id: \.self) { id in
-                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.runFold(id) }
+                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile || ws.overlay != .none) { ws.runFold(id) }
                 }
             }
             Divider()
@@ -313,14 +313,14 @@ struct OnyxApp: App {
             Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)
             Button("Find Previous (⇧⌘G while finding)") { ws.findStep(-1) }.disabled(!ws.finder.visible)
             Divider()
-            ShortcutMenus.button("merge", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginMerge() }
-            ShortcutMenus.button("extract", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginExtract() }
-            ShortcutMenus.button("extractheading", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.beginExtract(heading: true) }
+            ShortcutMenus.button("merge", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.isFile || ws.overlay != .none) { ws.beginMerge() }
+            ShortcutMenus.button("extract", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.isFile || ws.overlay != .none) { ws.beginExtract() }
+            ShortcutMenus.button("extractheading", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true || ws.isCanvas || ws.isBase || ws.isFile || ws.overlay != .none) { ws.beginExtract(heading: true) }
         }
         CommandMenu("Format") {
             ForEach(Array(Workspace.formatMenu.enumerated()), id: \.offset) { _, id in
                 if let id {
-                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.overlay != .none) { ws.runEditCommand(id) }
+                    ShortcutMenus.button(id, disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile || ws.overlay != .none) { ws.runEditCommand(id) }
                 } else { Divider() }
             }
         }
@@ -332,11 +332,11 @@ struct OnyxApp: App {
             Divider()
             ShortcutMenus.button("lint", disabled: ws.currentPath?.lowercased().hasSuffix(".md") != true) { ws.lintCurrentNote() }
             ShortcutMenus.button("lintfolder", disabled: ws.root == nil) { ws.chooseLintFolder() }
-            ShortcutMenus.button("readaloud", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase) { ws.readAloud() }
+            ShortcutMenus.button("readaloud", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile) { ws.readAloud() }
             ShortcutMenus.button("readpause", title: ws.speech.state == .paused ? "Resume Reading" : "Pause Reading", disabled: !ws.speech.isActive) { ws.toggleSpeechPause() }
             ShortcutMenus.button("readstop", disabled: !ws.speech.isActive) { ws.stopSpeech() }
             ShortcutMenus.button("record", title: ws.recorder.isRecording ? "Stop Recording" : "Record Audio",
-                                 disabled: !ws.recorder.isRecording && (ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.recorder.isActive)) { ws.toggleRecording() }
+                                 disabled: !ws.recorder.isRecording && (ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile || ws.recorder.isActive)) { ws.toggleRecording() }
             Divider()
             ShortcutMenus.button("reindex") { ws.reindex() }
             ShortcutMenus.button("hints") { withAnimation(Motion.quick) { ws.showHints = true } }
