@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.12] - 2026-11-23
+
 ### Added
 - Smart pairs in the editor, like Obsidian's Auto pair brackets and Auto pair Markdown syntax. Typing `(`, `[`, `{`, or a quote (`"`, `'`, `` ` ``) inserts the closer with the caret in between; `[[` becomes `[[|]]` and still works with wikilink autocomplete. Quotes do not pair mid-word, so `don't` is left alone. With a selection, those and `*` `_` `~` `=` wrap the text (type `*` twice for `**bold**`) and keep the inner selection. Typing the closer when it is already the next character steps over it. Backspace in an empty pair deletes both. Markdown markers are not auto-paired without a selection, and are left alone inside fenced code. Each action is one undo step, and IME composition is not intercepted. Honors `autoPairBrackets` and `autoPairMarkdown` in `.obsidian/app.json` (on when missing), also in Settings ▸ Editor.
 
@@ -231,7 +233,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.11...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.12...HEAD
+[0.1.12]: https://github.com/kennethreitz/onyx/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/kennethreitz/onyx/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/kennethreitz/onyx/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/kennethreitz/onyx/compare/v0.1.8...v0.1.9
