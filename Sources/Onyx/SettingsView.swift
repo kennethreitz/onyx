@@ -67,7 +67,7 @@ enum SettingsTab: String, CaseIterable, Hashable, Identifiable {
         case .editor: "character.cursor.ibeam"
         case .shortcuts: "keyboard"
         case .reading: "book"
-        case .graph: "point.3.connected.trianglepath"
+        case .graph: "point.3.connected.trianglepath.dotted"
         case .sync: "arrow.triangle.2.circlepath.icloud"
         case .updates: "arrow.down.app"
         }

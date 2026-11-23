@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The title-bar graph button (and ⌘G, the footer graph icon, and the command palette) is a toggle: click it again while the graph overlay is open to close it and return to the note. Shift-click or ⇧⌘G still opens the atlas, and closes it if the atlas is already showing. The title-bar button stays marked while the graph is open.
 
 ### Fixed
+- The Graph tab in Settings showed no icon: it used `point.3.connected.trianglepath`, which is not an SF Symbol. It now uses `point.3.connected.trianglepath.dotted`, the same icon as the title-bar graph button.
 - Markdown image embeds (`![](…)`) in the reader resolve as Obsidian resolves them: next to the note, then from the vault root, then by name. Before, they only worked relative to the note.
 
 ## [0.1.7] - 2026-11-23
