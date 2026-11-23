@@ -14,7 +14,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Save | <kbd>⌘S</kbd> |
 | Rename File… | — |
 | Move Note to… | <kbd>⇧⌘M</kbd> |
-| Delete Note… | <kbd>⌘⌫</kbd> |
+| Delete Note… | — |
 | Export as PDF… | <kbd>⇧⌘E</kbd> |
 | Export Selection as PDF… | — |
 | Export Folder as PDF… | — |
@@ -23,6 +23,8 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Copy File Path | — |
 | Open in Default App | — |
 | Open Settings… | — |
+
+<kbd>⌘⌫</kbd> is not bound to Delete Note…, so the editor can use it to delete to the start of the line. When the file tree has focus, <kbd>⌘⌫</kbd> still deletes the selected file(s) to the Trash, after a confirm, like Finder. The command stays in the File menu and the palette.
 
 ## Edit
 

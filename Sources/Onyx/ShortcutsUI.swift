@@ -76,9 +76,11 @@ enum ShortcutMenus {
         if id == "closepane", chords.count == 1, chords.first == .command("w") {
             Button("Close Pane  (⌘W)", action: run).disabled(disabled)
         } else {
-            Button(title, action: run).commandShortcut(chords.first).disabled(disabled)
-            if chords.count > 1 {
-                Button(title + " ", action: run).commandShortcut(chords[1]).disabled(disabled)
+            // ⌘⌫ / ⌥⌫ stay with the focused text view. The file tree handles ⌘⌫ itself.
+            let menu = chords.filter { !$0.yieldsToTextInput }
+            Button(title, action: run).commandShortcut(menu.first).disabled(disabled)
+            if menu.count > 1 {
+                Button(title + " ", action: run).commandShortcut(menu[1]).disabled(disabled)
             }
         }
     }

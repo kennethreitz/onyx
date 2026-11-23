@@ -223,7 +223,7 @@ struct OnyxApp: App {
         CommandGroup(after: .saveItem) {
             ShortcutMenus.button("save") { ws.lintOnSave(); ws.flushSave() }
             Divider()
-            // Delete is disabled while a palette is open, so text fields there keep ⌘⌫
+            // Delete is disabled while a palette is open; ⌘⌫ is also kept off the menu item so the editor and text fields can use it.
             ShortcutMenus.button("rename", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmRenameCurrent() }
             ShortcutMenus.button("move", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.beginMoveCurrent() }
             ShortcutMenus.button("delete", disabled: ws.currentPath == nil || ws.overlay != .none) { ws.confirmTrashCurrent() }

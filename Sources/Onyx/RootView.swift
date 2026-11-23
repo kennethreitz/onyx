@@ -540,6 +540,11 @@ struct RootView: View {
 
     // MARK: Events
 
+    /// Field editors are NSTextViews, so this covers the note editor, find, palettes, and inline rename.
+    static func isTextInput(_ responder: NSResponder?) -> Bool {
+        responder is NSTextView || responder is NSTextField
+    }
+
     func installMonitors() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
             if ProcessInfo.processInfo.environment["ONYX_DEBUG_KEYS"] != nil {
@@ -587,9 +592,12 @@ struct RootView: View {
                 if KeyChord.matches(e, command: "back") { ws.goBack(); return nil }
                 if KeyChord.matches(e, command: "forward") { ws.goForward(); return nil }
             }
-            // ⌘⌫ right after clicking in the file tree deletes the tree selection (one confirm)
+            // ⌘⌫ in the file tree deletes the selection (one confirm), like Finder.
+            // If a text view or field is first responder — the editor, a palette,
+            // or an inline rename — the event goes through as delete-to-beginning-of-line.
             if mods == [.command], e.keyCode == 51, ws.treeFocused, ws.sidebarVisible, ws.sidebarTab == .files,
-               ws.treeSelection.count > 0, ws.overlay == .none, e.window != nil, e.window === MainWindow.current {
+               ws.treeSelection.count > 0, ws.overlay == .none, e.window != nil, e.window === MainWindow.current,
+               !Self.isTextInput(e.window?.firstResponder) {
                 let sel = TreeSelection.roots(ws.treeSelection.selected)
                 DispatchQueue.main.async { ws.confirmTrash(sel) }
                 return nil
@@ -687,7 +695,7 @@ enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
         ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
-        ("⌘G", "Focus graph overlay · click or ⌘G again to close · ⇧⌘G atlas · Esc also closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete note · or the sidebar selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
+        ("⌘G", "Focus graph overlay · click or ⌘G again to close · ⇧⌘G atlas · Esc also closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete to the start of the line · in the sidebar, delete the selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
     ]
 }
 

@@ -94,7 +94,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌃⇥ / ⌃⇧⇥ | Next / previous pane (click also focuses) |
 | ⌘[ ⌘] | Back / forward through this pane's history (also mouse buttons 4/5, swipe) |
 | ⌥⌘[ ⌥⌘] | Previous / next daily note |
-| ⌘⌫ | Delete note: confirm, then the Trash; panes and history move on (replaces the editor's delete-to-line-start) |
+| ⌘⌫ | In the editor or a text field, delete to the start of the line (or the selection). In the file tree, delete the selection to the Trash, after a confirm |
 | ⌘N | New note (in the selected folder, or next to the open note). ⌘S names a still-Untitled file from its first heading |
 | ⇧⌘N | New folder |
 | ⌃⌘F | Focus mode |
@@ -223,7 +223,7 @@ horizontal swipe when the system setting allows it (outside overlays). The title
 
 Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
 New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
-Delete…. Delete Note… is also in the File menu and the palette (⌘⌫). Delete always confirms and
+Delete…. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
 always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. A new Untitled
 note is named from its first heading (or first line) when you save or leave it. Afterwards the
 note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),
@@ -235,7 +235,7 @@ visible rows between the anchor and the click; ⌘-click toggles a row without c
 (the anchor moves to it). Selected rows share one highlight; during a multi-selection the open note,
 if not selected, keeps only a faint one. Right-clicking a selected row gives a selection menu: Move N
 Items to…, Reveal N Items in Finder, Delete N Items… (Open, Rename and Open in Obsidian are shown
-disabled). ⌘⌫ deletes the selection when the last click was in the tree; Esc clears it. A folder
+disabled). ⌘⌫ deletes the selection when the last click was in the tree and no text field is editing; Esc clears it. A folder
 in the selection swallows its selected descendants (`TreeSelection.roots`). Batch moves rewrite
 links per item but report one vault change, and batch deletes are one Trash call, so git sync makes
 one commit per batch ("Move 3 items: a, b, c → Folder", "Delete a and b").

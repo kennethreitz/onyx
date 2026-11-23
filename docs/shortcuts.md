@@ -19,7 +19,7 @@
 | <kbd>⌘W</kbd> | Close the focused pane (the window, when there’s one pane). Closing the last window leaves Onyx running; the Dock icon or File ▸ New Window restores it. ⌘Q quits |
 | <kbd>⌃⇥</kbd> · <kbd>⌃⇧⇥</kbd> | Next / previous pane |
 | <kbd>⌘[</kbd> · <kbd>⌘]</kbd> | Back / forward (per pane; mouse buttons and swipe too) |
-| <kbd>⌘⌫</kbd> | Delete note (to the Trash, after a confirm). After clicking in the sidebar, deletes the selection |
+| <kbd>⌘⌫</kbd> | In the editor or any text field, delete from the caret to the start of the line (or the selection). After clicking in the sidebar, delete the selected file(s) to the Trash, after a confirm |
 | <kbd>⇧</kbd>/<kbd>⌘</kbd>-click | Sidebar multi-select (range / toggle); right-click to Move, Reveal, or Delete them all; Esc clears |
 | <kbd>⌘</kbd>-drag | Move the selected sidebar rows into a folder, or into the vault root (drop on the empty area). A folder can’t be moved into itself |
 | <kbd>↩</kbd> | Rename the selected sidebar row, when the file tree is focused. Enter commits, Esc or an empty or unchanged name cancels |
@@ -44,7 +44,7 @@ Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette an
 
 Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
 
-Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, and ⌘Z stay with the editor and are not rebound here.
+Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, ⌘Z, ⌘⌫ (delete to the start of the line), and ⌥⌫ (delete the previous word) stay with the editor and are not rebound here.
 
 Lint Current Note and Lint All Notes in Folder… are in the command palette and the Note menu; they have no default shortcut. See [Linter](linter.md).
 

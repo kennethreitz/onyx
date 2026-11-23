@@ -29,7 +29,7 @@ final class ShortcutStoreTests: XCTestCase {
         XCTAssertEqual(store.display(for: "openvault"), "⇧⌘O")
         XCTAssertEqual(store.display(for: "save"), "⌘S")
         XCTAssertEqual(store.display(for: "move"), "⇧⌘M")
-        XCTAssertEqual(store.display(for: "delete"), "⌘⌫")
+        XCTAssertEqual(store.chords(for: "delete"), [])
         XCTAssertEqual(store.display(for: "exportpdf"), "⇧⌘E")
         XCTAssertEqual(store.display(for: "print"), "⌥⌘P")
         XCTAssertEqual(store.display(for: "daily"), "⌘T  ⌘\\")
@@ -131,9 +131,16 @@ final class ShortcutStoreTests: XCTestCase {
         XCTAssertEqual(store.evaluate(.command("q"), for: "graph").reservedReason, "Quit")
         XCTAssertEqual(store.evaluate(.command("c"), for: "graph").reservedReason, "Copy")
         XCTAssertEqual(store.evaluate(.command(","), for: "graph").reservedReason, "Settings")
+        XCTAssertEqual(store.evaluate(.command("\u{7F}"), for: "delete").reservedReason, "Delete to Beginning of Line")
+        XCTAssertEqual(store.evaluate(.chord("\u{7F}", .option), for: "delete").reservedReason, "Delete Word Backward")
         XCTAssertNil(store.evaluate(.command("g"), for: "graph").reservedReason)
         XCTAssertTrue(KeyChord.command("q").isReserved)
         XCTAssertFalse(KeyChord.command("w").isReserved)
+        XCTAssertTrue(KeyChord.command("\u{7F}").yieldsToTextInput)
+        XCTAssertTrue(KeyChord.command("\u{08}").yieldsToTextInput)
+        XCTAssertTrue(KeyChord.chord("\u{7F}", .option).yieldsToTextInput)
+        XCTAssertFalse(KeyChord.command("\u{7F}", shift: true).yieldsToTextInput)
+        XCTAssertFalse(KeyChord.command("w").yieldsToTextInput)
     }
 
     func testResetAllAndPersistenceRoundTrip() {

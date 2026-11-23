@@ -46,7 +46,7 @@ public enum CommandCatalog {
         cmd("save", "Save", .file, [.command("s")]),
         cmd("rename", "Rename File…", .file, [], "pencil.line"),
         cmd("move", "Move Note to…", .file, [.command("m", shift: true)], "folder"),
-        cmd("delete", "Delete Note…", .file, [.command("\u{7F}")], "trash"),
+        cmd("delete", "Delete Note…", .file, [], "trash"),
         cmd("exportpdf", "Export as PDF…", .file, [.command("e", shift: true)], "doc.richtext"),
         cmd("exportsel", "Export Selection as PDF…", .file, [], "doc.on.doc"),
         cmd("exportfolder", "Export Folder as PDF…", .file, [], "folder"),

@@ -113,6 +113,8 @@ extension KeyChord {
         (.command("a"), "Select All"),
         (.command("z"), "Undo"),
         (.command("z", shift: true), "Redo"),
+        (.command("\u{7F}"), "Delete to Beginning of Line"),
+        (.chord("\u{7F}", .option), "Delete Word Backward"),
     ]
 
     public static func reservedReason(_ chord: KeyChord) -> String? {
@@ -120,4 +122,11 @@ extension KeyChord {
     }
 
     public var isReserved: Bool { Self.reservedReason(self) != nil }
+
+    /// ⌘⌫ and ⌥⌫ belong to the text system (delete to the start of the line,
+    /// delete the previous word). A menu item with either as its key equivalent
+    /// would steal them from the editor and from text fields.
+    public var yieldsToTextInput: Bool {
+        (key == "\u{7F}" || key == "\u{08}") && (modifiers == .command || modifiers == .option)
+    }
 }
