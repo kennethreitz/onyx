@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Clicking the current note name in the title bar no longer copies its wikilink, and the brief “copied” label is gone. The name is plain text. Folder and ancestor crumbs still navigate, and the `class:` tag is unchanged. Copy Wikilink (⇧⌘L) and Copy File Path remain in the command palette and menus.
+
 ## [0.1.12] - 2026-11-23
 
 ### Added

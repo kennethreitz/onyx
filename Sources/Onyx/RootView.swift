@@ -6,7 +6,6 @@ import OnyxCore
 /// itself, and a docked file list you can put away. Everything else is
 /// summoned (⌘O ⌘P ⌘K ⌘I ⌘G); ⌃⌘F is pure text.
 struct RootView: View {
-    @State private var copied = false
     @Bindable var ws: Workspace
     var appearance: (String) -> Void
     @AppStorage(Prefs.readerSize) private var readerSize = 19.0
@@ -96,24 +95,16 @@ struct RootView: View {
                                 ws.revealFolder(path)
                             }
                         case .note:
-                            PathSegment(text: c.name, color: Color.muted, help: "Copy [[\(c.name)]]") {
-                                ws.copyWikilink(); ws.copiedFlash += 1
-                            }
+                            Text(c.name).foregroundStyle(Color.muted)
                         }
                     }
                     if let cls = ws.currentPath.flatMap({ ws.snapshot?.noteClass($0) }) { ClassBadge(ws: ws, name: cls) }
-                    if copied {
-                        Text("copied").foregroundStyle(Color.faint).transition(.opacity)
-                    } else if ws.isDirty {
-                        Circle().fill(Color.faint).frame(width: 4, height: 4).transition(.opacity)
+                    if ws.isDirty {
+                        Circle().fill(Color.faint).frame(width: 4, height: 4)
                     }
                     NavChevrons(ws: ws, only: .forward).padding(.leading, 3)
                     GraphButton(ws: ws).padding(.leading, 2)
                 }
-            }
-            .onChange(of: ws.copiedFlash) {
-                withAnimation(Motion.quick) { copied = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { withAnimation(.easeIn(duration: 0.3)) { copied = false } }
             }
             .font(.system(size: 12))
             .lineLimit(1).truncationMode(.head)

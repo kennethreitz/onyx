@@ -107,7 +107,6 @@ final class Workspace {
     @ObservationIgnored var paneTop: [UUID: Double] = [:]
     var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
     var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
-    var copiedFlash = 0                  // bump to flash "Copied" in the title line
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
     var inspectorTab: InspectorTab = .outline

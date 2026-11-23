@@ -5,7 +5,7 @@ public struct TitleCrumb: Equatable, Sendable {
     public enum Kind: Equatable, Sendable {
         /// Reveal this folder in the sidebar.
         case folder(path: String)
-        /// The open note: stay here (the existing action is copy-wikilink).
+        /// The open note. Shown as the last crumb; it is not a control.
         case note
         /// A `partOf` ancestor: open it. `others` lists the note's other direct parents
         /// (only on the last ancestor crumb).
