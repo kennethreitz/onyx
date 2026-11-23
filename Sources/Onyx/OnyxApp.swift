@@ -4,6 +4,11 @@ import WebKit
 import OnyxCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ n: Notification) {
+        // Before windows come up or boot() restores session state: ask any
+        // other packaged Onyx to quit and wait for it to finish saving.
+        SingleInstanceHandover.takeOverIfNeeded()
+    }
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -150,6 +155,9 @@ struct OnyxApp: App {
         nc.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [ws] _ in
             MainActor.assumeIsolated { ws.git?.syncNow(); ws.obsidianSync?.syncNow() }
         }
+        // terminate() from a new Onyx (and Quit) lands here: flush unsaved
+        // notes and session state before the process exits, so the new copy
+        // can restore them. Never skip this for a "just quit" path.
         nc.addObserver(forName: NSApplication.willTerminateNotification, object: nil, queue: .main) { [ws] _ in
             MainActor.assumeIsolated { ws.flushSave(); ws.persistSplitLayout(); ws.git?.finishForQuit(); ws.obsidianSync?.stop() }
         }

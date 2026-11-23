@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Files already in the vault aren't copied. A ⌘-drag from the sidebar, or a Finder drag of a file inside the vault, inserts a link to the existing file.
 
 ### Changed
+- Launching a second packaged Onyx (another build, `open -n`, or a worktree app with the same bundle identifier) now asks the running copy to quit first. That copy saves unsaved notes and session state, then exits; the new copy waits for it (up to 10 seconds) before restoring the window and vault, and never force-kills it. Set `ONYX_ALLOW_MULTIPLE=1` (or the hidden default `onyx.allowMultipleInstances`) to keep both. Test hooks (`make run-test`, `make dev`, `scripts/shoot.sh`, and the usual `ONYX_*` screenshot and self-test variables) skip this so a test launch cannot close a running Onyx. Unpackaged `swift run` binaries are left alone. See [DEVELOP.md](docs/DEVELOP.md#one-running-onyx).
 - The title-bar graph button (and ⌘G, the footer graph icon, and the command palette) is a toggle: click it again while the graph overlay is open to close it and return to the note. Shift-click or ⇧⌘G still opens the atlas, and closes it if the atlas is already showing. The title-bar button stays marked while the graph is open.
 
 ### Fixed

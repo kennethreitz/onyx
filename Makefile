@@ -29,16 +29,17 @@ release:
 run: app
 	open -n build/Onyx.app --args $(if $(VAULT),--vault "$(VAULT)") $(ARGS)
 
-# The disposable demo/test copy, never ~/Notes.
+# The disposable demo/test copy, never ~/Notes. ONYX_ALLOW_MULTIPLE so a
+# test launch cannot quit a running Onyx someone is using.
 run-test: app
-	open -n --env ONYX_NO_DEFAULT_VAULT=1 build/Onyx.app --args --vault "$(TEST_VAULT)" $(ARGS)
+	open -n --env ONYX_NO_DEFAULT_VAULT=1 --env ONYX_ALLOW_MULTIPLE=1 build/Onyx.app --args --vault "$(TEST_VAULT)" $(ARGS)
 
 # Your real vault: whatever Onyx last opened (or the welcome screen).
 open: app
 	open build/Onyx.app
 
 dev:
-	swift build && ONYX_NO_DEFAULT_VAULT=1 ./.build/debug/Onyx --vault "$(or $(VAULT),$(TEST_VAULT))" $(ARGS)
+	swift build && ONYX_NO_DEFAULT_VAULT=1 ONYX_ALLOW_MULTIPLE=1 ./.build/debug/Onyx --vault "$(or $(VAULT),$(TEST_VAULT))" $(ARGS)
 
 test:
 	swift test

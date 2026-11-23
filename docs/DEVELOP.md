@@ -26,6 +26,14 @@ With no `--vault`, Onyx opens the last vault you chose, or `~/Notes` if that fol
 
 **Never write test files into `~/Notes`.** Point the app at a copy under `/tmp`. `make demo-vault` builds `/tmp/onyx-vault` from the neutral parts of a real vault (read-only on the source). Prefer a git worktree so you don’t overwrite a running `build/Onyx.app` someone is using.
 
+### One running Onyx
+
+Launching a second packaged Onyx (same bundle identifier, `org.kennethreitz.onyx`) asks the copy that's already running to quit first. That copy saves unsaved notes and session state through the normal `willTerminate` path (`flushSave`, the split layout, and git's finish-for-quit), then exits. The new copy waits up to 10 seconds so those writes land before it restores the window and vault, and it never force-kills the old one: if the wait times out (git quit can take up to 8 seconds, or a note may still be saving), both may briefly run.
+
+**Test, screenshot, and harness launches must not quit a running Onyx someone is using.** Set `ONYX_ALLOW_MULTIPLE=1` to skip the takeover, or turn on the hidden default `onyx.allowMultipleInstances`. `make run-test`, `make dev`, and `scripts/shoot.sh` set `ONYX_ALLOW_MULTIPLE=1` automatically. The same skip also happens when any of the usual test hooks are set (`ONYX_NO_DEFAULT_VAULT`, `ONYX_SHOT_QUIET`, `ONYX_TYPE_TEST`, `ONYX_KEY_SELFTEST`, `ONYX_SCROLL_TEST`, `ONYX_OPEN_SETTINGS`, `ONYX_DUMP_MENUS`, `ONYX_BASES_EDIT`). Unpackaged `swift run` / `.build/debug/Onyx` binaries have no bundle identifier and never ask another copy to quit. `onyx-bench` is a separate executable and does not launch `Onyx.app`.
+
+Workers launching a packaged `build/Onyx.app` (or any other copy with that bundle identifier) must set `ONYX_ALLOW_MULTIPLE=1`, or use the Makefile / shoot.sh targets that already do. Do not `open -n` a packaged Onyx without that escape hatch.
+
 To leave git or Obsidian Sync alone for a session:
 
 ```sh
@@ -56,7 +64,8 @@ These are for development and screenshots. Don’t set them in normal use unless
 
 | Variable | What it does |
 | --- | --- |
-| `ONYX_NO_DEFAULT_VAULT=1` | Don’t fall back to the remembered vault or `~/Notes`. Used by `make run-test` and `make dev`. |
+| `ONYX_ALLOW_MULTIPLE=1` | Don’t ask another running Onyx to quit at launch. Required for any packaged test or screenshot launch so it cannot close someone’s running app. `make run-test`, `make dev`, and `scripts/shoot.sh` set this. A hidden default, `defaults write org.kennethreitz.onyx onyx.allowMultipleInstances -bool true`, does the same. Usual test hooks also skip the takeover (see above). |
+| `ONYX_NO_DEFAULT_VAULT=1` | Don’t fall back to the remembered vault or `~/Notes`. Used by `make run-test` and `make dev`. Also skips asking another Onyx to quit. |
 | `ONYX_NO_GIT=1` | Don’t auto-commit, pull, or push for this session. |
 | `ONYX_NO_SYNC=1` | Don’t start Obsidian Sync, even if this vault is connected. |
 | `ONYX_UPDATE_DISABLE=1` | Don’t check for GitHub updates automatically. Manual **Check for Updates…** still works. Screenshot and self-test hooks also skip automatic checks. |
@@ -169,4 +178,5 @@ Patches are welcome. Keep the page quiet — if you’re changing how it looks o
 - Work on a branch or a git worktree. `git pull --rebase` before you push, and don’t force-push `master`.
 - Run `make test`.
 - Point the app at a copy under `/tmp` while you work. Never write test files into a real vault.
+- When launching a packaged `Onyx.app` for tests, set `ONYX_ALLOW_MULTIPLE=1` so you don’t quit a running Onyx. Prefer `make run-test` or `make dev`.
 - Onyx is [AGPL-3.0](LICENSE).

@@ -46,6 +46,8 @@ The latest build is on the [releases page](https://github.com/kennethreitz/onyx/
 
 This build is not notarized, so the first launch needs System Settings ▸ Privacy & Security ▸ **Open Anyway**. It updates itself from v0.1.1 on. Requires macOS 14 (Sonoma) or later, on Apple silicon or Intel.
 
+Opening a second copy of Onyx (a newly built app, `open -n`, or another folder with the same app) quits the one that's already running, after it saves. Set `ONYX_ALLOW_MULTIPLE=1` if you want both to stay open.
+
 ## Docs
 
 - [Reading](docs/reading.md) — typography, sidenotes, PDF and print
