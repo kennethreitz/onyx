@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-11-23
+
 ### Changed
 - Clicking the current note name in the title bar no longer copies its wikilink, and the brief “copied” label is gone. The name is plain text. Folder and ancestor crumbs still navigate, and the `class:` tag is unchanged. Copy Wikilink (⇧⌘L) and Copy File Path remain in the command palette and menus.
 
@@ -236,7 +238,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.12...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.13...HEAD
+[0.1.13]: https://github.com/kennethreitz/onyx/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/kennethreitz/onyx/compare/v0.1.11...v0.1.12
 [0.1.11]: https://github.com/kennethreitz/onyx/compare/v0.1.10...v0.1.11
 [0.1.10]: https://github.com/kennethreitz/onyx/compare/v0.1.9...v0.1.10
