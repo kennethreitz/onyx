@@ -327,9 +327,11 @@ final class OnyxTextView: NSTextView {
         if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
     }
 
-    /// Apply a core `TextEdit` as one undoable change.
+    /// Apply a core `TextEdit` as one undoable change. When smart lists are on,
+    /// also renumbers nearby ordered lists in the same step.
     @discardableResult
     func apply(_ e: TextEdit) -> Bool {
+        let e = smartIndentList() ? ListRenumber.applying(e, to: string) : e
         guard shouldChangeText(in: e.range, replacementString: e.replacement) else { return false }
         textStorage?.replaceCharacters(in: e.range, with: e.replacement)
         didChangeText()
@@ -360,6 +362,43 @@ final class OnyxTextView: NSTextView {
             apply(e); return
         }
         super.deleteBackward(sender)
+    }
+
+    /// Backspace, Delete, ⌘⌫, cut, and the other text-delete selectors: if the
+    /// deletion leaves a numbered list out of order, fix it in the same undo group.
+    override func doCommand(by selector: Selector) {
+        if smartIndentList(), !hasMarkedText(), Self.deleteSelectors.contains(NSStringFromSelector(selector)) {
+            renumberAfterDelete { super.doCommand(by: selector) }
+            return
+        }
+        super.doCommand(by: selector)
+    }
+
+    override func cut(_ sender: Any?) {
+        if smartIndentList(), !hasMarkedText() {
+            renumberAfterDelete { super.cut(sender) }
+            return
+        }
+        super.cut(sender)
+    }
+
+    private static let deleteSelectors: Set<String> = [
+        "deleteBackward:", "deleteForward:",
+        "deleteWordBackward:", "deleteWordForward:",
+        "deleteToBeginningOfLine:", "deleteToEndOfLine:",
+        "deleteToBeginningOfParagraph:", "deleteToEndOfParagraph:",
+        "deleteBackwardByDecomposingPreviousCharacter:", "delete:",
+    ]
+
+    private func renumberAfterDelete(_ body: () -> Void) {
+        let um = undoManager
+        let before = string
+        um?.beginUndoGrouping()
+        body()
+        if let e = ListRenumber.afterChange(string, selection: selectedRange(), from: before) {
+            apply(e)
+        }
+        um?.endUndoGrouping()
     }
 
     override func insertNewline(_ sender: Any?) {

@@ -98,7 +98,8 @@ public enum ListContinue {
         var prefixLength: Int
     }
 
-    static func parse(_ line: String) -> Item? {
+    /// Quote markers and leading whitespace before the list marker (or the rest of the line).
+    static func lead(_ line: String) -> (quote: String, indent: String, rest: Substring) {
         var i = line.startIndex
         var quote = ""
         while i < line.endIndex, line[i] == ">" {
@@ -114,10 +115,14 @@ public enum ListContinue {
             indent.append(line[i])
             i = line.index(after: i)
         }
-        let rest = line[i...]
-        guard let (marker, next) = marker(rest) else { return nil }
-        return Item(quote: quote, indent: indent, marker: marker, nextMarker: next,
-                    prefixLength: len(quote) + len(indent) + len(marker))
+        return (quote, indent, line[i...])
+    }
+
+    static func parse(_ line: String) -> Item? {
+        let lead = lead(line)
+        guard let (marker, next) = marker(lead.rest) else { return nil }
+        return Item(quote: lead.quote, indent: lead.indent, marker: marker, nextMarker: next,
+                    prefixLength: len(lead.quote) + len(lead.indent) + len(marker))
     }
 
     /// The current marker and the one Return should write on the next line.

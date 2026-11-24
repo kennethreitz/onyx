@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Numbered lists are renumbered automatically after Return, Tab / Shift-Tab (and the Indent / Outdent / Delete Line commands), and after Backspace, Delete, or cut that leaves items out of sequence. The list's starting number and delimiter (`.` or `)`) are kept, nested lists are numbered on their own, and a blank line (or a non-list line) ends the contiguous list, so two lists separated by a blank stay independent. Inside a fenced code block or frontmatter nothing is rewritten. The caret moves if a nearby number grows (9 → 10), and the fix is the same undo step as the edit that caused it. Follows `smartIndentList` like the rest of list continuation.
+
 ## [0.1.13] - 2026-11-23
 
 ### Changed

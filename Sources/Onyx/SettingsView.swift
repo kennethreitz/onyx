@@ -251,7 +251,7 @@ struct EditorSettingsPage: View {
                         },
                         set: { ws.setObsidianConfig("app.json", ["smartIndentList": $0]) }
                     ))
-                    Text("Return in a list starts the next item with the same marker, or the next number. Return on an empty item ends the list, or outdents a nested one. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items. Saved as smartIndentList in the vault’s app.json, the same key Obsidian uses.")
+                    Text("Return in a list starts the next item with the same marker, or the next number, and following numbered items are renumbered. Return on an empty item ends the list, or outdents a nested one. Shift-Return inserts a plain newline. Tab and Shift-Tab indent and outdent list items, and both the level left and the level joined are renumbered (a newly nested item starts at 1). Saved as smartIndentList in the vault’s app.json, the same key Obsidian uses.")
                         .font(.system(size: 11)).foregroundStyle(Color.faint)
                     Toggle("Auto pair brackets", isOn: Binding(
                         get: {

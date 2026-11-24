@@ -25,12 +25,7 @@ extension Workspace {
         }
         guard let tv = (MainWindow.current?.firstResponder as? OnyxTextView) ?? liveEditor, tv.isEditable else { NSSound.beep(); return }
         guard let e = f(tv.string, tv.selectedRange()) else { NSSound.beep(); return }
-        if tv.shouldChangeText(in: e.range, replacementString: e.replacement) {
-            tv.textStorage?.replaceCharacters(in: e.range, with: e.replacement)
-            tv.didChangeText()
-            tv.setSelectedRange(e.selection)
-            tv.scrollRangeToVisible(e.selection)
-        }
+        _ = tv.apply(e)
         DispatchQueue.main.async { tv.window?.makeFirstResponder(tv) }
     }
 
