@@ -6,8 +6,13 @@ ARGS ?=
 # UNIVERSAL=1 (or `make release`) builds an arm64 + x86_64 binary.
 # `make app` stays native so everyday rebuilds stay fast.
 UNIVERSAL ?= 0
+# make install: where the universal app goes. DESTDIR stages under a prefix.
+INSTALL_DIR ?= /Applications
+DESTDIR ?=
+NO_QUIT ?=
+RELAUNCH ?=
 
-.PHONY: build app run dev test icon demo-vault clean install release
+.PHONY: build app run dev test icon demo-vault clean install uninstall release
 
 build:
 	UNIVERSAL=$(UNIVERSAL) ./scripts/build-binary.sh release
@@ -55,8 +60,15 @@ demo-vault:
 	cd ~/Notes && rsync -a Writing/Essays Writing/Poetry Writing/Music "Writing/Artificial Intelligence" Writing/Writing.md /tmp/onyx-vault/Writing/
 	cd ~/Notes/.obsidian && cp app.json appearance.json bookmarks.json daily-notes.json /tmp/onyx-vault/.obsidian/
 
-install: app
-	rm -rf /Applications/Onyx.app && cp -R build/Onyx.app /Applications/
+# Universal app (same build as `make release`, no zip) into $(INSTALL_DIR)/Onyx.app.
+# Quits a running Onyx gracefully only for the real /Applications (NO_QUIT=1 skips);
+# RELAUNCH=1 reopens it afterwards if it was running.
+install:
+	$(MAKE) app UNIVERSAL=1
+	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" RELAUNCH="$(RELAUNCH)" ./scripts/install.sh install
+
+uninstall:
+	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" ./scripts/install.sh uninstall
 
 clean:
 	rm -rf .build build

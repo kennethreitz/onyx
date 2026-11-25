@@ -49,6 +49,15 @@ This build is not notarized, so the first launch needs System Settings ▸ Priva
 
 Opening a second copy of Onyx (a newly built app, `open -n`, or another folder with the same app) quits the one that's already running, after it saves. Set `ONYX_ALLOW_MULTIPLE=1` if you want both to stay open.
 
+## Build from source
+
+```sh
+git clone https://github.com/kennethreitz/onyx && cd onyx
+make install            # universal (Apple silicon + Intel) build into /Applications/Onyx.app
+```
+
+`make install` builds the same universal app as `make release` (without the zip), asks a running Onyx to quit (it saves first; never force-killed), swaps the new app in with `ditto` so the signature is kept, then prints the installed version and architectures. `INSTALL_DIR=~/Applications` (or `DESTDIR`) installs elsewhere, `NO_QUIT=1` skips quitting, `RELAUNCH=1` reopens Onyx if it was running, and `make uninstall` removes it. Details and other targets are in [Building from source](docs/DEVELOP.md).
+
 ## Docs
 
 - [Reading](docs/reading.md) — typography, sidenotes, PDF and print
