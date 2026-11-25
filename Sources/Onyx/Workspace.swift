@@ -1416,7 +1416,7 @@ final class Workspace {
         else { toast = "Linked \(count) mention\(count == 1 ? "" : "s") in \(files) note\(files == 1 ? "" : "s")" }
     }
 
-        func toggleTask(index: Int) {
+    func toggleTask(index: Int) {
         let lines = text.components(separatedBy: "\n")
         var out = lines
         var n = 0
@@ -1456,7 +1456,6 @@ final class Workspace {
             renderToken += 1
         }
     }
-
 
     // MARK: External changes
 

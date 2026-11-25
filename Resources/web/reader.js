@@ -1103,7 +1103,9 @@
     setUnlinked(list) {
       const ul = page.querySelector('.bl-unlinked');
       if (!ul) return;
-      ul.innerHTML = list.length ? list.map(b => `<li><a class="internal-link bl-source" data-path="${esc(b.path)}">${esc(b.name)}</a><span class="bl-context">${esc(b.text)}</span></li>`).join('')
+      ul.innerHTML = list.length ? list.map(b => `<li class="bl-unlinked-row"><a class="internal-link bl-source" data-path="${esc(b.path)}">${esc(b.name)}</a>` +
+        `<button type="button" class="bl-link" data-path="${esc(b.path)}" data-loc="${b.loc}" data-len="${b.len}" data-matched="${esc(b.matched || '')}">Link</button>` +
+        `<a class="internal-link bl-context" data-path="${esc(b.path)}" data-line="${b.line}">${esc(b.text)}</a></li>`).join('')
         : '<li class="bl-empty">No unlinked mentions.</li>';
       const s = page.querySelector('details[data-k=unlinked] summary');
       if (s) s.innerHTML = `Unlinked mentions <span class="bl-count">${list.length}</span>`;
@@ -1167,6 +1169,12 @@
     if (play) { const au = play.parentElement.querySelector('audio'); if (au) { if (au.paused) { document.querySelectorAll('.audio-embed audio').forEach(o => { if (o !== au) o.pause(); }); au.play(); } else au.pause(); } return; }
     const track = e.target.closest('.ae-track');
     if (track) { const au = track.parentElement.querySelector('audio'); const r = track.getBoundingClientRect(); if (au && isFinite(au.duration)) { au.currentTime = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * au.duration; aeSync(au); } return; }
+    const linkBtn = e.target.closest('button.bl-link');
+    if (linkBtn) {
+      e.preventDefault();
+      post({ type: 'linkMention', path: linkBtn.dataset.path || '', loc: +linkBtn.dataset.loc, len: +linkBtn.dataset.len, matched: linkBtn.dataset.matched || '' });
+      return;
+    }
     const a = e.target.closest('a');
     const img = !a && e.target.closest('img[data-path]');
     if (img && img.dataset.path) { post({ type: 'open', path: img.dataset.path, target: img.dataset.path }); return; }   // an image opens in the viewer

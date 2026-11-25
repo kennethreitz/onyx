@@ -452,6 +452,8 @@ a.field-chip.is-unresolved { border-bottom: 1px dotted currentColor; }
 .doc-backlinks .bl-folder { color: var(--text-faint); font-size: 11px; margin-left: .6em; }
 .doc-backlinks .bl-context { display: block; color: var(--text-muted); text-decoration: none; font-size: 12.5px; line-height: 1.45; margin: .2em 0 0 .1em; padding: .25em .6em; border-left: 2px solid color-mix(in srgb, currentColor 14%, transparent); }
 .doc-backlinks a.bl-context:hover { color: var(--text-normal); background: color-mix(in srgb, currentColor 5%, transparent); }
+.doc-backlinks .bl-link { float: right; border: 0; background: none; color: var(--text-faint); font: 500 10.5px var(--font-interface); letter-spacing: .04em; cursor: pointer; padding: 0 .2em; }
+.doc-backlinks .bl-link:hover { color: var(--text-normal); }
 .doc-backlinks .bl-empty { color: var(--text-faint); font-style: italic; }
 
 /* hover page preview: a compact page inside the card */

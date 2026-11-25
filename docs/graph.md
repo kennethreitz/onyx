@@ -12,6 +12,6 @@ The *focus graph* (<kbd>⌘G</kbd>) opens as an overlay on the current pane, ove
   <img src="focus-graph.png" alt="Focus graph centered on a note" width="85%">
 </p>
 
-The inspector (<kbd>⌥⌘I</kbd>) holds the outline, backlinks, and properties. Backlinks also appear at the bottom of the reader, and in the footer when you hover it.
+The inspector (<kbd>⌥⌘I</kbd>) holds the outline, backlinks, and properties. The Backlinks tab lists linked mentions and, when expanded, unlinked mentions of the note's name, title, or aliases; clicking a row opens that note at the line, and Link (or Link all) turns an unlinked mention into a `[[wikilink]]`. The same lists appear at the bottom of the reader, where a mention is also clickable and has Link. The footer shows a backlink count when you hover it.
 
 See also [keyboard shortcuts](shortcuts.md).

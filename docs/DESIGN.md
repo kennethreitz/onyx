@@ -350,7 +350,10 @@ on startup (~/Notes does).
 
 Below every note (not Kanban boards) the reader lists linked mentions, grouped by note with up to
 three context lines each. Field links count, wikilinks read as their alias, and table rows are flattened. Clicking
-a context opens the note at that line. "Unlinked mentions" loads on demand when expanded.
+a context opens the note at that line. "Unlinked mentions" loads on demand when expanded: whole-word, case-insensitive
+matches of the note's name, title, or aliases, skipping frontmatter, code, comments, and existing links. Link turns
+that mention into a `[[wikilink]]` (with a display alias when the visible text differs). The inspector's Backlinks
+tab shows the same lists, and clicking a row opens the source at that line; Link all converts every remaining mention.
 Both sections collapse, and the open state is remembered.
 
 ## Hover page preview
