@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Sync-only vaults: keep an Obsidian Sync vault in Onyx without picking a folder. **Connect Obsidian Sync Vault…** (welcome screen, File menu, and Settings ▸ General ▸ Vault ▸ Sync-only Vault…) signs in (Keychain, 2FA when asked), lists your remote vaults, checks the end-to-end password, creates a local copy in `~/Library/Application Support/Onyx/Vaults/<name>`, pulls everything down, and keeps it synced with the usual footer status. Sync-only vaults are listed with Open, Reveal in Finder, and Delete Local Copy… (confirmed first; deletes only this Mac's copy, never the remote vault). Disconnect keeps the copy for a later reconnect, which reuses it and never deletes on either side. The library and its delete safeguards are in OnyxCore and the connect flow in OnyxSync, tested against the fake sync server; OnyxSync now builds for iOS too ([docs](docs/sync.md#sync-only-vaults)).
 
+### Fixed
+- Obsidian Sync sign-in no longer wedges after a partial failure. Requests to Obsidian's API now keep no cookies (like the official CLI), so a session cookie from one attempt can't make the next one fail with "Already logged in"; that answer is also retried once from a clean state. A token Onyx already holds is checked (`/user/info`) and reused, and a stale one is signed out and cleared first. If the Keychain refuses the token after the server accepted it, Onyx keeps it for the session instead of failing. Builds with no Keychain access, like the unsigned simulator build (errSecMissingEntitlement), fall back to an owner-only, data-protected file under Application Support/Onyx/Secrets. Errors are shown as plain sentences, never raw error domains; the details go to the log (subsystem `org.kennethreitz.onyx`, category `sync`). Tested against the fake server.
+
 ## [0.1.18] - 2026-11-25
 
 ### Added

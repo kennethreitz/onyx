@@ -8,7 +8,11 @@ public struct ObsidianAPI: Sendable {
         public var description: String { message }
         public init(message: String) { self.message = message }
     }
-    public struct HTTPError: Error { public let status: Int }
+    public struct HTTPError: Error, CustomStringConvertible {
+        public let status: Int
+        public init(status: Int) { self.status = status }
+        public var description: String { "HTTP \(status)" }
+    }
 
     public var baseURL: URL
     /// Sent on every request. Obsidian's official headless CLI sends `obsidian-headless/<version>` (set once at
@@ -27,8 +31,28 @@ public struct ObsidianAPI: Sendable {
     public static let signInOrigin = "https://obsidian.md"
 
     public init(baseURL: URL = URL(string: "https://api.obsidian.md")!, userAgent: String? = ObsidianAPI.defaultUserAgent,
-                session: URLSession = .shared) {
+                session: URLSession = ObsidianAPI.makeSession()) {
         self.baseURL = baseURL; self.userAgent = userAgent; self.session = session
+    }
+
+    /// Like the official CLI (Node fetch, no cookie jar): no cookies, no cache. With `URLSession.shared` the
+    /// session cookie from one sign-in made the next attempt fail with "Already logged in".
+    public static func makeSession() -> URLSession {
+        let c = URLSessionConfiguration.ephemeral
+        c.httpCookieStorage = nil
+        c.httpShouldSetCookies = false
+        c.httpCookieAcceptPolicy = .never
+        c.urlCache = nil
+        c.requestCachePolicy = .reloadIgnoringLocalCacheData
+        c.timeoutIntervalForRequest = 30
+        return URLSession(configuration: c)
+    }
+
+    /// The server's answer when it thinks this client already has a session.
+    public static func isAlreadyLoggedIn(_ error: Error) -> Bool {
+        guard let e = error as? APIError else { return false }
+        let m = e.message.lowercased()
+        return m.contains("already logged in") || m.contains("already signed in")
     }
 
     /// Thrown by `signIn` when the account has 2FA and no (or an empty) code was sent: the server's error
@@ -65,6 +89,9 @@ public struct ObsidianAPI: Sendable {
         try await post("/user/signin", ["email": email, "password": password, "mfa": mfa],
                        preflight: true, headers: ["Origin": Self.signInOrigin])
     }
+    public struct UserInfo: Decodable, Sendable { public let name: String?; public let email: String? }
+    /// `ob login` checks a stored token this way before signing in again.
+    public func userInfo(token: String) async throws -> UserInfo { try await post("/user/info", ["token": token]) }
     public func signOut(token: String) async throws { let _: Empty = try await post("/user/signout", ["token": token]) }
     public func listVaults(token: String, supportedEncryptionVersion: Int = ObsidianCrypto.currentEncryptionVersion) async throws -> VaultList {
         try await post("/vault/list", ["token": token, "supported_encryption_version": supportedEncryptionVersion])

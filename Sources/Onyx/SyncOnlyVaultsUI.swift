@@ -46,7 +46,7 @@ enum SyncOnlyVaultsMac {
         guard a.runModal() == .alertFirstButtonReturn else { return }
         if isOpen { ws.closeVault() }
         do { try s.removeLocalCopy(v) } catch {
-            let e = NSAlert(); e.messageText = "Couldn’t delete the local copy"; e.informativeText = "\(error)"; e.runModal()
+            let e = NSAlert(); e.messageText = "Couldn’t delete the local copy"; e.informativeText = SyncErrorText.describe(error); e.runModal()
         }
     }
 }
@@ -167,7 +167,7 @@ struct SyncOnlyConnectSheet: View {
 
     func run(_ label: String, _ op: () async throws -> Void) async {
         busy = label; error = nil
-        do { try await op() } catch { self.error = "\(error)" }
+        do { try await op() } catch { self.error = SyncErrorText.describe(error) }
         busy = nil
     }
 
