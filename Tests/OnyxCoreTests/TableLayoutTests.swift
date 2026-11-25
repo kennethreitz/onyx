@@ -61,8 +61,30 @@ final class TableLayoutTests: XCTestCase {
         XCTAssertGreaterThan(cols[0].width, cols[1].width)
     }
 
+    func testTwoColumnShortLinksAndLongProseFitsAndWraps() {
+        // A reader table of short wikilinks plus a description column of
+        // full sentences should stay in a 41em measure and wrap the prose,
+        // not bleed or scroll as if the description were one long line.
+        let rows = [
+            ["Note", "Description"],
+            ["[[Home]]", "A long sentence about this note that should wrap within the reading measure instead of staying on one line and scrolling."],
+            ["[[Daily]]", "Another full sentence of description prose that also wraps at word boundaries."],
+        ]
+        XCTAssertTrue(TableLayout.fits(rows, available: 41))
+        XCTAssertLessThan(TableLayout.minWidth(rows), 41)
+        let cols = TableLayout.columns(rows, available: 41)
+        XCTAssertEqual(cols.count, 2)
+        XCTAssertTrue(cols[0].nowrap)
+        XCTAssertFalse(cols[1].nowrap)
+        XCTAssertEqual(cols.map(\.width).reduce(0, +), 41, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(cols[1].width, TableLayout.minimumEm)
+        XCTAssertGreaterThan(cols[1].width, cols[0].width)
+    }
+
     func testEmptyInput() {
         XCTAssertEqual(TableLayout.columns([], available: 40), [])
         XCTAssertEqual(TableLayout.columns([[]], available: 40), [])
+        XCTAssertTrue(TableLayout.fits([], available: 41))
+        XCTAssertEqual(TableLayout.minWidth([]), 0)
     }
 }

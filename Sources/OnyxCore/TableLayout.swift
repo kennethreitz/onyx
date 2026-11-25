@@ -76,6 +76,19 @@ public enum TableLayout {
         return cols
     }
 
+    /// Sum of each column's minimum (8em for wrapping columns, natural
+    /// width for compact ones). If this is at most `available`, the table
+    /// should stay in the measure and wrap prose rather than bleed or scroll.
+    public static func minWidth(_ rows: [[String]]) -> Double {
+        columns(rows, available: 0).reduce(0) { $0 + $1.width }
+    }
+
+    /// True when the column minimums fit in `available` and leftover
+    /// measure can be given to wrapping columns.
+    public static func fits(_ rows: [[String]], available: Double) -> Bool {
+        minWidth(rows) <= available
+    }
+
     /// True for a date, a numeric cell, or a short token with no spaces.
     public static func isCompact(_ cell: String) -> Bool {
         let t = cell.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -264,9 +264,45 @@
 
   /** Always run, even when Typeset reading is off: column classes drive the CSS. */
   function layoutTables(page) {
+    if (!page || typeof page.querySelectorAll !== 'function') return;
     page.querySelectorAll('.table-wrap table').forEach(table => {
       numericColumns(table);
       compactColumns(table);
+    });
+    sizeWideTables(page);
+  }
+
+  /** Mark a wrap as scrollable and, if the user can still scroll right,
+      leave off `.at-end` so the CSS fade shows. Hidden when nothing overflows. */
+  function updateScrollCue(el) {
+    if (!el || el.clientWidth == null) return;
+    const max = el.scrollWidth - el.clientWidth;
+    const overflow = max > 1;
+    el.classList.toggle('is-scrollable', overflow);
+    el.classList.toggle('at-end', !overflow || el.scrollLeft >= max - 1);
+    if (overflow && !el._onyxScrollCue) {
+      el.addEventListener('scroll', () => updateScrollCue(el), { passive: true });
+      el._onyxScrollCue = true;
+    }
+  }
+
+  /** Bleed / scroll only when the table's min-content (8em floors + nowrap
+      natural widths) exceeds the measure. Never size the table to max-content,
+      or a wrapping description will refuse to wrap and spill into a scroll. */
+  function sizeWideTables(page) {
+    if (!page || typeof page.querySelectorAll !== 'function') return;
+    page.querySelectorAll('.table-wrap').forEach(wrap => {
+      const table = wrap.querySelector('table');
+      if (!table) return;
+      wrap.classList.remove('table-wide', 'is-scrollable', 'at-end');
+      const available = wrap.clientWidth;
+      if (!available) { updateScrollCue(wrap); return; }
+      const prev = table.style.width;
+      table.style.width = 'min-content';
+      const min = table.getBoundingClientRect().width;
+      table.style.width = prev;
+      if (min > available + 0.5) wrap.classList.add('table-wide');
+      updateScrollCue(wrap);
     });
   }
 
@@ -300,5 +336,5 @@
     layoutTables(page);
   }
 
-  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact };
+  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact, layoutTables, sizeWideTables, updateScrollCue };
 })();

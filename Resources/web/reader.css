@@ -77,19 +77,73 @@ pre { background: transparent; border: none; padding: 0.2em 0; font-size: 0.95em
 pre code { font-size: 1em; white-space: pre; }
 pre code .kw { font-weight: 700; }
 
-/* Tables and Mermaid stay in the measure when they fit. A wide one may use
-   up to 8rem of the pane on each side (or up to a 1.2rem gutter at the pane
-   edge), and scrolls horizontally if it still cannot. */
-.table-wrap, .mermaid {
+/* Tables and Mermaid stay in the measure by default. Bleed (and a
+   horizontal scroll) applies only when JS adds .table-wide / .mermaid-wide
+   after measuring: for tables, when the sum of column minimums (8em floors
+   plus nowrap natural widths) exceeds the measure; for diagrams, when the
+   SVG's natural width does. The formula lives on the elements (not :root)
+   so 50% is the parent measure, not the viewport — up to 8rem of the pane
+   on each side, 1.2rem gutter. */
+.table-wide, .mermaid-wide {
+  position: relative;
   overflow-x: auto;
+  overflow-y: hidden;
   margin-left: min(0px, max(-8rem, calc(50% - 50vw + 1.2rem)));
   margin-right: min(0px, max(-8rem, calc(50% - 50vw + 1.2rem)));
 }
+
+/* Always-visible (not macOS overlay) thin scrollbar when a wrap overflows.
+   Hidden automatically when nothing overflows (overflow-x: auto). */
+.table-wide::-webkit-scrollbar,
+.mermaid-wide::-webkit-scrollbar {
+  -webkit-appearance: none;
+  height: 4px;
+  width: 4px;
+  background: transparent;
+}
+.table-wide::-webkit-scrollbar-track,
+.mermaid-wide::-webkit-scrollbar-track {
+  background: transparent;
+}
+.table-wide::-webkit-scrollbar-thumb,
+.mermaid-wide::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--text-faint) 45%, transparent);
+  border-radius: 4px;
+}
+.table-wide::-webkit-scrollbar-thumb:hover,
+.mermaid-wide::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--text-muted) 60%, transparent);
+}
+.table-wide::-webkit-scrollbar-button,
+.mermaid-wide::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.table-wide::-webkit-scrollbar-corner,
+.mermaid-wide::-webkit-scrollbar-corner { background: transparent; }
+
+/* Soft right-edge fade when the wrap can still be scrolled further. */
+.table-wide.is-scrollable:not(.at-end)::after,
+.mermaid-wide.is-scrollable:not(.at-end)::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 4px;
+  width: 2.2em;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--background-primary));
+}
+
 /* Tables: columns never collapse below 8em; short cells (dates, numbers)
-   stay on one line. Wikilinks wrap at words. */
+   stay on one line. Wikilinks wrap at words. Width is the measure by
+   default so prose wraps; .table-wide tables size to min-content and may
+   scroll inside the bled wrap. */
 .table-wrap { margin-top: 1.2em; margin-bottom: 1.2em; }
 table { border-collapse: collapse; border-top: 1.6px solid var(--table-border-color); border-bottom: 1.6px solid var(--table-border-color); margin: 1.2em auto; font-size: 0.97em; font-variant-numeric: lining-nums tabular-nums; }
-.table-wrap table { margin: 0 auto; width: max-content; min-width: 100%; }
+.table-wrap table { margin: 0 auto; width: 100%; max-width: 100%; }
+.table-wrap.table-wide table { width: auto; min-width: 100%; max-width: none; }
 thead { border-bottom: 0.8px solid var(--table-border-color); }
 th, td { border: none; padding: 0.35em 1em; background: transparent; vertical-align: top; }
 .table-wrap th, .table-wrap td {
@@ -248,10 +302,17 @@ a.file-open:hover { color: var(--text-normal) !important; }
 .markdown-embed .embed-link { font-family: var(--font-interface); font-size: 11px; color: var(--text-faint); text-decoration: none; float: right; }
 
 /* Mermaid — TikZ: paper fill, ink hairlines, serif labels.
-   Natural size, centered; a wide figure uses the shared bleed and scrolls
-   rather than shrinking until the labels are tiny. Small ones are not upscaled. */
+   Natural size, centered. A diagram wider than the measure may use the
+   bleed; if it is only modestly wider than the bled width (up to ~25%),
+   it is scaled down to fit, otherwise it scrolls at natural size. Small
+   ones are not upscaled. Default overflow is visible so a tight figure
+   is not given a scrollbar. When scrolling, justify-content is start so
+   the full SVG width is reachable (centering a too-wide flex child clips
+   the start edge). */
 .mermaid { display: flex; justify-content: center; margin-top: 1.6em; margin-bottom: 1.6em; background: none !important; }
+.mermaid:not(.mermaid-wide) { overflow: visible; }
 .mermaid svg { height: auto; flex: 0 0 auto; max-width: none; }
+.mermaid-wide.is-scrollable { justify-content: flex-start; }
 .mermaid .node rect, .mermaid .node circle, .mermaid .node ellipse, .mermaid .node polygon, .mermaid .node path, .mermaid .cluster rect {
   fill: var(--background-primary) !important; stroke: var(--text-normal) !important; stroke-width: 1px !important; }
 .mermaid .edgePath .path, .mermaid .flowchart-link, .mermaid line { stroke: var(--text-normal) !important; }

@@ -488,10 +488,72 @@
   }
   page.addEventListener('load', scheduleNotes, true);            // images, video posters
   document.addEventListener('toggle', scheduleNotes, true);      // <details> callouts and backlinks
-  if (document.fonts) document.fonts.addEventListener('loadingdone', scheduleNotes);
+  if (document.fonts) document.fonts.addEventListener('loadingdone', () => { scheduleNotes(); relayoutWide(); });
   if (window.ResizeObserver) {
     let w = 0;
-    new ResizeObserver(es => { const nw = Math.round(es[0].contentRect.width); if (nw !== w) { w = nw; scheduleNotes(); } }).observe(page);
+    new ResizeObserver(es => { const nw = Math.round(es[0].contentRect.width); if (nw !== w) { w = nw; scheduleNotes(); relayoutWide(); } }).observe(page);
+  }
+
+  function relayoutWide() {
+    if (window.OnyxTypeset && OnyxTypeset.layoutTables) OnyxTypeset.layoutTables(page);
+    layoutMermaids();
+  }
+
+  /** Bleed, modest scale-to-fit (~25% over the bled width), or scroll at
+      natural size. Records natural dimensions once so a resize can recompute
+      without compounding. */
+  const MERMAID_SCALE_LIMIT = 1.25;
+  function layoutMermaids() {
+    const cue = window.OnyxTypeset && OnyxTypeset.updateScrollCue;
+    page.querySelectorAll('pre.mermaid').forEach(node => {
+      const svg = node.querySelector && node.querySelector('svg');
+      if (!svg) return;
+      node.classList.remove('mermaid-wide', 'is-scrollable', 'at-end');
+      svg.style.width = '';
+      svg.style.height = '';
+      if (svg.getAttribute('width') === '100%') {
+        const m = (svg.getAttribute('style') || '').match(/max-width:\s*([\d.]+)px/);
+        if (m) { svg.setAttribute('width', m[1]); svg.style.maxWidth = ''; }
+      }
+      let natural = parseFloat(svg.dataset.naturalWidth || '');
+      if (!natural) {
+        const attr = svg.getAttribute('width');
+        if (attr && attr !== '100%') natural = parseFloat(attr);
+        if (!natural) {
+          const vb = svg.viewBox && svg.viewBox.baseVal && svg.viewBox.baseVal.width;
+          natural = vb || svg.getBoundingClientRect().width;
+        }
+        if (natural) svg.dataset.naturalWidth = String(natural);
+        const hAttr = svg.getAttribute('height');
+        let h = (hAttr && hAttr !== '100%') ? parseFloat(hAttr) : 0;
+        if (!h) h = svg.getBoundingClientRect().height;
+        if (h) svg.dataset.naturalHeight = String(h);
+      }
+      const measure = node.clientWidth;
+      if (!natural || !measure || natural <= measure + 1) {
+        if (cue) cue(node);
+        return;
+      }
+      node.classList.add('mermaid-wide');
+      const bleedW = node.clientWidth;
+      if (natural <= bleedW + 1) {
+        if (cue) cue(node);
+        return;
+      }
+      const nh = parseFloat(svg.dataset.naturalHeight || '');
+      if (natural <= bleedW * MERMAID_SCALE_LIMIT + 0.5) {
+        const scale = bleedW / natural;
+        svg.style.width = bleedW + 'px';
+        svg.style.height = nh ? (nh * scale) + 'px' : 'auto';
+        if (cue) cue(node);
+        return;
+      }
+      // Keep natural size and scroll. Explicit layout width so the scroll
+      // container includes the full SVG and nothing is unreachable.
+      svg.style.width = natural + 'px';
+      if (nh) svg.style.height = nh + 'px';
+      if (cue) cue(node);
+    });
   }
 
   async function mermaids() {
@@ -511,14 +573,7 @@
     });
     try { await document.fonts.load('15px "Latin Modern Roman"'); await document.fonts.ready; } catch (e) { }
     try { await mermaid.run({ nodes, suppressErrors: true }); } catch (e) { }
-    nodes.forEach(n => {
-      const svg = n.querySelector && n.querySelector('svg');
-      if (!svg) return;
-      if (svg.getAttribute('width') === '100%') {
-        const m = (svg.getAttribute('style') || '').match(/max-width:\s*([\d.]+)px/);
-        if (m) { svg.setAttribute('width', m[1]); svg.style.maxWidth = ''; }
-      }
-    });
+    layoutMermaids();
     scheduleNotes();
   }
 
