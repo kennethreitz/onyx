@@ -55,6 +55,8 @@ struct ReaderView: NSViewRepresentable {
     var paneID: UUID? = nil
     /// A hover preview: compact, no backlinks, no nested previews, never edits.
     var preview = false
+    /// When set (version-history overlay), the reader renders a rich insert/delete diff instead of `text` alone.
+    var richDiff: [NoteDiff.RichBlock]? = nil
     @Environment(\.colorScheme) var scheme
     // Observed so a Settings ▸ Typesetting change re-renders at once (values are read in Typeset).
     @AppStorage(Typeset.on) private var tsOn = true
@@ -102,9 +104,9 @@ struct ReaderView: NSViewRepresentable {
         if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
         let typeset = Typeset.signature
-        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset || c.foldable != foldHeadings {
-            let sameNote = c.renderedPath == path
-            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset; c.foldable = foldHeadings
+        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset || c.foldable != foldHeadings || c.renderedDiff != richDiff {
+            let sameNote = c.renderedPath == path && c.renderedDiff == richDiff
+            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset; c.foldable = foldHeadings; c.renderedDiff = richDiff
             c.render(keepScroll: sameNote)
         }
         if c.typeKey != "\(fontSize)/\(measure)" {
@@ -153,6 +155,7 @@ struct ReaderView: NSViewRepresentable {
         var scrollHandled: Int?
         var lastLayoutWidth: CGFloat = 0
         var foldable = true
+        var renderedDiff: [NoteDiff.RichBlock]?
 
         /// Source lines of this note's folded headings (shared with the editor via FoldStore).
         func foldedLines(_ text: String, path: String) -> [Int] {
@@ -190,7 +193,7 @@ struct ReaderView: NSViewRepresentable {
         func render(keepScroll: Bool) {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
             let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview, kanbanEditable: paneID == nil && !preview,
-                                               folds: foldedLines(renderedText ?? "", path: path), foldable: foldable && !preview)
+                                               folds: foldedLines(renderedText ?? "", path: path), foldable: foldable && !preview, diff: renderedDiff)
             startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
@@ -278,7 +281,7 @@ struct ReaderView: NSViewRepresentable {
 enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataviewjs|dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true, folds: [Int] = [], foldable: Bool = false) -> String {
+    static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true, folds: [Int] = [], foldable: Bool = false, diff: [NoteDiff.RichBlock]? = nil) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -333,11 +336,20 @@ enum ReaderPayload {
         resolveAll(body, from: path, depth: 0)
         // Markdown image embeds (`![](x.png)`) resolve like Obsidian: next to the note, from the vault root, or by name.
         var mdembeds: [String: String] = [:]
-        for href in Attachments.markdownImageTargets(in: body) where mdembeds[href] == nil {
-            if let r = Attachments.resolveMarkdownTarget(href, from: path, exists: { snap.attachments[$0] != nil }, resolve: { snap.resolve($0, from: path) }) {
-                let url = "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)
-                mdembeds[href] = url
-                if let d = href.removingPercentEncoding { mdembeds[d] = url }
+        func absorbImages(_ s: String) {
+            for href in Attachments.markdownImageTargets(in: s) where mdembeds[href] == nil {
+                if let r = Attachments.resolveMarkdownTarget(href, from: path, exists: { snap.attachments[$0] != nil }, resolve: { snap.resolve($0, from: path) }) {
+                    let url = "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)
+                    mdembeds[href] = url
+                    if let d = href.removingPercentEncoding { mdembeds[d] = url }
+                }
+            }
+        }
+        absorbImages(body)
+        if let diff {
+            for b in diff {
+                resolveAll(b.text, from: path, depth: 0)
+                absorbImages(b.text)
             }
         }
 
@@ -368,6 +380,7 @@ enum ReaderPayload {
             "typeset": typeset ?? Typeset.options(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "folds": folds, "foldable": foldable,
+            "diff": diff.map { NoteDiff.richPayload($0) } ?? [],
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)

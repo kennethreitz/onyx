@@ -111,7 +111,7 @@ struct NoteHistoryList: View {
     }()
 }
 
-/// Dimmed overlay: a diff against the current note, a rendered preview, and Restore.
+/// Dimmed overlay: a rendered diff against the current note (raw line diff and the full version as alternatives), and Restore.
 struct NoteVersionView: View {
     @Bindable var ws: Workspace
     var preview: NoteVersionPreview
@@ -119,9 +119,15 @@ struct NoteVersionView: View {
     @State private var tab: Tab = .diff
 
     enum Tab: String, CaseIterable, Identifiable {
-        case diff, preview
+        case diff, raw, preview
         var id: String { rawValue }
-        var title: String { rawValue == "diff" ? "Diff" : "Preview" }
+        var title: String {
+            switch self {
+            case .diff: return "Diff"
+            case .raw: return "Line diff"
+            case .preview: return "Version"
+            }
+        }
     }
 
     var body: some View {
@@ -187,16 +193,33 @@ struct NoteVersionView: View {
             QuietEmpty(title: "This version isn’t text.", hint: "A rendered preview and a restore would not be meaningful here.")
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .text(let text):
-            if tab == .diff {
+            switch tab {
+            case .diff:
+                richDiffView(old: text)
+            case .raw:
                 diffView(old: text)
-            } else {
+            case .preview:
                 ReaderView(ws: ws, fontSize: 16, measure: 56, source: (preview.notePath, text), preview: true)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
+    func richDiffView(old: String) -> some View {
+        let blocks = NoteDiff.rich(old: old, new: preview.currentText)
+        return Group {
+            if !NoteDiff.richHasChanges(blocks) {
+                QuietEmpty(title: "This version matches the current note.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                ReaderView(ws: ws, fontSize: 16, measure: 56, source: (preview.notePath, old), preview: true, richDiff: blocks)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+    }
+
     func diffView(old: String) -> some View {
+
         let rows = NoteDiff.lines(old: old, new: preview.currentText)
         let changed = rows.contains { $0.isChange }
         return Group {

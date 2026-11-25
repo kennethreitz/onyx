@@ -865,13 +865,13 @@ struct GitPanel: View {
             if !isRepo {
                 QuietEmpty(title: "This vault isn’t a git repository.", hint: "Run git init in the vault folder to get history and auto-sync.").padding(.top, Space.xs)
             } else {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "arrow.triangle.branch").foregroundStyle(Color.faint)
-                    Text(branch).font(.custom("IBMPlexMono", size: 11.5))
-                    Spacer()
+                    Text(branch).font(.custom("IBMPlexMono", size: 11.5)).lineLimit(1).layoutPriority(1)
+                    sectionPicker
+                    Spacer(minLength: 4)
                     Button { ws.git?.syncNow(); refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("Sync now")
-                }.padding(.horizontal, 12).padding(.top, 10)
-                sectionPicker
+                }.padding(.horizontal, 10).padding(.top, 8)
                 if ws.gitPanelSection == .history {
                     NoteHistoryList(ws: ws, isRepo: isRepo)
                 } else {
@@ -879,7 +879,8 @@ struct GitPanel: View {
                 }
             }
         }
-        .onAppear { refresh() }
+        .onAppear { refresh(); applyDefaultSection(opening: true) }
+        .onChange(of: ws.currentPath) { applyDefaultSection(opening: false) }
     }
 
     var sectionPicker: some View {
@@ -889,12 +890,22 @@ struct GitPanel: View {
                     Text(s.title)
                         .font(.system(size: 11, weight: ws.gitPanelSection == s ? .semibold : .regular))
                         .foregroundStyle(ws.gitPanelSection == s ? Color.ink : Color.faint)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(ws.gitPanelSection == s ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
                 }.buttonStyle(.plain)
             }
-            Spacer(minLength: 0)
-        }.padding(.horizontal, 10)
+        }
+    }
+
+    /// History when a note is open in a git vault; Status otherwise. Opening the pane
+    /// picks the default; changing notes only falls back to Status when History wouldn't apply.
+    func applyDefaultSection(opening: Bool) {
+        let historyOK = isRepo && ws.currentPath != nil && !(ws.currentPath?.opensInFileView ?? true)
+        if !historyOK {
+            if ws.gitPanelSection == .history { ws.gitPanelSection = .status }
+        } else if opening {
+            ws.gitPanelSection = .history
+        }
     }
 
     @ViewBuilder var statusPane: some View {

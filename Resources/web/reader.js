@@ -1050,6 +1050,52 @@
     closeLightbox(false);
   }, true);
 
+
+  function parseInlineDiff(text) {
+    const raw = String(text ?? '');
+    const safe = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const prep = window.OnyxMath ? window.OnyxMath.protect(safe) : { text: safe, slots: [] };
+    let html;
+    try { html = mainMarked.parseInline(prep.text); }
+    catch (e) { html = safe; }
+    return window.OnyxMath ? window.OnyxMath.restore(html, prep.slots) : html;
+  }
+  function renderDiffSpans(b) {
+    const inner = (b.spans || []).map(sp => {
+      const html = parseInlineDiff(sp.text || '');
+      if (sp.op === 'insert') return `<ins class="onyx-diff-ins">${html}</ins>`;
+      if (sp.op === 'delete') return `<del class="onyx-diff-del">${html}</del>`;
+      return html;
+    }).join('');
+    const kind = b.kind || 'paragraph';
+    if (kind === 'heading') {
+      const l = Math.min(6, Math.max(1, +b.level || 1));
+      return `<h${l}>${inner}</h${l}>`;
+    }
+    if (kind === 'listItem' || kind === 'task') {
+      const checked = kind === 'task' && /\[[xX]\]/.test(b.markdown || '');
+      return `<ul><li${checked ? ' class="is-checked"' : ''}>${inner}</li></ul>`;
+    }
+    if (kind === 'blockquote') return `<blockquote>${inner}</blockquote>`;
+    if (kind === 'blank') return '<p class="onyx-diff-blank">&nbsp;</p>';
+    return `<p>${inner}</p>`;
+  }
+  function wrapDiff(op, inner) {
+    if (op === 'insert') return `<div class="onyx-diff-ins-block">${inner}</div>`;
+    if (op === 'delete') return `<div class="onyx-diff-del-block">${inner}</div>`;
+    if (op === 'change') return `<div class="onyx-diff-chg-block">${inner}</div>`;
+    return inner;
+  }
+  function renderDiffBlock(b) {
+    if (b.kind === 'blank' && b.op === 'equal') return '';
+    if (b.op === 'change' && Array.isArray(b.spans)) return wrapDiff('change', renderDiffSpans(b));
+    const inner = parseWithLines(b.markdown || '', 0);
+    return wrapDiff(b.op, inner);
+  }
+  function renderDiff(blocks) {
+    return (blocks || []).map(renderDiffBlock).join('');
+  }
+
   window.Onyx = {
     render(payload) {
       P = payload;
@@ -1061,6 +1107,9 @@
       let html;
       if (payload.kanban) {
         html = `<h1>${esc(payload.name)}</h1>` + kanbanHTML(payload.kanban);
+      } else if (Array.isArray(payload.diff) && payload.diff.length) {
+        try { html = renderDiff(payload.diff); }
+        catch (e) { html = `<p>Couldn’t render this diff.</p>`; }
       } else {
         try { html = parseWithLines(md, payload.lineBase || 0); }
         catch (e) { try { html = withMath(md, s => mainMarked.parse(s)); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
@@ -1172,6 +1221,7 @@
     },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
+    _diffHTML(blocks) { return renderDiff(blocks); },
     _escapeWikilinkPipesInTables: escapeWikilinkPipesInTables,
     setFolds(lines) { FOLDS = new Set(lines.map(Number)); refreshFolds(); },
     foldCommand(id) {

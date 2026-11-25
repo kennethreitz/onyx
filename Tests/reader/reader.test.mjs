@@ -600,3 +600,45 @@ test('typesetClasses treats OpenDyslexic as its own face', () => {
   // a leftover dyslexic flag still selects the OpenDyslexic face
   assert.equal(C({ on: true, face: 'lm', dyslexic: true }).trim(), 'typeset face-od');
 });
+
+test('rich diffs wrap inserts and deletes at word level', () => {
+  const out = ctx.window.Onyx._diffHTML([
+    { op: 'change', kind: 'paragraph', markdown: 'The slow fox.\n', spans: [
+      { op: 'same', text: 'The ' },
+      { op: 'delete', text: 'quick' },
+      { op: 'insert', text: 'slow' },
+      { op: 'same', text: ' fox.' },
+    ]},
+  ]);
+  assert.match(out, /<del class="onyx-diff-del">quick<\/del>/);
+  assert.match(out, /<ins class="onyx-diff-ins">slow<\/ins>/);
+  assert.match(out, /<p>/);
+});
+
+test('rich diffs render mermaid and tables as whole blocks', () => {
+  const mer = ctx.window.Onyx._diffHTML([
+    { op: 'delete', kind: 'mermaid', markdown: '```mermaid\ngraph TD\n  A-->B\n```\n' },
+    { op: 'insert', kind: 'mermaid', markdown: '```mermaid\ngraph TD\n  A-->C\n```\n' },
+  ]);
+  assert.match(mer, /onyx-diff-del-block/);
+  assert.match(mer, /onyx-diff-ins-block/);
+  assert.match(mer, /pre class="mermaid"/);
+  const table = ctx.window.Onyx._diffHTML([
+    { op: 'insert', kind: 'table', markdown: '| a | b |\n| - | - |\n| 1 | 2 |\n' },
+  ]);
+  assert.match(table, /onyx-diff-ins-block/);
+  assert.match(table, /<table>/);
+});
+
+test('rich diffs keep heading markup around an inline change', () => {
+  const out = ctx.window.Onyx._diffHTML([
+    { op: 'change', kind: 'heading', level: 2, markdown: '## Hello there\n', spans: [
+      { op: 'same', text: 'Hello ' },
+      { op: 'delete', text: 'world' },
+      { op: 'insert', text: 'there' },
+    ]},
+  ]);
+  assert.match(out, /<h2>/);
+  assert.match(out, /<del class="onyx-diff-del">world<\/del>/);
+  assert.match(out, /<ins class="onyx-diff-ins">there<\/ins>/);
+});

@@ -606,3 +606,36 @@ body.print #onyx-lightbox { display: none !important; }
 .fold-hidden { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .fold-toggle, .fold-toggle::before { transition: none; } }
 @media print { .fold-toggle, .fold-more { display: none !important; } }
+
+/* Version-history rich diff: insertions highlighted, deletions struck through. */
+ins.onyx-diff-ins {
+  background: rgba(32, 120, 72, 0.18);
+  text-decoration: none;
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+del.onyx-diff-del {
+  background: rgba(180, 40, 40, 0.14);
+  text-decoration: line-through;
+  color: var(--text-muted);
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+.theme-dark ins.onyx-diff-ins { background: rgba(80, 180, 110, 0.28); }
+.theme-dark del.onyx-diff-del { background: rgba(200, 70, 70, 0.22); }
+.onyx-diff-ins-block, .onyx-diff-del-block, .onyx-diff-chg-block {
+  margin: 0.15em -0.35em;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+.onyx-diff-ins-block { background: rgba(32, 120, 72, 0.14); }
+.onyx-diff-del-block { background: rgba(180, 40, 40, 0.12); }
+.theme-dark .onyx-diff-ins-block { background: rgba(80, 180, 110, 0.22); }
+.theme-dark .onyx-diff-del-block { background: rgba(200, 70, 70, 0.18); }
+.onyx-diff-ins-block > :first-child,
+.onyx-diff-del-block > :first-child,
+.onyx-diff-chg-block > :first-child { margin-top: 0; }
+.onyx-diff-ins-block > :last-child,
+.onyx-diff-del-block > :last-child,
+.onyx-diff-chg-block > :last-child { margin-bottom: 0; }
+.onyx-diff-blank { height: 0.6em; margin: 0; }
