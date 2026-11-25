@@ -2,9 +2,29 @@
 
 Onyx saves web pages into your vault as clean Markdown notes, the way Obsidian Web Clipper does: readable text only (no menus, ads or comments), frontmatter with the source, images downloaded into your attachment folder, and the note filed in a Clippings folder.
 
-There are two ways to clip.
+There are three ways to clip: the Safari extension (or the Share menu), a bookmarklet for any browser, and Clip Web Page… inside Onyx.
 
-## From your browser: the bookmarklet
+## In Safari: the Clip to Onyx extension
+
+Onyx.app carries a Safari Web Extension (and a Share menu item). Nothing to download:
+
+1. Open Onyx once (any build from 0.1.18 on). macOS registers the extension when the app is launched.
+2. Safari ▸ Settings ▸ **Extensions** ▸ turn on **Clip to Onyx**. Settings ▸ Files & Links ▸ Web Clipper ▸ **Safari Extension…** in Onyx jumps there.
+3. Click the **Clip to Onyx** toolbar button (Safari asks once to let it read the page you're on), or right-click a page, a selection, or a link: **Clip Page to Onyx**, **Clip Selection to Onyx**, **Clip Link to Onyx**. ⌃⇧O (Control-Shift-O) does the same as the toolbar button; Safari ▸ Settings ▸ Extensions can change it.
+
+It sends the same thing as the bookmarklet: the page's URL, title, and metadata, plus your selection if there is one. The extension's native half opens `onyx://clip` itself, so there is no "allow this page to open Onyx?" prompt and no URL-length worry for selections. If that fails it falls back to opening the `onyx://` link in the tab.
+
+**Share menu:** Safari's Share button (and any app that shares a link or text) also lists **Onyx**. A shared link is fetched and clipped; shared text is saved as is.
+
+### Signing: why the extension may not show up
+
+Safari only lists extensions from apps signed by an Apple-issued certificate. Onyx is normally signed with the self-signed "Onyx Local Signing" identity (or ad hoc), which Safari counts as **unsigned**:
+
+- **Without an Apple certificate:** turn on Safari ▸ Settings ▸ Advanced ▸ *Show features for web developers*, then Safari ▸ Settings ▸ Developer ▸ **Allow unsigned extensions** (asks for your password). Safari turns that off every time it quits, so the extension disappears on the next launch until you allow it again. The Share menu item doesn't depend on this.
+- **With a free Apple ID (Personal Team) or a paid account:** in Xcode ▸ Settings ▸ Accounts, select your Apple ID ▸ Manage Certificates… ▸ **+ ▸ Apple Development**. `make app`, `make install`, and `make release` (`scripts/bundle.sh`) already prefer an "Apple Development" or "Developer ID Application" identity over Onyx Local Signing, so the next build is signed with it, and Safari keeps Clip to Onyx enabled across restarts with no developer setting. (Changing identity once makes Keychain ask again for Onyx's saved passwords.)
+- Distributing a signed extension to *other* people's Macs needs Developer ID signing plus notarization (paid Apple Developer Program); Safari 18.4+ loads those.
+
+## From any browser: the bookmarklet
 
 1. Open Settings ▸ Files & Links ▸ **Web Clipper** and click **Copy Bookmarklet**.
 2. In Safari, Chrome, Arc, or Firefox, show the bookmarks bar, add a bookmark of any page, and edit it: name it *Clip to Onyx* and paste the copied text as its **address** (URL).
@@ -90,7 +110,8 @@ Values are percent-encoded. A clip sent while Onyx is closed opens Onyx and wait
 - PDFs and other non-HTML URLs aren't clipped. Download the file and drop it into a note instead.
 - Videos other than YouTube, iframes, forms, and comments are left out. Math rendered as images stays an image.
 - Readability sometimes misjudges a page (a front page, a forum thread). Select what you want and clip the selection.
-- There is no Safari share extension yet: those need an Xcode app-extension target, which Onyx's SwiftPM build doesn't have. The bookmarklet works in every browser in the meantime.
+- The Safari extension shows up without the developer setting only when Onyx is signed with an Apple certificate (see *Signing* above).
+- Chrome, Arc, and Firefox have no bundled extension; use the bookmarklet there.
 
 ## Credits
 

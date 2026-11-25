@@ -90,10 +90,11 @@ pre code .kw { font-weight: 700; }
    plus nowrap natural widths) exceeds the measure; for diagrams, when the
    SVG's natural width does. The formula lives on the elements (not :root)
    so 50% is the parent measure, not the viewport — up to 8rem of the pane
-   on each side, 1.2rem gutter. A Mermaid figure is scaled to the bled width
-   as long as node labels stay at least ~11px; only then does it scroll.
-   Fitted (and smaller) diagrams are centered; a scrolling one starts centered
-   on the figure. */
+   on each side, 1.2rem gutter, and never more than the visible room so a
+   sidenote shift cannot hide the figure. A Mermaid figure is scaled to the
+   bled width as long as node labels stay at least ~13px; only then does it
+   scroll, starting at the left edge. Fitted (and smaller) diagrams are
+   centered; overflowing ones are not. */
 .table-wide, .mermaid-wide {
   position: relative;
   overflow-x: auto;
@@ -106,10 +107,16 @@ pre code .kw { font-weight: 700; }
    wins in WKWebView even on a more specific rule). A custom 4px track is
    drawn by typeset.js when the wrap actually overflows. */
 .table-wide, .mermaid-wide { scrollbar-width: none; }
+.table-wide.is-scrollable,
+.mermaid-wide.is-scrollable {
+  /* Room for the 4px track so it does not cover the last row of the figure. */
+  padding-bottom: 8px;
+}
 .onyx-hscroll {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: var(--onyx-sl, 0px);
+  right: auto;
+  width: 100%;
   bottom: 0;
   height: 4px;
   z-index: 2;
@@ -128,7 +135,9 @@ pre code .kw { font-weight: 700; }
 }
 .onyx-hscroll:hover > i { background: color-mix(in srgb, var(--text-muted) 70%, transparent); }
 
-/* Fade only the side that still has hidden content. */
+/* Fade only the side that still has hidden content. Absolutely positioned
+   descendants scroll with the content, so `--onyx-sl` (the wrap's scrollLeft,
+   set in updateScrollCue) pins the fades to the visible edges. */
 .table-wide.is-scrollable:not(.at-end)::after,
 .mermaid-wide.is-scrollable:not(.at-end)::after,
 .table-wide.is-scrollable:not(.at-start)::before,
@@ -136,19 +145,20 @@ pre code .kw { font-weight: 700; }
   content: "";
   position: absolute;
   top: 0;
-  bottom: 4px;
+  bottom: 8px;
   width: 2.2em;
   pointer-events: none;
   z-index: 1;
 }
 .table-wide.is-scrollable:not(.at-end)::after,
 .mermaid-wide.is-scrollable:not(.at-end)::after {
-  right: 0;
+  left: calc(var(--onyx-sl, 0px) + 100% - 2.2em);
+  right: auto;
   background: linear-gradient(to right, transparent, var(--background-primary));
 }
 .table-wide.is-scrollable:not(.at-start)::before,
 .mermaid-wide.is-scrollable:not(.at-start)::before {
-  left: 0;
+  left: var(--onyx-sl, 0px);
   background: linear-gradient(to left, transparent, var(--background-primary));
 }
 
@@ -318,13 +328,13 @@ a.file-open:hover { color: var(--text-normal) !important; }
 .markdown-embed .embed-link { font-family: var(--font-interface); font-size: 11px; color: var(--text-faint); text-decoration: none; float: right; }
 
 /* Mermaid — TikZ: paper fill, ink hairlines, serif labels.
-   Natural size, centered. A diagram wider than the measure may use the
-   bleed. A figure is scaled to the bled width as long as labels stay at
-   least ~11px; only then does it scroll (starting centered). Small ones
-   are not upscaled. Default overflow is visible so a tight figure
-   is not given a scrollbar. When scrolling, justify-content is start so
-   the full SVG width is reachable (centering a too-wide flex child clips
-   the start edge). */
+   Natural size, centered when it fits. A diagram wider than the measure
+   may use the bleed. A figure is scaled to the bled width as long as
+   labels stay at least ~13px; only then does it scroll, starting at the
+   left so every node is reachable. Small ones are not upscaled. Default
+   overflow is visible so a tight figure is not given a scrollbar. When
+   scrolling, justify-content is start so the full SVG width is reachable
+   (centering a too-wide flex child clips the start edge). */
 .mermaid { display: flex; justify-content: center; margin-top: 1.6em; margin-bottom: 1.6em; background: none !important; position: relative; cursor: zoom-in; }
 .mermaid:not(.mermaid-wide) { overflow: visible; }
 .mermaid svg { height: auto; flex: 0 0 auto; max-width: none; user-select: none; -webkit-user-select: none; }
@@ -332,30 +342,33 @@ a.file-open:hover { color: var(--text-normal) !important; }
 .table-wide { cursor: zoom-in; }
 .onyx-zoom-hint {
   position: absolute;
-  top: 0.25rem;
-  right: 0.25rem;
-  width: 18px;
-  height: 18px;
+  top: 0.35rem;
+  left: calc(var(--onyx-sl, 0px) + 100% - 1.85rem);
+  right: auto;
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
-  border: none;
-  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--text-muted) 55%, transparent);
+  border-radius: 5px;
   z-index: 3;
   cursor: zoom-in;
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
-  background: color-mix(in srgb, var(--background-primary) 80%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--text-faint) 45%, transparent);
-  transition: opacity .15s ease-out;
-}
-.onyx-zoom-hint::before {
-  content: "";
-  position: absolute;
-  inset: 4px;
-  border: 1.2px solid var(--text-muted);
-  border-radius: 1.5px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5rem;
+  text-align: center;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-normal) 10%, transparent);
+  transition: opacity .15s ease-out, visibility .15s ease-out;
 }
 .mermaid:hover .onyx-zoom-hint,
-.table-wide:hover .onyx-zoom-hint { opacity: 0.9; pointer-events: auto; }
+.table-wide:hover .onyx-zoom-hint {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
 .mermaid .node rect, .mermaid .node circle, .mermaid .node ellipse, .mermaid .node polygon, .mermaid .node path, .mermaid .cluster rect {
   fill: var(--background-primary) !important; stroke: var(--text-normal) !important; stroke-width: 1px !important; }
 .mermaid .edgePath .path, .mermaid .flowchart-link, .mermaid line { stroke: var(--text-normal) !important; }
@@ -593,3 +606,36 @@ body.print #onyx-lightbox { display: none !important; }
 .fold-hidden { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .fold-toggle, .fold-toggle::before { transition: none; } }
 @media print { .fold-toggle, .fold-more { display: none !important; } }
+
+/* Version-history rich diff: insertions highlighted, deletions struck through. */
+ins.onyx-diff-ins {
+  background: rgba(32, 120, 72, 0.18);
+  text-decoration: none;
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+del.onyx-diff-del {
+  background: rgba(180, 40, 40, 0.14);
+  text-decoration: line-through;
+  color: var(--text-muted);
+  border-radius: 2px;
+  padding: 0 0.12em;
+}
+.theme-dark ins.onyx-diff-ins { background: rgba(80, 180, 110, 0.28); }
+.theme-dark del.onyx-diff-del { background: rgba(200, 70, 70, 0.22); }
+.onyx-diff-ins-block, .onyx-diff-del-block, .onyx-diff-chg-block {
+  margin: 0.15em -0.35em;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+}
+.onyx-diff-ins-block { background: rgba(32, 120, 72, 0.14); }
+.onyx-diff-del-block { background: rgba(180, 40, 40, 0.12); }
+.theme-dark .onyx-diff-ins-block { background: rgba(80, 180, 110, 0.22); }
+.theme-dark .onyx-diff-del-block { background: rgba(200, 70, 70, 0.18); }
+.onyx-diff-ins-block > :first-child,
+.onyx-diff-del-block > :first-child,
+.onyx-diff-chg-block > :first-child { margin-top: 0; }
+.onyx-diff-ins-block > :last-child,
+.onyx-diff-del-block > :last-child,
+.onyx-diff-chg-block > :last-child { margin-bottom: 0; }
+.onyx-diff-blank { height: 0.6em; margin: 0; }

@@ -29,6 +29,7 @@
 | <kbd>⌘N</kbd> | New note (in the selected folder, or next to the open note). The compose button at the bottom of the sidebar, Command Palette ▸ New note, and a folder’s New Note Here do the same |
 | <kbd>⇧⌘N</kbd> | New folder (in the selected folder, or the vault root) |
 | <kbd>⇧⌘K</kbd> | Clip a web page: paste a URL and Onyx saves a readable copy, with its images, to Clippings ([web clipper](web-clipper.md)) |
+| <kbd>⌃⇧O</kbd> | In Safari, with the Clip to Onyx extension on: clip the current page (change it in Safari ▸ Settings ▸ Extensions) |
 | <kbd>⌘S</kbd> | Save. A still-Untitled note is named from its first heading (or first line) and appears under that name in the sidebar. Autosave writes the file while you type, but leaves the placeholder name until you save or leave the note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘←</kbd> · <kbd>⌥⌘→</kbd> | Fold / unfold the section at the caret ([folding](folding.md)) |

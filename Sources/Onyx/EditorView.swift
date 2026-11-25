@@ -106,6 +106,9 @@ final class OnyxTextView: NSTextView {
         if !event.modifierFlags.contains(.command), let (region, _) = folds.hit(convert(event.locationInWindow, from: nil)) {
             folds.toggle(region); return   // the chevron or the ⋯ pill: never moves the caret
         }
+        if event.modifierFlags.contains(.command), let tag = tag(at: convert(event.locationInWindow, from: nil)) {
+            onOpenTag(tag); return   // ⌘-click a #tag: open it in the Tags pane
+        }
         if event.modifierFlags.contains(.command), let target = wikilink(at: convert(event.locationInWindow, from: nil)) {
             onFollowLink(target); return
         }
@@ -160,6 +163,19 @@ final class OnyxTextView: NSTextView {
         return nil
     }
 
+    var onOpenTag: (String) -> Void = { _ in }
+
+    /// The #tag under a point (the `#` counts), if any.
+    func tag(at point: NSPoint) -> String? {
+        let idx = characterIndexForInsertion(at: point)
+        let ns = string as NSString
+        guard idx <= ns.length, ns.length > 0 else { return nil }
+        let lr = ns.lineRange(for: NSRange(location: min(idx, ns.length - 1), length: 0))
+        let fm = Frontmatter.parse(string)
+        let occ = lr.location < fm.bodyOffset ? TagScanner.frontmatter(string, parsed: fm) : TagScanner.inline(string, in: lr, code: [])
+        return occ.first { NSLocationInRange(idx, NSRange(location: $0.range.location - 1, length: $0.range.length + 1)) }?.name
+    }
+
     func wikilink(at point: NSPoint) -> String? {
         let idx = characterIndexForInsertion(at: point)
         let ns = string as NSString
@@ -188,6 +204,11 @@ final class OnyxTextView: NSTextView {
     var suggest: (LinkCompletion.Part, String) -> [LinkSuggestion] = { _, _ in [] }
     // The same list for `key::` lines (FieldCompletion): keys after `word:`, notes after `key:: `.
     var fieldSuggest: (FieldCompletion.Part, String) -> [LinkSuggestion] = { _, _ in [] }
+    // And for `#tags` (TagCompletion): by path segment, in text and in a frontmatter `tags:` list.
+    var tagSuggest: (String) -> [LinkSuggestion] = { _ in [] }
+    private var tagCtx: TagCompletion.Context?
+    private var tagLineStart = 0
+    private var dismissedTag: Int?        // absolute start of the tag Esc closed
     private var fieldCtx: FieldCompletion.Context?
     private var fieldLineStart = 0
     private var dismissedFieldLine: Int?
@@ -207,7 +228,7 @@ final class OnyxTextView: NSTextView {
         setSelectedRange(NSRange(location: NSMaxRange(r), length: 0))
     }
 
-    func hideSuggestions() { panel.hide(); linkCtx = nil; fieldCtx = nil; lastQuery = nil }
+    func hideSuggestions() { panel.hide(); linkCtx = nil; fieldCtx = nil; tagCtx = nil; lastQuery = nil }
 
     func refreshSuggestions() {
         guard !refreshing else { return }
@@ -219,10 +240,11 @@ final class OnyxTextView: NSTextView {
         let line = ns.substring(with: NSRange(location: lr.location, length: max(0, NSMaxRange(lr) - lr.location)))
         guard let c = LinkCompletion.context(line: line, caret: sel.location - lr.location) else {
             dismissedOpen = nil
+            if refreshTagSuggestions(line: line, lineStart: lr.location, caret: sel.location) { return }
             refreshFieldSuggestions(line: line, lineStart: lr.location, caret: sel.location - lr.location)
             return
         }
-        fieldCtx = nil
+        fieldCtx = nil; tagCtx = nil
         let absOpen = lr.location + c.open
         if let d = dismissedOpen, d != absOpen { dismissedOpen = nil }
         guard dismissedOpen == nil else { hideSuggestions(); return }
@@ -242,6 +264,57 @@ final class OnyxTextView: NSTextView {
         if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
             FileHandle.standardError.write("[suggest] q=\"\(c.query)\" part=\(c.part) n=\(items.count) hl=\(m.highlighted.map(String.init) ?? "-") top=\(items[0].title)\n".data(using: .utf8)!)
         }
+    }
+
+    /// Shows the tag list when the caret is in a `#tag` (or a frontmatter `tags:` value).
+    /// Returns whether a tag context exists (so field completion stays away).
+    private func refreshTagSuggestions(line: String, lineStart: Int, caret: Int) -> Bool {
+        var ctx: TagCompletion.Context?
+        var start = lineStart
+        if string.hasPrefix("---"), let fc = TagCompletion.frontmatterContext(text: string, caret: caret) {
+            ctx = fc.context; start = fc.lineStart
+        } else if let c = TagCompletion.context(line: line, caret: caret - lineStart) {
+            let at = lineStart + c.queryStart
+            let fm = Frontmatter.parse(string)
+            let inCode = NoteParser.codeRanges(string).contains { NSLocationInRange(at, $0) }
+            if at >= fm.bodyOffset, !inCode { ctx = c }
+        }
+        guard let c = ctx else { dismissedTag = nil; tagCtx = nil; return false }
+        let abs = start + c.queryStart
+        if let d = dismissedTag, d != abs { dismissedTag = nil }
+        guard dismissedTag == nil else { hideSuggestions(); return true }
+        let items = tagSuggest(c.query)
+        guard !items.isEmpty else { hideSuggestions(); return true }
+        let m = panel.model
+        let queryChanged = c.query != lastQuery || tagCtx?.queryStart != c.queryStart || tagLineStart != start
+        m.items = items
+        if queryChanged || (m.highlighted ?? 0) >= items.count {
+            m.highlighted = LinkCompletion.defaultHighlight(topIsExact: items[0].exact)
+        }
+        m.onPick = { [weak self] i in self?.acceptSuggestion(i) }
+        linkCtx = nil; fieldCtx = nil; tagCtx = c; tagLineStart = start; lastQuery = c.query
+        let anchor = firstRect(forCharacterRange: NSRange(location: max(start, abs - 1), length: 1), actualRange: nil)
+        if let w = window, anchor != .zero { panel.show(below: anchor, parent: w) }
+        if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
+            FileHandle.standardError.write("[tagsuggest] q=\"\(c.query)\" n=\(items.count) hl=\(m.highlighted.map(String.init) ?? "-") top=\(items[0].title)\n".data(using: .utf8)!)
+        }
+        return true
+    }
+
+    private func acceptTag(_ i: Int) {
+        guard let c = tagCtx, panel.model.items.indices.contains(i) else { return }
+        let item = panel.model.items[i]
+        let from = tagLineStart + c.queryStart
+        let to = max(from, tagLineStart + c.replaceEnd)
+        hideSuggestions()
+        var insert = item.insert
+        let ns = string as NSString
+        let next: unichar = to < ns.length ? ns.character(at: to) : 10
+        let finished = !insert.hasSuffix("/") && !c.inFrontmatter
+        if finished, next != 32, next != 9, next != 10, next != 13 { insert += " " }
+        insertText(insert, replacementRange: NSRange(location: from, length: min(to, ns.length) - from))
+        // a finished tag before an existing space: step past it, like typing the space
+        if finished, next == 32 || next == 9 { setSelectedRange(NSRange(location: selectedRange().location + 1, length: 0)) }
     }
 
     private func refreshFieldSuggestions(line: String, lineStart: Int, caret: Int) {
@@ -278,6 +351,7 @@ final class OnyxTextView: NSTextView {
     }
 
     func acceptSuggestion(_ i: Int) {
+        if tagCtx != nil { acceptTag(i); return }
         if linkCtx == nil, fieldCtx != nil { acceptField(i); return }
         guard let c = linkCtx, panel.model.items.indices.contains(i) else { return }
         let item = panel.model.items[i]
@@ -324,7 +398,7 @@ final class OnyxTextView: NSTextView {
         let ranges = folds.adjust(ranges, stillSelecting: stillSelecting)
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
         needsDisplay = true
-        if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
+        if !stillSelecting, panel.isVisible || linkCtx != nil || fieldCtx != nil || tagCtx != nil { DispatchQueue.main.async { [weak self] in self?.refreshSuggestions() } }
     }
 
     /// Apply a core `TextEdit` as one undoable change. When smart lists are on,
@@ -452,10 +526,11 @@ final class OnyxTextView: NSTextView {
             switch LinkCompletion.action(for: key, highlighted: m.highlighted) {
             case .accept(let i): acceptSuggestion(i); return
             case .leave:
-                if fieldCtx != nil { hideSuggestions(); break }   // a field line: the key does its usual thing
+                if fieldCtx != nil || tagCtx != nil { hideSuggestions(); break }   // a field line or a tag: the key does its usual thing
                 leaveLink(); return
             case .dismiss:
-                if fieldCtx != nil { dismissedFieldLine = fieldLineStart }
+                if let t = tagCtx { dismissedTag = tagLineStart + t.queryStart }
+                else if fieldCtx != nil { dismissedFieldLine = fieldLineStart }
                 else if let c = linkCtx { dismissedOpen = linkLineStart + c.open }
                 hideSuggestions(); return
             case .pass: break
@@ -537,6 +612,8 @@ struct EditorView: NSViewRepresentable {
         tv.folds.onChange = { [weak ws] p in ws?.editorFoldsChanged(p) }
         tv.suggest = { [weak ws] part, q in ws?.linkSuggestions(part, q) ?? [] }
         tv.fieldSuggest = { [weak ws] part, q in ws?.fieldSuggestions(part, q) ?? [] }
+        tv.tagSuggest = { [weak ws] q in ws?.tagSuggestions(q) ?? [] }
+        tv.onOpenTag = { [weak ws] t in ws?.revealTag(t) }
         tv.onFollowLink = { [weak ws] t in GraphPreviewController.shared.close(); ws?.openLink(t) }
         tv.onExtract = { [weak ws] in ws?.beginExtract() }
         tv.vaultRoot = { [weak ws] in ws?.root }

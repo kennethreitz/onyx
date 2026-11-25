@@ -115,6 +115,8 @@ struct TreeClickCatcher: NSViewRepresentable {
     var onChevron: (() -> Void)? = nil
     var onClick: (NSEvent.ModifierFlags) -> Void
     var onCommandDrag: ((String) -> [String])? = nil
+    var onMoveDrag: (([String]) -> Void)? = nil
+    var urlForPath: ((String) -> URL?)? = nil
     var isFolderPath: ((String) -> Bool)? = nil
     var onDragHover: ((String, Bool) -> Bool)? = nil
     var onDrop: ((String, Bool) -> Void)? = nil
@@ -139,13 +141,16 @@ struct TreeClickCatcher: NSViewRepresentable {
         var onChevron: (() -> Void)?
         var chevronWidth: CGFloat = 0
         var onCommandDrag: ((String) -> [String])?
+        var onMoveDrag: (([String]) -> Void)?
+        var urlForPath: ((String) -> URL?)?
         var isFolderPath: ((String) -> Bool)?
         var onDragHover: ((String, Bool) -> Bool)?
         var onDrop: ((String, Bool) -> Void)?
         var onDragEnded: (() -> Void)?
         private var pendingClick: NSEvent?
         private var pendingPoint: NSPoint = .zero
-        private var startedDrag = false
+        private var pointer = TreePointerSession()
+        private var dragIsMove = false
 
         func apply(_ s: TreeClickCatcher) {
             path = s.path
@@ -155,6 +160,8 @@ struct TreeClickCatcher: NSViewRepresentable {
             onChevron = s.onChevron
             chevronWidth = s.chevronWidth
             onCommandDrag = s.onCommandDrag
+            onMoveDrag = s.onMoveDrag
+            urlForPath = s.urlForPath
             isFolderPath = s.isFolderPath
             onDragHover = s.onDragHover
             onDrop = s.onDrop
@@ -177,65 +184,97 @@ struct TreeClickCatcher: NSViewRepresentable {
         }
         override func mouseDown(with event: NSEvent) {
             if dropOnly { return }
-            if event.modifierFlags.contains(.control) { nextResponder?.mouseDown(with: event); return }
+            if event.modifierFlags.contains(.control) {
+                pointer.cancel()
+                pendingClick = nil
+                nextResponder?.mouseDown(with: event)
+                return
+            }
             let loc = convert(event.locationInWindow, from: nil)
             if chevronWidth > 0 && loc.x < chevronWidth {
+                pointer.cancel()
+                pendingClick = nil
                 onChevron?()
                 return
             }
-            // ⌘-click vs ⌘-drag: wait to see whether this is a drag before toggling selection,
-            // so we don't deselect a row the user is about to move.
-            if event.modifierFlags.contains(.command), onCommandDrag != nil {
+            // Chevron clicks toggle immediately and are not a drag source.
+            // A regular click fires now so a folder stays expanded when you let go;
+            // the press stays armed so a follow-through drag can still pin the row.
+            // A ⌘-click is deferred until mouse-up so a ⌘-drag can move files
+            // without toggling selection first.
+            switch pointer.mouseDown(command: event.modifierFlags.contains(.command), canDrag: onCommandDrag != nil) {
+            case .clickNow:
+                onClick?(event.modifierFlags)
+                if onCommandDrag != nil {
+                    pendingClick = event
+                    pendingPoint = loc
+                } else {
+                    pendingClick = nil
+                }
+            case .deferClick:
                 pendingClick = event
                 pendingPoint = loc
-                startedDrag = false
-                return
             }
-            onClick?(event.modifierFlags)
         }
         override func mouseDragged(with event: NSEvent) {
-            guard let start = pendingClick, !startedDrag, let onCommandDrag else { return }
+            guard let start = pendingClick, let onCommandDrag else { return }
             let loc = convert(event.locationInWindow, from: nil)
             let dx = loc.x - pendingPoint.x, dy = loc.y - pendingPoint.y
-            guard (dx * dx + dy * dy) >= 16 else { return }
-            guard start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command) else { return }
+            guard pointer.mouseDragged(distanceSquared: Double(dx * dx + dy * dy)) == .startDrag else { return }
             let paths = onCommandDrag(path)
             guard !paths.isEmpty else { return }
-            startedDrag = true
             pendingClick = nil
-            beginMoveDrag(paths: paths, event: event)
+            let isMove = start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command)
+            if isMove { onMoveDrag?(paths) }
+            beginDrag(paths: paths, event: event, isMove: isMove)
         }
         override func mouseUp(with event: NSEvent) {
-            if let start = pendingClick, !startedDrag {
-                pendingClick = nil
+            let fire = pointer.mouseUp() == .clickNow
+            if fire, let start = pendingClick {
                 onClick?(start.modifierFlags)
             }
             pendingClick = nil
-            startedDrag = false
         }
         override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
 
-        private func beginMoveDrag(paths: [String], event: NSEvent) {
-            let pb = NSPasteboardItem()
-            pb.setString(paths.joined(separator: "\n"), forType: .onyxTreePaths)
-            let item = NSDraggingItem(pasteboardWriter: pb)
+        private func beginDrag(paths: [String], event: NSEvent, isMove: Bool) {
+            dragIsMove = isMove
             let img = TreeDragPreview.image(paths: paths, isFolder: isFolderPath ?? { _ in false })
             let size = img.size
             let loc = convert(event.locationInWindow, from: nil)
-            // Frame must match the image size. A wider row-sized frame stretches a
-            // short image and leaves a black slab around the name.
-            item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
-            item.imageComponentsProvider = {
-                let c = NSDraggingImageComponent(key: .icon)
-                c.contents = img
-                c.frame = NSRect(origin: .zero, size: size)
-                return [c]
+            var items: [NSDraggingItem] = []
+            for (i, p) in paths.enumerated() {
+                let pb = NSPasteboardItem()
+                if i == 0 {
+                    // ⌘-drag keeps the tree-move type so folders still accept it.
+                    // A plain drag uses a vault-path type Bookmarks can pin, which
+                    // the tree itself ignores, so dropping on a folder won't move the file.
+                    pb.setString(paths.joined(separator: "\n"), forType: isMove ? .onyxTreePaths : .onyxVaultPaths)
+                }
+                if let url = urlForPath?(p) {
+                    pb.setString(url.absoluteString, forType: .fileURL)
+                }
+                let item = NSDraggingItem(pasteboardWriter: pb)
+                if i == 0 {
+                    // Frame must match the image size. A wider row-sized frame stretches a
+                    // short image and leaves a black slab around the name.
+                    item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
+                    item.imageComponentsProvider = {
+                        let c = NSDraggingImageComponent(key: .icon)
+                        c.contents = img
+                        c.frame = NSRect(origin: .zero, size: size)
+                        return [c]
+                    }
+                } else {
+                    item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: 1, height: 1)
+                }
+                items.append(item)
             }
-            Self.moving = true
-            beginDraggingSession(with: [item], event: event, source: self)
+            if isMove { Self.moving = true }
+            beginDraggingSession(with: items, event: event, source: self)
         }
 
-        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
+        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { dragIsMove ? .move : .copy }
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
             Self.moving = false
             onDragEnded?()
@@ -418,10 +457,10 @@ struct TreeNodeView: View {
                         },
                         onCommandDrag: { path in
                             guard ws.renamingPath == nil else { return [] }
-                            let paths = ws.pathsForTreeDrag(from: path)
-                            ws.beginTreeDrag(paths)
-                            return paths
+                            return ws.pathsForTreeDrag(from: path)
                         },
+                        onMoveDrag: { ws.beginTreeDrag($0) },
+                        urlForPath: { ws.root?.appendingPathComponent($0) },
                         isFolderPath: { ws.snapshot?.folders.contains($0) == true },
                         onDragHover: { path, isFolder in ws.treeDragHover(on: path, isFolder: isFolder) },
                         onDrop: { path, isFolder in ws.performTreeDrop(on: path, isFolder: isFolder) },
@@ -533,6 +572,7 @@ struct FileMenu: View {
         Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
         Button("Move to…") { ws.beginMove(path) }
         Divider()
+        // Adjacent on purpose: Open in Obsidian is a hidden Option-alternate of Reveal in Finder.
         Button("Reveal in Finder") { ws.revealInFinder(path) }
         if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }
         Divider()
@@ -556,6 +596,7 @@ struct SelectionMenu: View {
         Button("Rename…") {}.disabled(true)
         Button("Move \(paths.count) Items to…") { ws.beginMove(paths) }
         Divider()
+        // Adjacent on purpose: the disabled Open in Obsidian item is a hidden Option-alternate of Reveal.
         Button("Reveal \(paths.count) Items in Finder") {
             if let r = ws.root { NSWorkspace.shared.activateFileViewerSelecting(paths.map { r.appendingPathComponent($0) }) }
         }
@@ -623,6 +664,20 @@ struct NoteRow: View {
             GraphPreviewController.shared.close()
             if let line { ws.openNote(path, line: line + 1) } else { ws.openNote(path) }
         }
+        .modifier(VaultPathDraggable(url: ws.root?.appendingPathComponent(path)))
+    }
+}
+
+/// Makes a sidebar or inspector row draggable as a vault file URL so it can be
+/// pinned to Bookmarks (search, recent, backlinks) or dropped in Finder.
+private struct VaultPathDraggable: ViewModifier {
+    var url: URL?
+    func body(content: Content) -> some View {
+        if let url {
+            content.draggable(url)
+        } else {
+            content
+        }
     }
 }
 
@@ -687,10 +742,24 @@ struct SearchPanel: View {
 
 struct BookmarksPanel: View {
     @Bindable var ws: Workspace
+    @State private var emptyArmed = false
     var body: some View {
         VStack(spacing: 0) {
             if ws.bookmarkStore.items.isEmpty {
-                QuietEmpty(title: "No bookmarks yet.", hint: "Bookmark a note from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+                VStack(spacing: 0) {
+                    QuietEmpty(title: "No bookmarks yet.", hint: "Drag a note here, or pin one from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+                    BookmarksEmptyDrop(ws: ws, parent: nil)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.control)
+                        .fill(emptyArmed ? Color.cursorBlue.opacity(0.08) : Color.clear)
+                        .padding(6)
+                )
+                .overlay {
+                    BookmarksDropCatcher(ws: ws, parent: nil, before: nil) { emptyArmed = $0 }
+                }
             } else {
                 ScrollView {
                     BookmarksList(ws: ws, items: ws.bookmarkStore.items, parent: nil, depth: 0)
@@ -705,44 +774,6 @@ struct BookmarksPanel: View {
                 }.buttonStyle(.plain).foregroundStyle(Color.muted).padding(10)
             }
         }
-    }
-}
-
-struct TagsPanel: View {
-    @Bindable var ws: Workspace
-    func sortedTags() -> [(String, Int)] {
-        let pairs: [(String, Int)] = (ws.snapshot?.tags ?? [:]).map { (k, v) in (k, v.count) }
-        return pairs.sorted { (a: (String, Int), b: (String, Int)) -> Bool in a.1 == b.1 ? a.0 < b.0 : a.1 > b.1 }
-    }
-    var body: some View {
-        let tags = sortedTags()
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(tags, id: \.0) { t in
-                    TagRow(name: t.0, count: t.1) { ws.searchQuery = "tag:" + t.0; ws.sidebarTab = .search }
-                }
-            }.padding(.vertical, 6).thinScrollers()
-        }
-    }
-}
-
-/// One tag in the Tags panel: the same hover wash as note rows, counts in tabular figures.
-struct TagRow: View {
-    var name: String
-    var count: Int
-    var action: () -> Void
-    @State private var hover = false
-    var body: some View {
-        HStack {
-            Text("#" + name).font(.custom("IBMPlexMono", size: 11.5)).foregroundStyle(Color.ink).lineLimit(1)
-            Spacer()
-            Text("\(count)").font(.system(size: TypeScale.caption).monospacedDigit()).foregroundStyle(Color.faint)
-        }
-        .padding(.horizontal, 12).frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: Radius.control).fill(Color.ink.opacity(hover ? 0.04 : 0)).padding(.horizontal, 5))
-        .contentShape(Rectangle())
-        .onHover { hover = $0 }
-        .onTapGesture(perform: action)
     }
 }
 
@@ -832,7 +863,13 @@ struct InspectorView: View {
         info("Words", "\(s.wordCount)")
         info("Links out", "\(s.links.count)")
         info("Backlinks", "\(snap.backlinks[note.path]?.count ?? 0)")
-        if !s.tags.isEmpty { info("Tags", s.tags.map { "#" + $0 }.joined(separator: " ")) }
+        if !s.tags.isEmpty {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Tags").font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 98, alignment: .leading)
+                TagChips(ws: ws, tags: s.tags)
+                Spacer(minLength: 0)
+            }.padding(.horizontal, 14).padding(.vertical, 3)
+        }
         info("Modified", note.mtime.formatted(date: .abbreviated, time: .shortened))
         info("Created", note.ctime.formatted(date: .abbreviated, time: .omitted))
         info("Path", note.path)
@@ -856,6 +893,7 @@ struct GitPanel: View {
     @State private var branch = ""
     @State private var changes: [(String, String)] = []
     @State private var message = ""
+    @State private var suggested = ""
     @State private var status = ""
     @State private var isRepo = true
     var body: some View {
@@ -863,13 +901,13 @@ struct GitPanel: View {
             if !isRepo {
                 QuietEmpty(title: "This vault isn’t a git repository.", hint: "Run git init in the vault folder to get history and auto-sync.").padding(.top, Space.xs)
             } else {
-                HStack {
+                HStack(spacing: 6) {
                     Image(systemName: "arrow.triangle.branch").foregroundStyle(Color.faint)
-                    Text(branch).font(.custom("IBMPlexMono", size: 11.5))
-                    Spacer()
+                    Text(branch).font(.custom("IBMPlexMono", size: 11.5)).lineLimit(1).layoutPriority(1)
+                    sectionPicker
+                    Spacer(minLength: 4)
                     Button { ws.git?.syncNow(); refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("Sync now")
-                }.padding(.horizontal, 12).padding(.top, 10)
-                sectionPicker
+                }.padding(.horizontal, 10).padding(.top, 8)
                 if ws.gitPanelSection == .history {
                     NoteHistoryList(ws: ws, isRepo: isRepo)
                 } else {
@@ -877,7 +915,8 @@ struct GitPanel: View {
                 }
             }
         }
-        .onAppear { refresh() }
+        .onAppear { refresh(); applyDefaultSection(opening: true) }
+        .onChange(of: ws.currentPath) { applyDefaultSection(opening: false) }
     }
 
     var sectionPicker: some View {
@@ -887,12 +926,22 @@ struct GitPanel: View {
                     Text(s.title)
                         .font(.system(size: 11, weight: ws.gitPanelSection == s ? .semibold : .regular))
                         .foregroundStyle(ws.gitPanelSection == s ? Color.ink : Color.faint)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .padding(.horizontal, 7).padding(.vertical, 2)
                         .background(ws.gitPanelSection == s ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
                 }.buttonStyle(.plain)
             }
-            Spacer(minLength: 0)
-        }.padding(.horizontal, 10)
+        }
+    }
+
+    /// History when a note is open in a git vault; Status otherwise. Opening the pane
+    /// picks the default; changing notes only falls back to Status when History wouldn't apply.
+    func applyDefaultSection(opening: Bool) {
+        let historyOK = isRepo && ws.currentPath != nil && !(ws.currentPath?.opensInFileView ?? true)
+        if !historyOK {
+            if ws.gitPanelSection == .history { ws.gitPanelSection = .status }
+        } else if opening {
+            ws.gitPanelSection = .history
+        }
     }
 
     @ViewBuilder var statusPane: some View {
@@ -945,14 +994,58 @@ struct GitPanel: View {
         changes = git(["status", "--porcelain"]).1.split(separator: "\n").map { l in
             (String(l.prefix(2)).trimmingCharacters(in: .whitespaces), String(l.dropFirst(3)))
         }
+        let next = suggestedMessage()
+        if message.isEmpty || message == suggested { message = next }
+        suggested = next
+    }
+    /// Working-tree changes (including untracked) with note texts, for a prefilled message the user can edit.
+    func suggestedMessage() -> String {
+        var files: [GitText.FileEdit] = []
+        let (headOK, _) = git(["rev-parse", "--verify", "--quiet", "HEAD"])
+        if headOK == 0 {
+            files = GitText.parseNameStatus(git(["diff", "HEAD", "--name-status", "-M"]).1).map { c in
+                let oldPath = c.from ?? c.path
+                let oldText = c.status == "A" ? nil : gitBlob("HEAD:" + oldPath)
+                let newText = c.status == "D" ? nil : workingText(c.path)
+                return GitText.FileEdit(change: c, oldText: oldText, newText: newText)
+            }
+            let untracked = git(["ls-files", "--others", "--exclude-standard"]).1.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            for path in untracked where !files.contains(where: { $0.change.path == path }) {
+                files.append(GitText.FileEdit(change: GitText.Change(status: "A", path: path), oldText: nil, newText: workingText(path)))
+            }
+        } else {
+            files = changes.compactMap { status, path -> GitText.FileEdit? in
+                guard !path.isEmpty else { return nil }
+                let added = status.contains("?") || status.contains("A")
+                let deleted = status.contains("D")
+                let st: Character = deleted ? "D" : (added ? "A" : "M")
+                return GitText.FileEdit(change: GitText.Change(status: st, path: path), oldText: nil, newText: deleted ? nil : workingText(path))
+            }
+        }
+        guard !files.isEmpty else { return "" }
+        return GitText.commitMessage(files)
+    }
+    func gitBlob(_ spec: String) -> String? {
+        let (code, out) = git(["show", spec])
+        if code != 0 || out.utf8.count > 1_000_000 || out.contains("\0") { return nil }
+        return out
+    }
+    func workingText(_ path: String) -> String? {
+        guard let root = ws.root else { return nil }
+        let url = root.appendingPathComponent(path)
+        guard let data = try? Data(contentsOf: url), data.count <= 1_000_000, !data.contains(0) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
     func commit() {
         ws.flushSave()
-        let msg = message.isEmpty ? "vault backup: \(Workspace.stamp())" : message
+        let typed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let msg = typed.isEmpty ? suggestedMessage() : message
+        let final = msg.isEmpty ? "vault backup: \(Workspace.stamp())" : msg
         _ = git(["add", "-A"])
-        let (code, out) = git(["commit", "-m", msg])
+        let (code, out) = git(["commit", "-m", final])
         status = code == 0 ? "Committed." : out
         message = ""
+        suggested = ""
         refresh()
     }
 }

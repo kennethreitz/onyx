@@ -233,4 +233,72 @@ final class BookmarksTests: XCTestCase {
     func testWatchedConfigIncludesBookmarks() {
         XCTAssertTrue(ObsidianConfig.watchedFiles.contains("bookmarks.json"))
     }
+
+    func testInsertAddsMovesAndDeduplicates() {
+        var s = BookmarkStore()
+        XCTAssertTrue(s.insert(path: "Home.md", isFolder: false, parent: nil, before: nil, now: 1))
+        XCTAssertTrue(s.containsFile(path: "Home.md"))
+        XCTAssertEqual(s.items.count, 1)
+        XCTAssertEqual(s.items[0].ctime, 1)
+        // Same path at the same place is a no-op, not a second pin.
+        XCTAssertFalse(s.insert(path: "Home.md", isFolder: false, parent: nil, before: nil, now: 2))
+        XCTAssertEqual(s.items.filter { $0.path == "Home.md" }.count, 1)
+        XCTAssertEqual(s.items[0].ctime, 1)
+
+        let a = BookmarkItem.file(path: "A.md", subpath: nil, ctime: 3)
+        let b = BookmarkItem.file(path: "B.md", subpath: nil, ctime: 4)
+        s.items = [a, b]
+        XCTAssertTrue(s.insert(path: "Home.md", isFolder: false, parent: nil, before: b.id, now: 5))
+        XCTAssertEqual(s.items.map(\.path), ["A.md", "Home.md", "B.md"])
+
+        // Already bookmarked: move to the drop position instead of duplicating.
+        XCTAssertTrue(s.insert(path: "Home.md", isFolder: false, parent: nil, before: a.id, now: 6))
+        XCTAssertEqual(s.items.map(\.path), ["Home.md", "A.md", "B.md"])
+        XCTAssertEqual(s.items.filter { $0.path == "Home.md" }.count, 1)
+
+        XCTAssertTrue(s.insert(path: "Projects", isFolder: true, parent: nil, before: nil, now: 7))
+        XCTAssertFalse(s.insert(path: "Projects", isFolder: true, parent: nil, before: nil, now: 8))
+        XCTAssertEqual(s.items.filter { $0.type == "folder" && $0.path == "Projects" }.count, 1)
+
+        // A heading bookmark does not block a whole-file pin of the same note.
+        XCTAssertTrue(s.insert(path: "A.md", isFolder: false, subpath: "#Intro", parent: nil, before: nil, now: 9))
+        XCTAssertEqual(s.items.filter { $0.path == "A.md" }.count, 2)
+
+        let g = BookmarkItem.group(title: "Pins", items: [], ctime: 10)
+        s.items.append(g)
+        XCTAssertTrue(s.insert(path: "Home.md", isFolder: false, parent: g.id, before: nil, now: 11))
+        XCTAssertEqual(s.item(id: g.id)?.items?.map(\.path), ["Home.md"])
+        XCTAssertFalse(s.items.contains(where: { $0.path == "Home.md" }))
+        XCTAssertEqual(s.items.filter { $0.path == "Home.md" }.count, 0)
+        XCTAssertEqual(s.item(id: g.id)?.items?.filter { $0.path == "Home.md" }.count, 1)
+    }
+
+    func testVaultFileDropRelativePath() {
+        let root = URL(fileURLWithPath: "/Users/ken/Notes")
+        XCTAssertEqual(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes/Home.md"), vaultRoot: root), "Home.md")
+        XCTAssertEqual(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes/Daily/x.md"), vaultRoot: root), "Daily/x.md")
+        XCTAssertEqual(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes/Home.md/"), vaultRoot: root), "Home.md")
+        XCTAssertNil(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes"), vaultRoot: root))
+        XCTAssertNil(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Other/Home.md"), vaultRoot: root))
+        XCTAssertNil(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes2/Home.md"), vaultRoot: root))
+        // Case-insensitive prefix; keep the dropped path's own casing under the root.
+        XCTAssertEqual(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/users/ken/notes/Home.md"), vaultRoot: root), "Home.md")
+        XCTAssertEqual(VaultFileDrop.relativePath(of: URL(fileURLWithPath: "/Users/ken/Notes/Daily/X.md"), vaultRoot: root), "Daily/X.md")
+    }
+
+    func testVaultFileDropItemsSkipOutsideAndDeduplicate() {
+        let root = URL(fileURLWithPath: "/Users/ken/Notes")
+        let items = VaultFileDrop.items(
+            treePaths: "Home.md\nDaily/x.md\nHome.md",
+            urls: [
+                URL(fileURLWithPath: "/Users/ken/Notes/Home.md"),
+                URL(fileURLWithPath: "/Users/ken/Notes/Projects/Onyx.md"),
+                URL(fileURLWithPath: "/tmp/outside.md"),
+            ],
+            vaultRoot: root,
+            isFolder: { path, _ in path == "Projects" }
+        )
+        XCTAssertEqual(items.map(\.path), ["Home.md", "Daily/x.md", "Projects/Onyx.md"])
+        XCTAssertEqual(items.map(\.isFolder), [false, false, false])
+    }
 }

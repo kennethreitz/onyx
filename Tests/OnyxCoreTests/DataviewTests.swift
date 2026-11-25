@@ -330,4 +330,28 @@ final class DataviewTests: XCTestCase {
         let parsed = try Dataview.parseSource("outgoing([[Sun]]) or incoming([[Moon]])")
         if case .or(.outgoing("Sun"), .incoming("Moon")) = parsed { } else { XCTFail("parsed \(String(describing: parsed))") }
     }
+
+    func testHtmlRendersWikilinksInStringCells() {
+        let row: [DVValue] = [
+            .link(path: "Knowledge/Crystals/Aquamarine.md", name: "Aquamarine"),
+            .string("Third Eye ([[Ajna]]), Throat"),
+            .string("[[Jupiter]], [[Neptune (astrology)|Neptune]] / [[Pisces]], [[Aquarius]]"),
+            .string("Water"),
+        ]
+        let html = Dataview.html(DVResult(headers: ["Stone", "Chakra", "Planet / Zodiac", "Element"], rows: [row], isList: false))
+        XCTAssertTrue(html.contains("<span class=\"onyx-inline-md\">Third Eye ([[Ajna]]), Throat</span>"), html)
+        XCTAssertTrue(html.contains("<span class=\"onyx-inline-md\">[[Jupiter]], [[Neptune (astrology)|Neptune]] / [[Pisces]], [[Aquarius]]</span>"), html)
+        XCTAssertTrue(html.contains("data-path=\"Knowledge/Crystals/Aquamarine.md\">Aquamarine</a>"), html)
+        XCTAssertFalse(html.contains("onyx-inline-md\">Water"), html)
+        XCTAssertTrue(html.contains(">Water</td>"), html)
+    }
+
+    func testMarkdownTableEscapesPipesInsideWikilinkCells() {
+        let md = Dataview.markdownTable(
+            ["Planet / Zodiac"],
+            [[.string("[[Jupiter]], [[Neptune (astrology)|Neptune]] / [[Pisces]]")]]
+        )
+        XCTAssertTrue(md.contains("[[Neptune (astrology)\\|Neptune]]"), md)
+        XCTAssertFalse(md.contains("| Neptune]]"), md)
+    }
 }

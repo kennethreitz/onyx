@@ -197,6 +197,12 @@ struct Ops: Sendable {
     func line(_ args: [String]) -> String? {
         let r = run(args); return r.code == 0 ? r.out.trimmingCharacters(in: .whitespacesAndNewlines) : nil
     }
+    /// File text at a git revision (`HEAD:path` or `:path` for the index). Nil if missing, binary, or huge.
+    func blob(_ spec: String) -> String? {
+        let r = run(["show", spec])
+        if r.code != 0 || r.data.count > 1_000_000 || r.data.contains(0) { return nil }
+        return r.out
+    }
 
     var gitDir: URL { URL(fileURLWithPath: line(["rev-parse", "--absolute-git-dir"]) ?? root.appendingPathComponent(".git").path) }
     var rebasing: Bool {
@@ -205,14 +211,20 @@ struct Ops: Sendable {
     }
     var merging: Bool { FileManager.default.fileExists(atPath: gitDir.appendingPathComponent("MERGE_HEAD").path) }
 
-    /// Stage everything and commit it with a message naming the notes. Returns the subject.
+    /// Stage everything and commit it with a message that summarizes the changes. Returns the subject.
     func commit(reason: String?) -> String? {
         guard !rebasing, !merging else { return nil }
         run(["add", "-A"])
         let ns = run(["diff", "--cached", "--name-status", "-M"]).out
         let changes = GitText.parseNameStatus(ns)
         guard !changes.isEmpty else { return nil }
-        let msg = GitText.commitMessage(changes, reason: reason)
+        let files = changes.map { c -> GitText.FileEdit in
+            let oldPath = c.from ?? c.path
+            let oldText = c.status == "A" ? nil : blob("HEAD:" + oldPath)
+            let newText = c.status == "D" ? nil : blob(":" + c.path)
+            return GitText.FileEdit(change: c, oldText: oldText, newText: newText)
+        }
+        let msg = GitText.commitMessage(files, reason: reason)
         var args = ["commit", "-q", "--no-verify", "-m", msg]
         if (line(["config", "user.email"]) ?? "").isEmpty {
             args = ["-c", "user.name=Onyx", "-c", "user.email=onyx@\(ProcessInfo.processInfo.hostName)"] + args

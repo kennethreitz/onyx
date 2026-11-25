@@ -65,7 +65,7 @@ Tests/               OnyxCore and OnyxSync tests; Tests/reader for the typograph
 
 The reader is a WKWebView. `reader.js` / `reader.css` render the page; `typeset.js` / `typeset.css` add the book typography (small caps, old-style figures, hyphenation, drop caps, sidenote layout) when Typeset reading is on. Graph layout lives in OnyxCore (`Graph.swift`, `GraphIndex.swift`, `RelationGraph.swift`) and is drawn by `GraphView.swift`. Git autosync is `GitSync.swift`. Auto-update from GitHub Releases is `Updater.swift` (OnyxCore) plus `UpdateUI.swift`. Obsidian Sync is the `OnyxSync` package plus `ObsidianSync.swift`. Protocol notes are in [docs/obsidian-sync-protocol.md](docs/obsidian-sync-protocol.md).
 
-`scripts/bundle.sh` wraps the SwiftPM binary into `build/Onyx.app` and signs it.
+`scripts/bundle.sh` wraps the SwiftPM binary into `build/Onyx.app` and signs it. It first runs `scripts/build-extensions.sh`, which builds the app extensions in `Extensions/` into `Contents/PlugIns` without an Xcode project: `OnyxSafari.appex` (the Clip to Onyx Safari Web Extension: `SafariWebExtensionHandler.swift` plus `manifest.json`, `background.js`, and the committed icons in `Extensions/Safari/Resources/images`, rendered from `Resources/AppIcon.icns` by `swift scripts/make-extension-icons.swift`: the app icon for the manifest, a monochrome crystal-and-graph glyph for the toolbar, which Safari treats as a template) and `OnyxShare.appex` (the Share menu). Each is compiled with `swiftc -e _NSExtensionMain` per architecture (both for `UNIVERSAL=1`) and lipo'd, along with `Sources/OnyxCore/ClipURL.swift`. `SKIP_EXTENSIONS=1` leaves them out. `Tests/extension` (run by `make test`) checks `background.js` against a stub `browser` API.
 
 ## Environment variables and test hooks
 
@@ -144,6 +144,11 @@ foldclick <n>         # click the nth fold region's chevron (through mouseDown)
 select <offset>       # a programmatic caret move, as Find does (opens folds)
 foldstate             # folded count, hidden ranges, text height, text intact?
 rfold [command id]    # reader: run a fold command, print foldable/folded/hidden counts
+tagtree               # the Tags pane tree, fully expanded, with own/total counts
+tagreveal <tag>       # what clicking a #tag does: select it in the Tags pane
+tagsuggest <query>    # the editor's #tag completion rows
+tagrename <from> -> <to>  # plan and write a tag rename (no sheet)
+tagundo               # undo the last tag rename
 ```
 
 There are more workspace commands for tree selection, previews, and relations; see `TypeSelfTest` in `Sources/Onyx/LinkSuggest.swift`. Never set `ONYX_TYPE_TEST` in normal use.
@@ -151,6 +156,8 @@ There are more workspace commands for tree selection, previews, and relations; s
 ## Signing
 
 After a rebuild, macOS may ask for Keychain access if the app was signed ad hoc (the signature changes every build). `make app` and `make release` (via `scripts/bundle.sh`) sign with an Apple Development or Developer ID identity if you have one, otherwise with a stable local “Onyx Local Signing” identity. Create that once with `scripts/make-signing-cert.sh`. Then “Always Allow” lasts across rebuilds.
+
+The extensions are signed first, each with `Extensions/sandbox.entitlements` (extensions must be sandboxed), then the app without `--deep`. Safari lists the web extension only when that identity is an Apple Development or Developer ID certificate; see [the web clipper doc](web-clipper.md#signing-why-the-extension-may-not-show-up). To check registration without launching the app: copy the bundle somewhere, `lsregister -f` it, `pluginkit -a` its `.appex`es, then `pluginkit -m -v -p com.apple.Safari.web-extension` (and `-p com.apple.share-services`); undo with `pluginkit -r` and `lsregister -u`.
 
 `SIGN_IDENTITY` and `SIGN_KEYCHAIN` override the identity and keychain `bundle.sh` uses. If nothing is available, the app is signed ad hoc, and Keychain will prompt again after each rebuild.
 

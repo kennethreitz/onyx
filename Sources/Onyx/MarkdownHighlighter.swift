@@ -11,7 +11,7 @@ struct MarkdownHighlighter {
     static let highlight = try! NSRegularExpression(pattern: #"(==)(?=\S)(.+?)(?<=\S)(==)"#)
     static let mark = try! NSRegularExpression(pattern: #"<mark class=\"hltr-(\w+)\">(.+?)</mark>"#)
     static let code = try! NSRegularExpression(pattern: #"(`+)([^`\n]|[^`\n][^\n]*?[^`\n])\1"#)
-    static let tag = try! NSRegularExpression(pattern: #"(?<![\w/&#])#[A-Za-z0-9_\-/]*[A-Za-z_\-/][A-Za-z0-9_\-/]*"#)
+    static let tag = TagScanner.inlineRegex   // the same #tags the index sees (Unicode, nested)
     static let comment = try! NSRegularExpression(pattern: #"%%[\s\S]*?%%"#)
     static let strike = try! NSRegularExpression(pattern: #"(~~)(.+?)(~~)"#)
     static let url = try! NSRegularExpression(pattern: #"https?://[^\s)>\]]+"#)

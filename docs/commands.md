@@ -152,7 +152,7 @@ Backlinks lists notes that link to the current one (click to open at that line) 
 | Bookmark | <kbd>⌥⌘D</kbd> |
 | Copy Wikilink | <kbd>⇧⌘L</kbd> |
 | Reveal in Finder | <kbd>⌥⇧⌘R</kbd> |
-| Open in Obsidian | — |
+| Open in Obsidian | — (hold ⌥ in menus; always in the palette) |
 | Read Aloud | — |
 | Pause Reading | — |
 | Stop Reading | — |

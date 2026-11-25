@@ -55,6 +55,8 @@ struct ReaderView: NSViewRepresentable {
     var paneID: UUID? = nil
     /// A hover preview: compact, no backlinks, no nested previews, never edits.
     var preview = false
+    /// When set (version-history overlay), the reader renders a rich insert/delete diff instead of `text` alone.
+    var richDiff: [NoteDiff.RichBlock]? = nil
     @Environment(\.colorScheme) var scheme
     // Observed so a Settings ▸ Typesetting change re-renders at once (values are read in Typeset).
     @AppStorage(Typeset.on) private var tsOn = true
@@ -102,9 +104,9 @@ struct ReaderView: NSViewRepresentable {
         if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
         let typeset = Typeset.signature
-        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset || c.foldable != foldHeadings {
-            let sameNote = c.renderedPath == path
-            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset; c.foldable = foldHeadings
+        if c.renderedToken != ws.renderToken || c.renderedPath != path || c.dark != dark || c.sidenotes != ws.sidenotes || c.renderedText != text || c.typeset != typeset || c.foldable != foldHeadings || c.renderedDiff != richDiff {
+            let sameNote = c.renderedPath == path && c.renderedDiff == richDiff
+            c.renderedToken = ws.renderToken; c.renderedPath = path; c.dark = dark; c.sidenotes = ws.sidenotes; c.renderedText = text; c.typeset = typeset; c.foldable = foldHeadings; c.renderedDiff = richDiff
             c.render(keepScroll: sameNote)
         }
         if c.typeKey != "\(fontSize)/\(measure)" {
@@ -153,6 +155,7 @@ struct ReaderView: NSViewRepresentable {
         var scrollHandled: Int?
         var lastLayoutWidth: CGFloat = 0
         var foldable = true
+        var renderedDiff: [NoteDiff.RichBlock]?
 
         /// Source lines of this note's folded headings (shared with the editor via FoldStore).
         func foldedLines(_ text: String, path: String) -> [Int] {
@@ -191,7 +194,7 @@ struct ReaderView: NSViewRepresentable {
             guard let snap = ws.snapshot, let path = renderedPath else { return }
             let payload = ReaderPayload.build(text: renderedText ?? "", path: path, snap: snap, dark: dark, sidenotes: sidenotes && !preview, keepScroll: keepScroll, line: keepScroll ? 0 : startLine, preview: preview, kanbanEditable: paneID == nil && !preview,
                                                typeset: Typeset.options(preview: preview),
-                                               folds: foldedLines(renderedText ?? "", path: path), foldable: foldable && !preview)
+                                               folds: foldedLines(renderedText ?? "", path: path), foldable: foldable && !preview, diff: renderedDiff)
             startLine = 0   // only the first render of this view restores
             eval("Onyx.render(\(payload))")
         }
@@ -254,7 +257,7 @@ struct ReaderView: NSViewRepresentable {
                 }
             case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
             case "tag":
-                if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
+                if let t = body["tag"] as? String { ws.revealTag(t) }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }
             case "dvtask":
                 if !preview, let p = body["path"] as? String, let i = body["index"] as? Int {

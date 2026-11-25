@@ -4,7 +4,7 @@ import Foundation
 public enum ReaderPayload {
     static let fence = try! NSRegularExpression(pattern: #"(?m)^```(dataviewjs|dataview|base)[^\n]*\n([\s\S]*?)\n```[ \t]*$"#)
 
-    public static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true, folds: [Int] = [], foldable: Bool = false) -> String {
+    public static func build(text: String, path: String, snap: VaultSnapshot, dark: Bool, sidenotes: Bool, keepScroll: Bool, line: Double = 0, preview: Bool = false, kanbanEditable: Bool = false, typeset: [String: Any]? = nil, backlinks: Bool = true, folds: [Int] = [], foldable: Bool = false, diff: [NoteDiff.RichBlock]? = nil) -> String {
         let fm = Frontmatter.parse(text)
         var body = fieldsHTML(text, path: path, snap: snap)
         // Dataview blocks become placeholders, computed here.
@@ -59,11 +59,20 @@ public enum ReaderPayload {
         resolveAll(body, from: path, depth: 0)
         // Markdown image embeds (`![](x.png)`) resolve like Obsidian: next to the note, from the vault root, or by name.
         var mdembeds: [String: String] = [:]
-        for href in Attachments.markdownImageTargets(in: body) where mdembeds[href] == nil {
-            if let r = Attachments.resolveMarkdownTarget(href, from: path, exists: { snap.attachments[$0] != nil }, resolve: { snap.resolve($0, from: path) }) {
-                let url = "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)
-                mdembeds[href] = url
-                if let d = href.removingPercentEncoding { mdembeds[d] = url }
+        func absorbImages(_ s: String) {
+            for href in Attachments.markdownImageTargets(in: s) where mdembeds[href] == nil {
+                if let r = Attachments.resolveMarkdownTarget(href, from: path, exists: { snap.attachments[$0] != nil }, resolve: { snap.resolve($0, from: path) }) {
+                    let url = "onyx://vault/" + (r.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? r)
+                    mdembeds[href] = url
+                    if let d = href.removingPercentEncoding { mdembeds[d] = url }
+                }
+            }
+        }
+        absorbImages(body)
+        if let diff {
+            for b in diff {
+                resolveAll(b.text, from: path, depth: 0)
+                absorbImages(b.text)
             }
         }
 
@@ -94,6 +103,7 @@ public enum ReaderPayload {
             "typeset": typeset ?? ReaderPayload.defaultTypeset(preview: preview),
             "lineBase": fm.bodyOffset > 0 ? fm.lineCount : 0, "line": line,
             "folds": folds, "foldable": foldable,
+            "diff": diff.map { NoteDiff.richPayload($0) } ?? [],
             "base": "onyx://vault/" + (folder.isEmpty ? "" : (folder.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? folder) + "/"),
         ]
         let data = (try? JSONSerialization.data(withJSONObject: obj)) ?? Data("{}".utf8)

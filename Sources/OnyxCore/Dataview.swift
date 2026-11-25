@@ -964,6 +964,8 @@ public enum Dataview {
             return l.map(inlineCell).joined(separator: ", ")
         case .null:
             return "<span class=\"dataview-empty\">null</span>"
+        case .string(let s):
+            return s.contains("[[") ? "<span class=\"onyx-inline-md\">\(esc(s))</span>" : esc(s)
         default:
             return esc(v.text)
         }
@@ -1531,6 +1533,11 @@ public enum Dataview {
         case .link(let p, let n): return "<a class=\"internal-link\" data-path=\"\(esc(p))\">\(esc(n))</a>"
         case .list(let l): return l.map(htmlCell).joined(separator: ", ")
         case .task(let t): return esc(t.text)
+        case .string(let s):
+            // Field text may hold several `[[wikilinks]]`, aliases, and
+            // markup in parentheses (`Third Eye ([[Ajna]])`). The reader
+            // re-parses `.onyx-inline-md` with the same inline tokenizer.
+            return s.contains("[[") ? "<span class=\"onyx-inline-md\">\(esc(s))</span>" : esc(s)
         default: return esc(v.text)
         }
     }

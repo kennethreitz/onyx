@@ -105,10 +105,11 @@
   };
   const tag = {
     name: 'tag', level: 'inline',
-    start(src) { const m = src.match(/(^|\s)#[A-Za-z0-9_\-\/]*[A-Za-z_\-\/]/); return m ? m.index + m[1].length : undefined; },
+    // Nested (#a/b/c) and Unicode (#café, #📚) like Obsidian; all-digit (#2024) is not a tag.
+    start(src) { const m = src.match(/(^|\s)#[\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*[\p{L}\p{M}\p{So}\p{Sk}_\-\u200d\ufe0f]/u); return m ? m.index + m[1].length : undefined; },
     tokenizer(src) {
-      const m = /^#([A-Za-z0-9_\-\/]*[A-Za-z_\-\/][A-Za-z0-9_\-\/]*)/.exec(src);
-      if (m) return { type: 'tag', raw: m[0], tag: m[1] };
+      const m = /^#([\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*[\p{L}\p{M}\p{So}\p{Sk}_\-\u200d\ufe0f][\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*?)\/*(?![\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f])/u.exec(src);
+      if (m) return { type: 'tag', raw: m[0].replace(/\/+$/, ''), tag: m[1] };
     },
     renderer(t) { return `<a class="tag" data-tag="${esc(t.tag)}">#${esc(t.tag)}</a>`; }
   };
@@ -165,6 +166,55 @@
   const embedMarked = new marked.Marked({ gfm: true, breaks: true });
   embedMarked.use({ extensions: [wikilink, highlight, tag], renderer });
 
+  /** GFM table rows split on `|`. Pipes inside `[[wikilinks]]` (alias
+      separators, escaped or not) must not become cell breaks — Obsidian
+      leaves the wikilink intact. Escape those pipes before marked lexes
+      the table; the wikilink tokenizer still treats `\|` as `|`. */
+  function escapePipesInsideWikilinks(line) {
+    let out = '', i = 0, n = line.length;
+    while (i < n) {
+      if (line[i] === '`') {
+        const ticks = (/^`+/.exec(line.slice(i)) || ['`'])[0];
+        const end = line.indexOf(ticks, i + ticks.length);
+        if (end < 0) { out += line.slice(i); break; }
+        out += line.slice(i, end + ticks.length);
+        i = end + ticks.length;
+        continue;
+      }
+      const wiki = line[i] === '[' && line[i + 1] === '['
+        || (line[i] === '!' && line[i + 1] === '[' && line[i + 2] === '[');
+      if (wiki) {
+        const open = line[i] === '!' ? i + 1 : i;
+        const end = line.indexOf(']]', open + 2);
+        if (end < 0) { out += line.slice(i); break; }
+        out += line.slice(i, end + 2).replace(/(^|[^\\])\|/g, '$1\\|');
+        i = end + 2;
+        continue;
+      }
+      out += line[i++];
+    }
+    return out;
+  }
+  function escapeWikilinkPipesInTables(md) {
+    const lines = String(md).split('\n');
+    let fence = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const open = /^( {0,3})(`{3,}|~{3,})/.exec(line);
+      if (open) {
+        const marker = open[2];
+        if (!fence) fence = marker;
+        else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+        continue;
+      }
+      if (fence) continue;
+      if (line.indexOf('|') < 0) continue;
+      if (!/^\s*\|/.test(line) && !/\|.+\|/.test(line)) continue;
+      lines[i] = escapePipesInsideWikilinks(line);
+    }
+    return lines.join('\n');
+  }
+
   function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, m => m.replace(/[^\n]/g, '')); }  // keep line numbers
 
   function withMath(md, parse) {
@@ -181,6 +231,7 @@
   const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
   function parseWithLines(md, base) {
     const prep = window.OnyxMath ? window.OnyxMath.protect(md) : { text: md, slots: [] };
+    prep.text = escapeWikilinkPipesInTables(prep.text);
     const toks = mainMarked.lexer(prep.text);
     // marked-footnote injects a `footnotes` token at the start of the lexer
     // list and moves it to the end in walkTokens — but only in that original
@@ -500,8 +551,8 @@
     page.querySelectorAll('.table-wide').forEach(ensureZoomHint);
   }
 
-  /** Bleed, scale-to-fit while labels stay ≥ ~11px, or scroll (starting
-      centered). Records natural dimensions once so a resize can recompute
+  /** Bleed, scale-to-fit while labels stay ≥ ~13px, or scroll (starting
+      at the left edge). Records natural dimensions once so a resize can recompute
       without compounding. */
   function mermaidLabelFontPx(svg) {
     const t = svg.querySelector && svg.querySelector('text');
@@ -522,7 +573,8 @@
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'onyx-zoom-hint';
-    b.title = 'Double-click to view full size';
+    b.title = 'View full size (or double-click the figure)';
+    b.textContent = '⤢';
     b.setAttribute('aria-label', 'View full size');
     b.addEventListener('click', e => {
       e.preventDefault();
@@ -597,13 +649,14 @@
       // is-scrollable (flex-start) must be on before we measure scrollWidth,
       // or a centered too-wide flex child clips the start edge.
       node.classList.add('is-scrollable');
-      const center = () => {
-        const max = node.scrollWidth - node.clientWidth;
-        if (max > 1) node.scrollLeft = max / 2;
+      // Overflowing content starts at the left edge so every node is
+      // reachable; only a figure that fits is centered (by flex).
+      const start = () => {
+        node.scrollLeft = 0;
         if (cue) cue(node);
       };
-      center();
-      requestAnimationFrame(center);
+      start();
+      requestAnimationFrame(start);
       ensureZoomHint(node);
     });
   }
@@ -998,6 +1051,52 @@
     closeLightbox(false);
   }, true);
 
+
+  function parseInlineDiff(text) {
+    const raw = String(text ?? '');
+    const safe = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const prep = window.OnyxMath ? window.OnyxMath.protect(safe) : { text: safe, slots: [] };
+    let html;
+    try { html = mainMarked.parseInline(prep.text); }
+    catch (e) { html = safe; }
+    return window.OnyxMath ? window.OnyxMath.restore(html, prep.slots) : html;
+  }
+  function renderDiffSpans(b) {
+    const inner = (b.spans || []).map(sp => {
+      const html = parseInlineDiff(sp.text || '');
+      if (sp.op === 'insert') return `<ins class="onyx-diff-ins">${html}</ins>`;
+      if (sp.op === 'delete') return `<del class="onyx-diff-del">${html}</del>`;
+      return html;
+    }).join('');
+    const kind = b.kind || 'paragraph';
+    if (kind === 'heading') {
+      const l = Math.min(6, Math.max(1, +b.level || 1));
+      return `<h${l}>${inner}</h${l}>`;
+    }
+    if (kind === 'listItem' || kind === 'task') {
+      const checked = kind === 'task' && /\[[xX]\]/.test(b.markdown || '');
+      return `<ul><li${checked ? ' class="is-checked"' : ''}>${inner}</li></ul>`;
+    }
+    if (kind === 'blockquote') return `<blockquote>${inner}</blockquote>`;
+    if (kind === 'blank') return '<p class="onyx-diff-blank">&nbsp;</p>';
+    return `<p>${inner}</p>`;
+  }
+  function wrapDiff(op, inner) {
+    if (op === 'insert') return `<div class="onyx-diff-ins-block">${inner}</div>`;
+    if (op === 'delete') return `<div class="onyx-diff-del-block">${inner}</div>`;
+    if (op === 'change') return `<div class="onyx-diff-chg-block">${inner}</div>`;
+    return inner;
+  }
+  function renderDiffBlock(b) {
+    if (b.kind === 'blank' && b.op === 'equal') return '';
+    if (b.op === 'change' && Array.isArray(b.spans)) return wrapDiff('change', renderDiffSpans(b));
+    const inner = parseWithLines(b.markdown || '', 0);
+    return wrapDiff(b.op, inner);
+  }
+  function renderDiff(blocks) {
+    return (blocks || []).map(renderDiffBlock).join('');
+  }
+
   window.Onyx = {
     render(payload) {
       P = payload;
@@ -1009,6 +1108,9 @@
       let html;
       if (payload.kanban) {
         html = `<h1>${esc(payload.name)}</h1>` + kanbanHTML(payload.kanban);
+      } else if (Array.isArray(payload.diff) && payload.diff.length) {
+        try { html = renderDiff(payload.diff); }
+        catch (e) { html = `<p>Couldn’t render this diff.</p>`; }
       } else {
         try { html = parseWithLines(md, payload.lineBase || 0); }
         catch (e) { try { html = withMath(md, s => mainMarked.parse(s)); } catch (e2) { html = `<pre>${esc(md)}</pre>`; } }
@@ -1120,6 +1222,8 @@
     },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
+    _diffHTML(blocks) { return renderDiff(blocks); },
+    _escapeWikilinkPipesInTables: escapeWikilinkPipesInTables,
     setFolds(lines) { FOLDS = new Set(lines.map(Number)); refreshFolds(); },
     foldCommand(id) {
       const heads = foldHeads().filter(h => h.classList.contains('foldable'));

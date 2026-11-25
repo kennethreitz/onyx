@@ -73,6 +73,66 @@ test('wikilinks with aliases survive the break', () => {
   assert.match(out, /internal-link[^>]*>Mercury<\/a><br>/);
 });
 
+function cell(html, i = 0) {
+  return [...html.matchAll(/<td>([\s\S]*?)<\/td>/g)].map(m => m[1])[i];
+}
+function links(html) {
+  return [...html.matchAll(/data-target="([^"]*)"[^>]*>([^<]*)<\/a>/g)].map(m => [m[1], m[2]]);
+}
+
+test('unescaped pipes inside wikilinks do not split table cells', () => {
+  const md = `| Stone | Chakra | Planet / Zodiac |
+| --- | --- | --- |
+| [[Aquamarine]] | Throat ([[Vishuddha]]) | [[Jupiter]], [[Neptune (astrology)|Neptune]] / [[Pisces]], [[Aquarius]] |
+`;
+  const out = html(md);
+  assert.equal((out.match(/<tr>/g) || []).length, 2); // header + one body row
+  assert.equal((out.match(/<td>/g) || []).length, 3);
+  const planet = cell(out, 2);
+  assert.deepEqual(links(planet), [
+    ['Jupiter', 'Jupiter'],
+    ['Neptune (astrology)', 'Neptune'],
+    ['Pisces', 'Pisces'],
+    ['Aquarius', 'Aquarius'],
+  ]);
+  const chakra = cell(out, 1);
+  assert.match(chakra, /^Throat \(/);
+  assert.deepEqual(links(chakra), [['Vishuddha', 'Vishuddha']]);
+  assert.match(chakra, /\)<\/td>$|\)$/);
+});
+
+test('escaped pipes inside table wikilinks are alias separators', () => {
+  const md = `| x |
+| --- |
+| [[Jupiter]], [[Neptune (astrology)\\|Neptune]] / [[Pisces]], [[Aquarius]] |
+`;
+  const out = html(md);
+  assert.equal((out.match(/<td>/g) || []).length, 1);
+  assert.deepEqual(links(cell(out, 0)), [
+    ['Jupiter', 'Jupiter'],
+    ['Neptune (astrology)', 'Neptune'],
+    ['Pisces', 'Pisces'],
+    ['Aquarius', 'Aquarius'],
+  ]);
+});
+
+test('wikilinks in parentheses inside a table cell render as links', () => {
+  const out = html('| Chakra |\n| --- |\n| Third Eye ([[Ajna]]) |\n');
+  const c = cell(out, 0);
+  assert.match(c, /^Third Eye \(/);
+  assert.deepEqual(links(c), [['Ajna', 'Ajna']]);
+});
+
+test('escapeWikilinkPipesInTables leaves fenced code and prose alone', () => {
+  const esc = ctx.window.Onyx._escapeWikilinkPipesInTables;
+  const prose = 'See [[Neptune (astrology)|Neptune]] in prose.';
+  assert.equal(esc(prose), prose);
+  const fence = '```\n| [[Neptune (astrology)|Neptune]] |\n```\n';
+  assert.equal(esc(fence), fence);
+  const table = '| [[Neptune (astrology)|Neptune]] |\n';
+  assert.equal(esc(table), '| [[Neptune (astrology)\\|Neptune]] |\n');
+});
+
 test('source-line markers are unchanged by line breaks (scroll mapping)', () => {
   const md = '# T\n\n**A**: 1\n**B**: 2\n**C**: 3\n\npara\n\n- x\n- y\n';
   assert.deepEqual(marks(md), [[0, 1], [2, 3], [6, 1], [8, 2]]);
@@ -324,46 +384,48 @@ test('image CSS never upscales past the column, and the resize grip is styled', 
 
 const Tset = () => ctx.window.OnyxTypeset;
 
-test('mermaidFit scales to the bled width until labels would drop below 11px', () => {
+test('mermaidFit scales to the bled width until labels would drop below 13px', () => {
   const T = Tset();
   assert.equal(T.MERMAID_FONT_PX, 15);
-  assert.equal(T.MERMAID_MIN_LABEL_PX, 11);
+  assert.equal(T.MERMAID_MIN_LABEL_PX, 13);
   // Fits in the wrap: leave natural, no scroll.
   const natural = T.mermaidFit(400, 500, 15);
   assert.equal(natural.mode, 'natural');
   assert.equal(natural.scrollable, false);
   assert.equal(natural.scale, 1);
-  // 20% over the bleed: 15px * (1/1.2) = 12.5px, still above 11 — fit and center.
-  const modest = T.mermaidFit(1200, 1000, 15);
+  // ~10% over the bleed: 15px * (1000/1100) ≈ 13.6px, still above 13 — fit.
+  const modest = T.mermaidFit(1100, 1000, 15);
   assert.equal(modest.mode, 'fit');
   assert.equal(modest.scrollable, false);
   assert.equal(modest.layoutWidth, 1000);
-  assert.ok(Math.abs(modest.scale - 1000 / 1200) < 1e-9);
-  assert.ok(15 * modest.scale >= 11);
-  // Previously the cap was 25% over; 40% over still fits at 15 * (1/1.4) ≈ 10.71, just under 11...
-  // 15 * 11/15 = 11 exactly at scale 11/15 ≈ 0.733, i.e. natural / bleed ≤ 15/11 ≈ 1.3636.
-  const atFloor = T.mermaidFit(1363.6, 1000, 15);
+  assert.ok(Math.abs(modest.scale - 1000 / 1100) < 1e-9);
+  assert.ok(15 * modest.scale >= 13);
+  // 20% over would be 12.5px, under the floor, so this scrolls.
+  const justOver = T.mermaidFit(1200, 1000, 15);
+  assert.equal(justOver.mode, 'scroll');
+  assert.equal(justOver.scrollable, true);
+  // 15 * 13/15 = 13 exactly at scale 13/15, i.e. natural / bleed ≤ 15/13 ≈ 1.1538.
+  const atFloor = T.mermaidFit(1153.8, 1000, 15);
   assert.equal(atFloor.mode, 'fit');
-  assert.ok(15 * atFloor.scale + 1e-6 >= 11);
-  // Wider than that: shrink only to the 11px floor and scroll the rest.
+  assert.ok(15 * atFloor.scale + 1e-6 >= 13);
+  // Wider than that: shrink only to the 13px floor and scroll the rest.
   const wide = T.mermaidFit(2000, 1000, 15);
   assert.equal(wide.mode, 'scroll');
   assert.equal(wide.scrollable, true);
-  assert.ok(Math.abs(wide.scale - 11 / 15) < 1e-9);
-  assert.ok(Math.abs(wide.layoutWidth - 2000 * 11 / 15) < 1e-6);
+  assert.ok(Math.abs(wide.scale - 13 / 15) < 1e-9);
+  assert.ok(Math.abs(wide.layoutWidth - 2000 * 13 / 15) < 1e-6);
   assert.ok(wide.layoutWidth > 1000);
-  // Effective labels stay at 11px.
-  assert.ok(Math.abs(15 * wide.scale - 11) < 1e-9);
+  assert.ok(Math.abs(15 * wide.scale - 13) < 1e-9);
 });
 
 test('mermaidFit honors a measured label font when it differs from 15px', () => {
-  // 18px labels can shrink further (18 * s >= 11 ⇒ s >= 11/18) and still fit a wider figure.
-  const fit = Tset().mermaidFit(1600, 1000, 18);
+  // 18px labels can shrink to 13px (s >= 13/18) and still fit a modestly wider figure.
+  const fit = Tset().mermaidFit(1300, 1000, 18);
   assert.equal(fit.mode, 'fit');
-  assert.ok(18 * fit.scale >= 11);
+  assert.ok(18 * fit.scale >= 13);
   const scroll = Tset().mermaidFit(2000, 1000, 18);
   assert.equal(scroll.mode, 'scroll');
-  assert.ok(Math.abs(scroll.scale - 11 / 18) < 1e-9);
+  assert.ok(Math.abs(scroll.scale - 13 / 18) < 1e-9);
 });
 
 test('reader CSS fades both overflow edges, hides the native bar, and styles the lightbox', () => {
@@ -374,6 +436,13 @@ test('reader CSS fades both overflow edges, hides the native bar, and styles the
   assert.match(css, /height: 4px/);
   assert.match(css, /is-scrollable:not\(\.at-end\)::after/);
   assert.match(css, /is-scrollable:not\(\.at-start\)::before/);
+  // Fades and the custom track are pinned to the visible edges via --onyx-sl.
+  assert.match(css, /left: calc\(var\(--onyx-sl, 0px\) \+ 100% - 2\.2em\)/);
+  assert.match(css, /left: var\(--onyx-sl, 0px\)/);
+  assert.match(css, /padding-bottom: 8px/);
+  // Lightbox button is a real control, hidden until hover.
+  assert.match(css, /visibility: hidden/);
+  assert.match(css, /\.mermaid:hover \.onyx-zoom-hint/);
   assert.match(css, /cursor: zoom-in/);
   assert.match(css, /#onyx-lightbox/);
   assert.match(css, /\.onyx-lb-backdrop/);
@@ -431,6 +500,51 @@ test('bleedSide caps at 8rem and leaves a 1.2rem gutter', () => {
   assert.equal(T.bleedSide(980, 980, 16), 0);
 });
 
+test('applyBleed is symmetric and never exceeds the visible room on either side', () => {
+  const T = Tset();
+  const el = {
+    style: {},
+    getBoundingClientRect() { return { left: 40, right: 840, width: 800, height: 100, top: 0, bottom: 100 }; }
+  };
+  // Desired bleed for measure 800 in a 1000px pane is min(128, (1000-800)/2 - 19.2) = 80.8,
+  // but the left only has 40 - 19.2 = 20.8px before the gutter. Use that on both sides.
+  const bled = T.applyBleed(el, 800, 1000);
+  assert.ok(Math.abs((el.style.marginLeft && parseFloat(el.style.marginLeft)) + 20.8) < 1e-6);
+  assert.equal(el.style.marginLeft, el.style.marginRight);
+  assert.ok(Math.abs(bled - (800 + 2 * 20.8)) < 1e-6);
+  const room = T.bleedRoom(el, 1000, 16);
+  // After applyBleed the box is still reported at the unbled rect we stubbed.
+  assert.ok(Math.abs(room.left - 20.8) < 1e-6);
+  assert.ok(room.right > room.left);
+});
+
+test('overflowing mermaid and tables start at scrollLeft 0, not centered', () => {
+  const js = fs.readFileSync(path.join(web, 'reader.js'), 'utf8');
+  assert.doesNotMatch(js, /scrollLeft\s*=\s*max\s*\/\s*2/);
+  assert.match(js, /node\.scrollLeft = 0/);
+});
+
+test('updateScrollCue pins overlay offset to the wrap scrollLeft', () => {
+  const T = Tset();
+  const props = {};
+  const el = {
+    clientWidth: 100,
+    scrollWidth: 300,
+    scrollLeft: 80,
+    className: '',
+    classes: new Set(),
+    classList: { toggle(name, on) { if (on) el.classes.add(name); else el.classes.delete(name); } },
+    querySelector() { return null; },
+    addEventListener() {},
+    style: { setProperty(k, v) { props[k] = v; } },
+  };
+  T.updateScrollCue(el);
+  assert.equal(props['--onyx-sl'], '80px');
+  el.scrollLeft = 0;
+  T.updateScrollCue(el);
+  assert.equal(props['--onyx-sl'], '0px');
+});
+
 // --- OpenDyslexic typeface ----------------------------------------------------
 
 test('OpenDyslexic @font-face declares all four cuts with real weights, styles, and size-adjust', () => {
@@ -485,4 +599,55 @@ test('typesetClasses treats OpenDyslexic as its own face', () => {
   assert.equal(C({ on: true, face: 'od', print: true }).trim(), 'typeset face-od print');
   // a leftover dyslexic flag still selects the OpenDyslexic face
   assert.equal(C({ on: true, face: 'lm', dyslexic: true }).trim(), 'typeset face-od');
+});
+
+test('rich diffs wrap inserts and deletes at word level', () => {
+  const out = ctx.window.Onyx._diffHTML([
+    { op: 'change', kind: 'paragraph', markdown: 'The slow fox.\n', spans: [
+      { op: 'same', text: 'The ' },
+      { op: 'delete', text: 'quick' },
+      { op: 'insert', text: 'slow' },
+      { op: 'same', text: ' fox.' },
+    ]},
+  ]);
+  assert.match(out, /<del class="onyx-diff-del">quick<\/del>/);
+  assert.match(out, /<ins class="onyx-diff-ins">slow<\/ins>/);
+  assert.match(out, /<p>/);
+});
+
+test('rich diffs render mermaid and tables as whole blocks', () => {
+  const mer = ctx.window.Onyx._diffHTML([
+    { op: 'delete', kind: 'mermaid', markdown: '```mermaid\ngraph TD\n  A-->B\n```\n' },
+    { op: 'insert', kind: 'mermaid', markdown: '```mermaid\ngraph TD\n  A-->C\n```\n' },
+  ]);
+  assert.match(mer, /onyx-diff-del-block/);
+  assert.match(mer, /onyx-diff-ins-block/);
+  assert.match(mer, /pre class="mermaid"/);
+  const table = ctx.window.Onyx._diffHTML([
+    { op: 'insert', kind: 'table', markdown: '| a | b |\n| - | - |\n| 1 | 2 |\n' },
+  ]);
+  assert.match(table, /onyx-diff-ins-block/);
+  assert.match(table, /<table>/);
+});
+
+test('rich diffs keep heading markup around an inline change', () => {
+  const out = ctx.window.Onyx._diffHTML([
+    { op: 'change', kind: 'heading', level: 2, markdown: '## Hello there\n', spans: [
+      { op: 'same', text: 'Hello ' },
+      { op: 'delete', text: 'world' },
+      { op: 'insert', text: 'there' },
+    ]},
+  ]);
+  assert.match(out, /<h2>/);
+  assert.match(out, /<del class="onyx-diff-del">world<\/del>/);
+  assert.match(out, /<ins class="onyx-diff-ins">there<\/ins>/);
+});
+
+test('tags: nested and Unicode, links to the tag; numbers and trailing slashes are not', () => {
+  const out = html('see #area/health/sleep and #café and #📚 but not #2024, end #a/b/\n');
+  assert.match(out, /<a class="tag" data-tag="area\/health\/sleep">#area\/health\/sleep<\/a>/);
+  assert.match(out, /data-tag="café"/);
+  assert.match(out, /data-tag="📚"/);
+  assert.doesNotMatch(out, /data-tag="2024"/);
+  assert.match(out, /<a class="tag" data-tag="a\/b">#a\/b<\/a>\//);
 });

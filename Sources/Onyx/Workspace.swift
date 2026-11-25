@@ -70,6 +70,8 @@ final class Workspace {
     var mode: ViewMode = .read
     let finder = FindModel()
     let replacer = FindReplaceModel()
+    /// The Tags pane: tree state, selection, rename (TagsUI.swift).
+    let tags = TagsModel()
     @ObservationIgnored weak var liveEditor: OnyxTextView?
     @ObservationIgnored weak var liveReader: ReaderView.Coordinator?
     /// Back/forward for the focused pane (each split pane keeps its own; see Pane).
@@ -1914,6 +1916,24 @@ final class Workspace {
         store.move(id: id, parent: parent, before: beforeID)
         bookmarkStore = store
         persistBookmarks()
+    }
+
+    /// Pin dropped vault files or folders at `parent`/`before`. An item that's
+    /// already bookmarked is moved to the drop position instead of being added twice.
+    func bookmarkDropped(paths: [(path: String, isFolder: Bool)], parent: UUID?, before beforeID: UUID?) {
+        guard !paths.isEmpty else { return }
+        var store = bookmarkStore
+        let now = bookmarkNow()
+        var changed = false
+        for t in paths {
+            if store.insert(path: t.path, isFolder: t.isFolder, parent: parent, before: beforeID, now: now) {
+                changed = true
+            }
+        }
+        guard changed else { return }
+        bookmarkStore = store
+        persistBookmarks()
+        if !bookmarksExpanded { setBookmarksExpanded(true) }
     }
 
     func openBookmark(_ item: BookmarkItem) {

@@ -2,7 +2,7 @@
 
 ## Git, continuously
 
-If the vault is a git repository and `git` is installed, Onyx uses it without being asked. It commits a moment after you stop typing (the message names the notes), and immediately on delete, rename, move, switching notes, or quit. It pulls with `--rebase` on launch, on focus, before each push, and every 30 seconds, then pushes. It never force-pushes and never rewrites published history. On a rebase conflict, your version keeps the path and the incoming one is saved beside it as `Note (conflict YYYY-MM-DD HHMM).md`; both are committed. Anything unexpected aborts the rebase and leaves your branch as it was.
+If the vault is a git repository and `git` is installed, Onyx uses it without being asked. It commits a moment after you stop typing, and immediately on delete, rename, move, switching notes, or quit. The message is generated on-device from the staged diff — note titles, headings, tasks, frontmatter, and links — and stays at most 72 characters on the subject line (a body lists per-file details when more than one note changed). The Source Control commit box is prefilled with the same kind of message, which you can edit. It pulls with `--rebase` on launch, on focus, before each push, and every 30 seconds, then pushes. It never force-pushes and never rewrites published history. On a rebase conflict, your version keeps the path and the incoming one is saved beside it as `Note (conflict YYYY-MM-DD HHMM).md`; both are committed. Anything unexpected aborts the rebase and leaves your branch as it was.
 
 A tiny footer glyph shows synced, syncing, offline, local-only, or conflict. Click it, run Show Sync Log from the command palette, or press Show Log in Settings ▸ Sync, for a panel of recent git and Obsidian Sync activity, with timestamps, the kind of event, and a short detail. Errors and conflicts are marked. The last 500 events are kept, and the same log is saved as a plain-text file in Application Support so it survives relaunch. Copy and Reveal in Finder are in the panel header; Esc closes it.
 
@@ -10,7 +10,7 @@ To leave git alone for a session while developing, see [DEVELOP.md](DEVELOP.md) 
 
 ## Version history
 
-The git sidebar (Source Control, <kbd>⇧⌘Y</kbd>, or Version History in the command palette) has a History tab for the current note. It lists commits that touched the file (`git log --follow`), with the date, author, and message. Choose one to see a diff against the current text (including unsaved edits) and a rendered preview of that version. Restore this version puts the old text in the editor as an unsaved edit after a confirmation; it never runs `git reset` or `git checkout` on the repository. If the vault is not a git repository, the pane says so and stays quiet.
+The git sidebar (Source Control, <kbd>⇧⌘Y</kbd>, or Version History in the command palette) opens on a History tab when a note is open (Status otherwise). It lists commits that touched the file (`git log --follow`), with the date, author, and message. Choose one to see a rendered, reader-style diff against the current text (including unsaved edits): insertions highlighted, deletions struck through, word-level where practical, and whole-block for tables, code, and mermaid. A raw line diff and a full preview of that version are also there. Restore this version puts the old text in the editor as an unsaved edit after a confirmation; it never runs `git reset` or `git checkout` on the repository. If the vault is not a git repository, the pane says so and stays quiet.
 
 
 ## Obsidian Sync, optional
