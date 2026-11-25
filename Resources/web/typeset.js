@@ -272,18 +272,120 @@
     sizeWideTables(page);
   }
 
-  /** Mark a wrap as scrollable and, if the user can still scroll right,
-      leave off `.at-end` so the CSS fade shows. Hidden when nothing overflows. */
+  /** Extra room on each side of the measure, matching the .table-wide /
+      .mermaid-wide CSS: up to 8rem, leaving a 1.2rem gutter to the pane edge.
+      JS applies the margins in pixels so the bleed does not depend on `vw`
+      percentages resolving (they can stay 0 in some WKWebView layouts). */
+  function bleedSide(measure, vw, rem) {
+    const root = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
+    let r = rem;
+    if (!(r > 0) && root && typeof getComputedStyle === 'function') {
+      r = parseFloat(getComputedStyle(root).fontSize);
+    }
+    if (!(r > 0)) r = 16;
+    const view = (vw > 0 ? vw : (typeof window !== 'undefined' ? window.innerWidth : measure));
+    return Math.min(8 * r, Math.max(0, (view - measure) / 2 - 1.2 * r));
+  }
+  function applyBleed(el, measure, vw) {
+    const side = bleedSide(measure, vw);
+    if (side > 0.5) {
+      el.style.marginLeft = -side + 'px';
+      el.style.marginRight = -side + 'px';
+    } else {
+      el.style.marginLeft = '';
+      el.style.marginRight = '';
+    }
+    return measure + 2 * side;
+  }
+  function clearBleed(el) {
+    if (!el || !el.style) return;
+    el.style.marginLeft = '';
+    el.style.marginRight = '';
+  }
+
+  /** Mermaid theme font and the smallest label we will scale to (px). */
+  const MERMAID_FONT_PX = 15;
+  const MERMAID_MIN_LABEL_PX = 11;
+
+  /** How to present a Mermaid SVG of `natural` CSS pixels in a bled wrap of
+      `bleedW`. Scale to fit as long as labels stay at least MERMAID_MIN_LABEL_PX
+      (from `fontPx`, defaulting to Mermaid's 15px). Wider than that, shrink
+      only to the font floor and scroll the rest. */
+  function mermaidFit(natural, bleedW, fontPx) {
+    const font = (fontPx > 0 ? fontPx : MERMAID_FONT_PX);
+    const minScale = MERMAID_MIN_LABEL_PX / font;
+    const nw = +natural || 0, bw = +bleedW || 0;
+    if (!nw || !bw || nw <= bw + 1) {
+      return { mode: 'natural', scale: 1, layoutWidth: nw, scrollable: false };
+    }
+    const fitScale = bw / nw;
+    if (fitScale + 1e-6 >= minScale) {
+      return { mode: 'fit', scale: fitScale, layoutWidth: bw, scrollable: false };
+    }
+    return { mode: 'scroll', scale: minScale, layoutWidth: nw * minScale, scrollable: true };
+  }
+
+  /** A 4px custom track/thumb. WebKit's overlay scrollbar is hidden globally
+      (`::-webkit-scrollbar { display: none }`) and is not reliable in WKWebView. */
+  function syncHScroll(el, overflow, max) {
+    let track = el.querySelector(':scope > .onyx-hscroll');
+    if (!overflow) {
+      if (track) track.remove();
+      return;
+    }
+    if (typeof el.appendChild !== 'function' || typeof document === 'undefined' || !document.createElement) return;
+    if (!track) {
+      track = document.createElement('div');
+      track.className = 'onyx-hscroll';
+      track.setAttribute('aria-hidden', 'true');
+      const thumb = document.createElement('i');
+      track.appendChild(thumb);
+      el.appendChild(track);
+      const posFromX = (clientX) => {
+        const r = track.getBoundingClientRect();
+        const tw = Math.max(24, r.width * r.width / el.scrollWidth);
+        const maxX = Math.max(1, r.width - tw);
+        const x = clientX - r.left - tw / 2;
+        el.scrollLeft = max * Math.max(0, Math.min(1, x / maxX));
+      };
+      track.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        track.setPointerCapture(e.pointerId);
+        posFromX(e.clientX);
+        const move = ev => posFromX(ev.clientX);
+        const up = ev => {
+          track.releasePointerCapture(ev.pointerId);
+          track.removeEventListener('pointermove', move);
+          track.removeEventListener('pointerup', up);
+        };
+        track.addEventListener('pointermove', move);
+        track.addEventListener('pointerup', up);
+      });
+    }
+    const thumb = track.firstElementChild;
+    const tw = el.clientWidth;
+    const th = Math.max(24, tw * tw / el.scrollWidth);
+    const left = (tw - th) * (el.scrollLeft / max);
+    thumb.style.width = th + 'px';
+    thumb.style.transform = 'translateX(' + left + 'px)';
+  }
+
+  /** Mark a wrap as scrollable. Fades only on the side that still has hidden
+      content (`.at-start` / `.at-end`). A 4px custom scrollbar is shown only
+      when the wrap actually overflows. */
   function updateScrollCue(el) {
     if (!el || el.clientWidth == null) return;
     const max = el.scrollWidth - el.clientWidth;
     const overflow = max > 1;
     el.classList.toggle('is-scrollable', overflow);
+    el.classList.toggle('at-start', !overflow || el.scrollLeft <= 1);
     el.classList.toggle('at-end', !overflow || el.scrollLeft >= max - 1);
     if (overflow && !el._onyxScrollCue) {
       el.addEventListener('scroll', () => updateScrollCue(el), { passive: true });
       el._onyxScrollCue = true;
     }
+    syncHScroll(el, overflow, max);
   }
 
   /** Bleed / scroll only when the table's min-content (8em floors + nowrap
@@ -294,14 +396,18 @@
     page.querySelectorAll('.table-wrap').forEach(wrap => {
       const table = wrap.querySelector('table');
       if (!table) return;
-      wrap.classList.remove('table-wide', 'is-scrollable', 'at-end');
+      wrap.classList.remove('table-wide', 'is-scrollable', 'at-end', 'at-start');
+      clearBleed(wrap);
       const available = wrap.clientWidth;
       if (!available) { updateScrollCue(wrap); return; }
       const prev = table.style.width;
       table.style.width = 'min-content';
       const min = table.getBoundingClientRect().width;
       table.style.width = prev;
-      if (min > available + 0.5) wrap.classList.add('table-wide');
+      if (min > available + 0.5) {
+        wrap.classList.add('table-wide');
+        applyBleed(wrap, available);
+      }
       updateScrollCue(wrap);
     });
   }
@@ -330,11 +436,14 @@
     if (by && by.matches('blockquote.epigraph')) by = by.nextElementSibling;
     if (by && by.tagName === 'P' && words(by) < 15 && !by.querySelector('img')) by.classList.add('byline');
     figures(page);
-    if (opts.smallCaps !== false) smallCapsDOM(page);
-    hangQuotes(page);
-    opening(page, opts.opening || 'smallcaps');
+    const od = opts.face === 'od' || !!opts.dyslexic;
+    if (opts.smallCaps !== false && !od) smallCapsDOM(page);
+    if (!od) hangQuotes(page);
+    // OpenDyslexic has no small caps or drop caps; a bold lead-in is the typeset opening.
+    const open = opts.opening || 'smallcaps';
+    opening(page, od && open !== 'none' ? 'smallcaps' : open);
     layoutTables(page);
   }
 
-  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact, layoutTables, sizeWideTables, updateScrollCue };
+  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact, layoutTables, sizeWideTables, updateScrollCue, mermaidFit, bleedSide, applyBleed, clearBleed, MERMAID_FONT_PX, MERMAID_MIN_LABEL_PX };
 })();

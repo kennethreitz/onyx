@@ -11,9 +11,11 @@ enum Prefs {
     static let startFocus = "onyx.startFocus"
     static let sidenotes = "onyx.sidenotes"
     static let escToReading = "onyx.escToReading"  // Esc in the editor returns to reading; default on
+    static let commandHoldHints = "onyx.commandHoldHints"  // hold ⌘ to show the hint sheet; default on
 
     static var editorPoints: CGFloat { CGFloat(UserDefaults.standard.object(forKey: editorSize) as? Double ?? 14) }
     static var escReturnsToReading: Bool { UserDefaults.standard.object(forKey: escToReading) as? Bool ?? true }
+    static var commandHoldHintsEnabled: Bool { UserDefaults.standard.object(forKey: commandHoldHints) as? Bool ?? true }
     static var measureRem: CGFloat { CGFloat(UserDefaults.standard.object(forKey: measure) as? Double ?? 41) }
     /// The editor's 760px measure corresponds to the reader's 41rem; keep them in proportion.
     static var editorMeasure: CGFloat { (measureRem / 41 * 760).rounded() }
@@ -25,18 +27,37 @@ enum Typeset {
     static let oldstyle = "onyx.oldstyleFigures"
     static let hyphens = "onyx.hyphenation"
     static let smallCaps = "onyx.smallCaps"        // runs of capitals (PSF, HTTP) in true small caps
-    static let face = "onyx.typeface"              // "lm" (Latin Modern, Reitz LaTeX) | "et" (ET Book, Tufte)
+    static let face = "onyx.typeface"              // "lm" (Latin Modern, Reitz LaTeX) | "et" (ET Book, Tufte) | "od" (OpenDyslexic)
     static let opening = "onyx.opening"            // "smallcaps" | "dropcap" | "none"
     static let justify = "onyx.justify"            // justified paragraphs; off = ragged right (default)
+    /// Retired in 0.1.18: OpenDyslexic is a typeface (`od`), not a separate toggle.
+    static let openDyslexicLegacy = "onyx.openDyslexic"
 
     static func bool(_ k: String, dflt: Bool = true) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? dflt }
-    static var faceName: String { UserDefaults.standard.string(forKey: face) ?? "lm" }
+    static var faceName: String {
+        migrateOpenDyslexicIfNeeded()
+        let f = UserDefaults.standard.string(forKey: face) ?? "lm"
+        return (f == "et" || f == "od") ? f : "lm"
+    }
     static var openingName: String { UserDefaults.standard.string(forKey: opening) ?? "smallcaps" }
+    static var openDyslexicEnabled: Bool { faceName == "od" }
+
+    /// Promote the old `onyx.openDyslexic` toggle to the OpenDyslexic typeface and drop the key.
+    static func migrateOpenDyslexicIfNeeded() {
+        let d = UserDefaults.standard
+        guard d.object(forKey: openDyslexicLegacy) != nil else { return }
+        if d.bool(forKey: openDyslexicLegacy) {
+            d.set("od", forKey: face)
+            d.set(true, forKey: on)
+        }
+        d.removeObject(forKey: openDyslexicLegacy)
+    }
 
     /// The `typeset` object the reader's typeset.js and typeset.css key off.
     static func options(preview: Bool = false, print: [String: Any]? = nil) -> [String: Any] {
+        let face = faceName
         var o: [String: Any] = ["on": bool(on), "onum": bool(oldstyle), "hyphens": bool(hyphens), "smallCaps": bool(smallCaps),
-                                "justify": bool(justify, dflt: false), "face": faceName, "opening": preview ? "none" : openingName]
+                                "justify": bool(justify, dflt: false), "face": face, "opening": preview ? "none" : openingName]
         if let print { o["print"] = print }
         return o
     }
@@ -338,10 +359,18 @@ struct ReadingSettingsPage: View {
                     Picker("Typeface", selection: $face) {
                         Text("Latin Modern (Reitz LaTeX)").tag("lm")
                         Text("ET Book (Tufte)").tag("et")
+                        Text("OpenDyslexic").tag("od")
                     }
+                }
+                .disabled(!typeset)
+                if typeset && face == "od" {
+                    Text("A typeset page in OpenDyslexic: a slightly smaller apparent size, a shorter measure, no small caps or old-style figures, ragged left, and no hyphenation. The editor and PDF export follow this face. Code stays monospace.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+                Group {
                     Picker("Opening paragraph", selection: $opening) {
-                        Text("Small-caps lead-in").tag("smallcaps")
-                        Text("Drop cap").tag("dropcap")
+                        Text(face == "od" ? "Bold lead-in" : "Small-caps lead-in").tag("smallcaps")
+                        if face != "od" { Text("Drop cap").tag("dropcap") }
                         Text("Plain").tag("none")
                     }
                     Toggle("Old-style figures in text", isOn: $oldstyle)
@@ -349,8 +378,10 @@ struct ReadingSettingsPage: View {
                     Toggle("Justified paragraphs", isOn: $justify)
                     Toggle("Small caps for abbreviations (PSF, HTTP)", isOn: $smallCaps)
                 }
-                .disabled(!typeset)
-                Text("Smart quotes and dashes, ties, true small caps, hanging punctuation and a baseline rhythm. Off is the plain Reitz LaTeX page. Code is never touched.")
+                .disabled(!typeset || face == "od")
+                Text(face == "od"
+                     ? "OpenDyslexic is its own reading style, next to Reitz LaTeX and Tufte. The Tufte options above don’t apply. Off is the plain Reitz LaTeX page. Code is never touched."
+                     : "Smart quotes and dashes, ties, true small caps, hanging punctuation and a baseline rhythm. Off is the plain Reitz LaTeX page. Code is never touched.")
                     .font(.system(size: 11)).foregroundStyle(Color.faint)
             } header: { settingsHeader("Typesetting") }
 
@@ -358,6 +389,7 @@ struct ReadingSettingsPage: View {
         }
         .settingsPage()
         .onChange(of: sidenotes) { ws.sidenotes = sidenotes }
+        .onChange(of: face) { if face == "od", opening == "dropcap" { opening = "smallcaps" } }
     }
 }
 

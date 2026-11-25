@@ -8,6 +8,11 @@ A tiny footer glyph shows synced, syncing, offline, local-only, or conflict. Cli
 
 To leave git alone for a session while developing, see [DEVELOP.md](DEVELOP.md) (`ONYX_NO_GIT`).
 
+## Version history
+
+The git sidebar (Source Control, <kbd>⇧⌘Y</kbd>, or Version History in the command palette) has a History tab for the current note. It lists commits that touched the file (`git log --follow`), with the date, author, and message. Choose one to see a diff against the current text (including unsaved edits) and a rendered preview of that version. Restore this version puts the old text in the editor as an unsaved edit after a confirmation; it never runs `git reset` or `git checkout` on the repository. If the vault is not a git repository, the pane says so and stays quiet.
+
+
 ## Obsidian Sync, optional
 
 Off by default, and opt-in per vault. In Settings ▸ Sync, sign in to your Obsidian account (2FA is supported), pick a remote vault, enter its encryption password, preview what the first sync will do, then connect. Onyx speaks Obsidian’s end-to-end encrypted protocol and merges Markdown the way Obsidian does. Credentials live in the macOS Keychain; the sign-in token is not read until you actually use Sync, so a rebuild should not prompt you for the keychain unless Sync is connected.

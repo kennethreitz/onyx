@@ -223,8 +223,8 @@ horizontal swipe when the system setting allows it (outside overlays). The title
 ## Deleting and the file menu
 
 Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
-New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
-Delete…. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
+Bookmark / Remove Bookmark, New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
+Delete…. Bookmarks are also a section at the top of the file sidebar, stored in `.obsidian/bookmarks.json` and shared with Obsidian; drag to reorder. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
 always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. A new Untitled
 note is named from its first heading (or first line) when you save or leave it. Afterwards the
 note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),
@@ -350,7 +350,10 @@ on startup (~/Notes does).
 
 Below every note (not Kanban boards) the reader lists linked mentions, grouped by note with up to
 three context lines each. Field links count, wikilinks read as their alias, and table rows are flattened. Clicking
-a context opens the note at that line. "Unlinked mentions" loads on demand when expanded.
+a context opens the note at that line. "Unlinked mentions" loads on demand when expanded: whole-word, case-insensitive
+matches of the note's name, title, or aliases, skipping frontmatter, code, comments, and existing links. Link turns
+that mention into a `[[wikilink]]` (with a display alias when the visible text differs). The inspector's Backlinks
+tab shows the same lists, and clicking a row opens the source at that line; Link all converts every remaining mention.
 Both sections collapse, and the open state is remembered.
 
 ## Hover page preview

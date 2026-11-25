@@ -41,11 +41,26 @@ enum Theme {
 
     // Typography
     static var editorSize: CGFloat { Prefs.editorPoints }
-    static let editorLineHeight: CGFloat = 1.8
+    /// OpenDyslexic’s x-height is large; a slightly smaller body size keeps the editor presentable.
+    static var editorBodySize: CGFloat { Typeset.openDyslexicEnabled ? editorSize * 0.88 : editorSize }
+    static var editorLineHeight: CGFloat { Typeset.openDyslexicEnabled ? 1.9 : 1.8 }
+    /// Tight tracking for Plex Mono; OpenDyslexic already has wide glyphs, so no extra kern.
+    static var editorKern: CGFloat { Typeset.openDyslexicEnabled ? 0 : -0.14 }
     static var editorMeasure: CGFloat { Prefs.editorMeasure }
-    static func editorFont(_ size: CGFloat = editorSize, bold: Bool = false, italic: Bool = false) -> NSFont {
+    static func editorMonoFont(_ size: CGFloat = editorSize, bold: Bool = false, italic: Bool = false) -> NSFont {
         let name = bold ? "IBMPlexMono-Bold" : (italic ? "IBMPlexMono-Italic" : "IBMPlexMono")
         return NSFont(name: name, size: size) ?? NSFont.monospacedSystemFont(ofSize: size, weight: bold ? .bold : .regular)
+    }
+    static func editorFont(_ size: CGFloat = editorBodySize, bold: Bool = false, italic: Bool = false) -> NSFont {
+        guard Typeset.openDyslexicEnabled else { return editorMonoFont(size, bold: bold, italic: italic) }
+        let name: String
+        switch (bold, italic) {
+        case (true, true): name = "OpenDyslexic-BoldItalic"
+        case (true, false): name = "OpenDyslexic-Bold"
+        case (false, true): name = "OpenDyslexic-Italic"
+        default: name = "OpenDyslexic-Regular"
+        }
+        return NSFont(name: name, size: size) ?? editorMonoFont(size, bold: bold, italic: italic)
     }
     static func serif(_ size: CGFloat, bold: Bool = false, italic: Bool = false) -> Font {
         .custom(bold ? "LMRoman10-Bold" : (italic ? "LMRoman10-Italic" : "LMRoman10-Regular"), size: size)

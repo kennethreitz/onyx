@@ -12,7 +12,7 @@ import OnyxCore
 /// the packing on paper. WebKit paginates it (avoiding breaks inside figures, tables, code
 /// and after headings, per typeset.css), and then we draw what CSS can't in WebKit, the
 /// running head (the note's title in letterspaced small caps, from page 2) and the folio
-/// (old-style page numbers), onto every page with Core Text. External links survive.
+/// (old-style page numbers), onto every page with Core Text. External links survive; in-note heading links and a bookmark outline are added afterwards.
 @MainActor
 final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
     enum Job { case export(URL), print }
@@ -43,6 +43,7 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
     private var window: NSWindow?
     private var webView: WKWebView?
     private var polls = 0
+    private var anchors: PDFLinkMap.AnchorSet?
     private let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("onyx-print-\(UUID().uuidString).pdf")
 
     /// Export or print the focused note. For export, asks where to save first.
@@ -106,10 +107,22 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
             guard let self else { return }
             self.polls += 1
             if (r as? Bool) == true || self.polls > 60 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
+                self.captureAnchorsThenPaginate()
             } else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.waitUntilReady() }
             }
+        }
+    }
+
+    private func captureAnchorsThenPaginate() {
+        guard let webView else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
+            return
+        }
+        webView.evaluateJavaScript("Onyx.printAnchors()") { [weak self] r, _ in
+            guard let self else { return }
+            self.anchors = PDFLinkMap.AnchorSet(json: r)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
         }
     }
 
@@ -143,7 +156,10 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         case .export(let url): out = url
         case .print: out = FileManager.default.temporaryDirectory.appendingPathComponent("onyx-print-\(UUID().uuidString)-book.pdf")
         }
-        do { try decorate(tmp, to: out) } catch { return finish(nil) }
+        do {
+            try decorate(tmp, to: out)
+            try linkNote(out)
+        } catch { return finish(nil) }
         try? FileManager.default.removeItem(at: tmp)
         switch job {
         case .export(let url):
@@ -171,6 +187,21 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         NotePrinter.running.removeAll { $0 === self }
     }
 
+    /// In-note heading links (`[[#Heading]]`, `#heading`) and a bookmark outline from headings.
+    private func linkNote(_ dst: URL) throws {
+        guard let set = anchors, set.contentWidth > 0 else { return }
+        guard let doc = CGPDFDocument(dst as CFURL) else { return }
+        let count = doc.numberOfPages
+        let geo = PDFAnnotator.geometry(page)
+        let dests = PDFLinkMap.destinations(in: set, geometry: geo, pageCount: count)
+        let jumps = PDFLinkMap.jumps(in: set, geometry: geo, pageCount: count) { heading, target in
+            if !target.isEmpty { return nil }   // other notes are not in this file
+            return dests[PDFLinkMap.normalize(heading)]
+        }
+        let outline = PDFLinkMap.headingOutline(in: set, geometry: geo, pageCount: count)
+        try PDFAnnotator.apply(to: dst, jumps: jumps, outline: outline)
+    }
+
     // MARK: Running head and folio
 
     private func font(_ postScript: String, size: CGFloat, features: [String]) -> CTFont {
@@ -192,12 +223,24 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         var box = doc.page(at: 1)!.getBoxRect(.mediaBox)
         let meta: [CFString: Any] = [kCGPDFContextTitle: title, kCGPDFContextCreator: "Onyx", kCGPDFContextAuthor: NSFullUserName()]
         guard let ctx = CGContext(dst as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
-        let et = face == "et"
+        let et = face == "et", od = face == "od"
         // The head: the title in letterspaced small caps. LM Roman Caps sets lowercase as small
-        // caps; ET Book has real c2sc/smcp. The folio: old-style figures.
-        let head = et ? font("ETBookOT-Roman", size: 9, features: ["c2sc", "smcp", "kern"]) : font("LMRomanCaps10-Regular", size: 9, features: ["kern"])
-        let folioFont = et ? font("ETBookOT-Roman", size: 10, features: ["onum", "kern"]) : font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
-        let headText = et ? title : title.lowercased()
+        // caps; ET Book has real c2sc/smcp. OpenDyslexic uses the real face, natural case, no tracking.
+        // The folio: old-style figures (LM/ET) or lining (OpenDyslexic).
+        let head: CTFont
+        let folioFont: CTFont
+        if od {
+            head = font("OpenDyslexic-Regular", size: 9 * 0.88, features: [])
+            folioFont = font("OpenDyslexic-Regular", size: 10 * 0.88, features: [])
+        } else if et {
+            head = font("ETBookOT-Roman", size: 9, features: ["c2sc", "smcp", "kern"])
+            folioFont = font("ETBookOT-Roman", size: 10, features: ["onum", "kern"])
+        } else {
+            head = font("LMRomanCaps10-Regular", size: 9, features: ["kern"])
+            folioFont = font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
+        }
+        let headText = et || od ? title : title.lowercased()
+        let headKern: CGFloat = od ? 0 : 0.9
         for i in 1...doc.numberOfPages {
             guard let pg = doc.page(at: i) else { continue }
             var mb = pg.getBoxRect(.mediaBox)
@@ -206,7 +249,7 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
             // Centered over the text block, not the whole page (the margin column is for notes).
             let x0 = mb.minX + page.left, w = page.textWidth
             if i > 1 {
-                let l = line(headText, head, kern: 0.9)
+                let l = line(headText, head, kern: headKern)
                 let lw = CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
                 ctx.textPosition = CGPoint(x: x0 + (w - min(lw, w)) / 2, y: mb.maxY - page.top + 26)
                 CTLineDraw(l, ctx)

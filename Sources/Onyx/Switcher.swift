@@ -275,6 +275,7 @@ enum PaletteCommands {
             item("bookmark", title: "Bookmark / unbookmark this note") { ws.toggleBookmark() },
             item("tags") { ws.toggleSidebar(.tags) },
             item("git") { ws.toggleSidebar(.git) },
+            item("notehistory", title: "Version history of this note") { ws.showNoteHistory() },
             item("synclog") { DispatchQueue.main.async { ws.show(.syncLog) } },
             item("inspector", title: "Show inspector (outline, backlinks, properties)") { ws.toggleInspector() },
             item("outline") { ws.toggleInspector(.outline) },
@@ -311,6 +312,8 @@ enum PaletteCommands {
             item("openvault") { DispatchQueue.main.async { Workspace.openVaultPanel(ws) } },
             item("find") { DispatchQueue.main.async { ws.openFind() } },
             item("findreplace") { DispatchQueue.main.async { ws.openFind(replace: true) } },
+            item("replacevault", title: "Replace in vault…") { DispatchQueue.main.async { ws.openVaultReplace() } },
+            item("undoreplace") { _ = ws.undoLastVaultReplace() },
             item("searchsel") { ws.searchSelection() },
             item("graphpane", title: ws.graphPaneIndex == nil ? "Graph in a pane" : "Close graph pane") {
                 ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane()
@@ -324,6 +327,7 @@ enum PaletteCommands {
             item("duplicate") { ws.duplicateCurrent() },
             item("copypath") { ws.copyFilePath() },
             item("openexternal") { ws.openInDefaultApp() },
+            item("clip") { DispatchQueue.main.async { ws.promptClip() } },
             item("zoomin") { ws.zoom(1) },
             item("zoomout") { ws.zoom(-1) },
             item("zoomreset") { ws.zoom(0) },

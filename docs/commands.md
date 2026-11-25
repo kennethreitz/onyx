@@ -22,6 +22,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Duplicate Note | — |
 | Copy File Path | — |
 | Open in Default App | — |
+| Clip Web Page… | <kbd>⇧⌘K</kbd> |
 | Open Settings… | — |
 
 <kbd>⌘⌫</kbd> is not bound to Delete Note…, so the editor can use it to delete to the start of the line. When the file tree has focus, <kbd>⌘⌫</kbd> still deletes the selected file(s) to the Trash, after a confirm, like Finder. The command stays in the File menu and the palette.
@@ -32,11 +33,15 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | --- | --- |
 | Find in Note… | <kbd>⌘F</kbd> |
 | Find and Replace… | <kbd>⌥⌘F</kbd> |
+| Replace in Vault… | <kbd>⌥⇧⌘F</kbd> |
+| Undo Last Replace | — |
 | Search Vault for Selection | — |
 | Toggle Spellcheck | — |
 | Merge Current File With Another File… | — |
 | Extract Current Selection… | — |
 | Extract This Heading… | — |
+
+Replace in Vault opens a preview of every match, grouped by note, with per-match checkboxes and before/after highlighting. You can search the whole vault, the current folder, or the current note, and choose match case, whole word, regular expressions (with `$1` capture groups in the replacement), and whether frontmatter is included. Replace Selected and Replace All ask for confirmation and show the counts; writes are atomic, open editors are updated, and Undo Last Replace restores the previous contents of those notes. The Search sidebar (⇧⌘F) has a button that opens the same panel with the current query. In-note find and replace (⌘F / ⌥⌘F in the editor) is unchanged.
 
 ## Format
 
@@ -87,6 +92,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Bookmarks | <kbd>⇧⌘B</kbd> |
 | Tags | <kbd>⇧⌘T</kbd> |
 | Source Control | <kbd>⇧⌘Y</kbd> |
+| Version History | — |
 | Inspector | <kbd>⌥⌘I</kbd> |
 | Outline | <kbd>⌥⌘1</kbd> |
 | Backlinks | <kbd>⌥⌘2</kbd> |
@@ -97,6 +103,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Appearance: Dark | — |
 | Appearance: Match System | — |
 | Show Sync Log | — |
+
 | Fold Section | <kbd>⌥⌘←</kbd> |
 | Unfold Section | <kbd>⌥⌘→</kbd> |
 | Toggle Fold | — |
@@ -105,6 +112,8 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Zoom In | <kbd>⌘=</kbd> |
 | Zoom Out | <kbd>⌘-</kbd> |
 | Actual Size | <kbd>⌘0</kbd> |
+
+Backlinks lists notes that link to the current one (click to open at that line) and unlinked mentions of its title or aliases, each with Link or Link all to turn them into wikilinks.
 
 ## Navigate
 
@@ -161,6 +170,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 - Move Line Up/Down, Duplicate Line, and Delete Line act on every line the selection touches.
 - Today’s Daily Note and Previous/Next Daily Note were already there. Previous/Next step between existing daily notes when one is open. Yesterday’s and Tomorrow’s always go by the calendar, and create the note if needed.
 - Jump to Heading… lists the open note’s headings in a palette.
+- Outline (<kbd>⌥⌘1</kbd>) opens the inspector Outline pane. The scope menu there can widen the tree from this note to its folder, linked and `partOf` neighbors, or the whole vault.
 - Folding (View ▸ Folding) folds a heading’s section or a list item’s nested items in the editor, and headings in the reader. It’s display only; the note text never changes. See [folding.md](folding.md).
 - Zoom In/Out change the editor and reader text sizes together, within the Settings ranges. Actual Size resets both.
 - Spellcheck is on by default; the toggle is also in Settings ▸ Editor.

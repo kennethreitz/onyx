@@ -7,9 +7,10 @@
 | <kbd>⇧⌘O</kbd> | Open vault… |
 | <kbd>⌘K</kbd> | Show or hide the sidebar (always docked; opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
+| <kbd>⌥⇧⌘F</kbd> | Replace in the vault: preview matches, replace selected or all, undo the last replace |
 | <kbd>⌘I</kbd> | Toggle italic (`*…*`, or unwrap `*` / `_`). With no selection, inserts `**` with the caret in between |
 | <kbd>⌥⌘I</kbd> | Inspector: outline, backlinks, properties |
-| <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline · backlinks · properties |
+| <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline (this note, folder, linked & partOf, or whole vault) · backlinks · properties |
 | <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph overlay · atlas overlay · graph in a pane. <kbd>⌘G</kbd> or the title-bar button again closes the overlay; <kbd>⇧⌘G</kbd> closes the atlas if it is already showing. In the atlas, double-click a folder to fill the view; double-click empty space or <kbd>Esc</kbd> fits all, and <kbd>Esc</kbd> closes the overlay when the whole vault is already in view |
 | <kbd>⌘F</kbd> · <kbd>⌥⌘F</kbd> | Find in the note (editor or reader) · find and replace (editor). While the bar is open, <kbd>⌘G</kbd>/<kbd>⇧⌘G</kbd> or <kbd>↩</kbd>/<kbd>⇧↩</kbd> go to the next/previous match, and <kbd>Esc</kbd> closes it |
 | <kbd>⌘↩</kbd> · <kbd>⌘E</kbd> | Read ⇄ edit, and save |
@@ -27,6 +28,7 @@
 | <kbd>⇧⌘M</kbd> | Move note to… a folder (fuzzy; type a new name to create one). Or ⌘-drag in the sidebar. Rename from File, right-click, or ↩ in the sidebar |
 | <kbd>⌘N</kbd> | New note (in the selected folder, or next to the open note). The compose button at the bottom of the sidebar, Command Palette ▸ New note, and a folder’s New Note Here do the same |
 | <kbd>⇧⌘N</kbd> | New folder (in the selected folder, or the vault root) |
+| <kbd>⇧⌘K</kbd> | Clip a web page: paste a URL and Onyx saves a readable copy, with its images, to Clippings ([web clipper](web-clipper.md)) |
 | <kbd>⌘S</kbd> | Save. A still-Untitled note is named from its first heading (or first line) and appears under that name in the sidebar. Autosave writes the file while you type, but leaves the placeholder name until you save or leave the note |
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘←</kbd> · <kbd>⌥⌘→</kbd> | Fold / unfold the section at the caret ([folding](folding.md)) |
@@ -43,7 +45,7 @@ Open Random Note is in the command palette and the Go menu; it has no default sh
 
 Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading. Record Audio (Stop Recording while recording) is there too, also without a default shortcut.
 
-Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
+Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back. Holding ⌘ by itself for two seconds shows the same sheet (the keys follow your current Settings ▸ Shortcuts bindings); releasing ⌘ fades it away. A click, another key, or Esc dismisses it, or cancels the hold if the sheet has not appeared yet. It does not fire during IME composition or while a modal or sheet is up. Turn this off in Settings ▸ Shortcuts.
 
 Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, ⌘Z, ⌘⌫ (delete to the start of the line), and ⌥⌫ (delete the previous word) stay with the editor and are not rebound here.
 

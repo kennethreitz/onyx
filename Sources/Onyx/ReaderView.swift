@@ -235,8 +235,22 @@ struct ReaderView: NSViewRepresentable {
                 if ws.liveReader === self, ws.finder.visible { ws.finder.count = body["count"] as? Int ?? 0; ws.finder.index = body["index"] as? Int ?? 0 }
             case "unlinked":
                 if let snap = ws.snapshot, let p = renderedPath {
-                    let items = snap.unlinkedMentions(of: p).map { ["path": $0.source, "name": snap.notes[$0.source]?.name ?? $0.source, "text": ReaderPayload.snippet($0.context)] }
+                    let items = snap.unlinkedMentions(of: p).map { [
+                        "path": $0.source,
+                        "name": snap.notes[$0.source]?.name ?? $0.source,
+                        "text": ReaderPayload.snippet($0.context),
+                        "line": $0.line,
+                        "loc": $0.range.location,
+                        "len": $0.range.length,
+                        "matched": $0.matched,
+                    ] as [String: Any] }
                     if let d = try? JSONSerialization.data(withJSONObject: items) { eval("Onyx.setUnlinked(\(String(decoding: d, as: UTF8.self)))") }
+                }
+            case "linkMention":
+                if let source = body["path"] as? String, let loc = body["loc"] as? Int, let len = body["len"] as? Int, let target = renderedPath {
+                    let matched = (body["matched"] as? String) ?? ""
+                    let title = ws.snapshot?.notes[target]?.name ?? ((target as NSString).lastPathComponent as NSString).deletingPathExtension
+                    ws.linkUnlinkedMention(UnlinkedMention(source: source, line: 0, context: "", range: NSRange(location: loc, length: len), matched: matched, needle: title), title: title)
                 }
             case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
             case "tag":

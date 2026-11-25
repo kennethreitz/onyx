@@ -17,6 +17,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Linter** — tidy Markdown like Obsidian Linter: one undoable edit for the current note, a preview before linting a folder, and optional lint on save ([docs](docs/linter.md))
 - **Read Aloud** — the current note or your selection, from the command palette, with macOS voices
 - **Drag, drop, and paste attachments.** Drop files from Finder, drop images from a browser, or paste a screenshot. Each one is copied to your attachments folder and linked as `![[…]]`, following Obsidian's Files and links settings ([docs](docs/attachments.md))
+- **Web clipper** — a bookmarklet for any browser, or File ▸ Clip Web Page… (⇧⌘K), saves the readable article (Mozilla Readability) or just your selection as a Markdown note in Clippings, with Obsidian Web Clipper-style frontmatter, the class and tags your other clippings use, and images downloaded into your attachment folder ([docs](docs/web-clipper.md))
 - **Attachments open in place** — click an image, PDF, audio file, or video and it opens in the pane: an image viewer with zoom and pan, PDFKit with find, a native audio player with a waveform, speed control, and your Record Audio transcript, and AVKit for video. ⌘[ goes back ([docs](docs/attachments.md#opening-attachments))
 - **Image sizes** — `![[photo.png|300]]`, `|300x200`, and `![alt|300](…)` size images the way Obsidian does, and in the reader you can drag an image's corner to resize it; the new width is written into that embed ([docs](docs/attachments.md#image-size))
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
@@ -24,13 +25,13 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Obsidian’s core commands** — formatting, headings, lists and checkboxes, move/duplicate/delete line, jump to heading, duplicate note, zoom, spellcheck, and more, all in the command palette ([list](docs/commands.md)). ⌘B and ⌘I toggle bold and italic; the inspector is ⌥⌘I. Return in a list starts the next item (or ends the list on an empty item) and renumbers following numbered items; Tab / Shift-Tab indent and outdent list items, and renumber both levels. Typing a bracket or quote inserts its closer (`[[` becomes `[[|]]`); a selection can be wrapped with those or with `*` `_` `~` `=`
 - **Folding** — fold a heading’s section or a nested list from a quiet margin chevron, in the editor and the reader. Folds are display only, remembered per note, and open themselves when Find, the outline, or a link lands inside ([docs](docs/folding.md))
 - **Note composer** — merge two notes (links follow, the source goes to the Trash), or extract a selection or heading into a new note, or append it to one you pick. Settings ▸ Editor
-- **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents
+- **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents. Contents rows and in-note heading links are clickable, and the PDF has an outline of the contents and headings.
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **`partOf::` relationships** — an ancestry path in the title bar, a parts tree and link-valued fields in the inspector, field and note completion after `key::`, and a hierarchy-only graph
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row
 - **Obsidian's core settings, in Onyx** — Settings ▸ Files & Links (new-note and attachment locations, link format, wikilinks, excluded files) and Settings ▸ Daily Notes (date format, folder, template, open on startup, Templates date and time formats). They read and write the vault's own `.obsidian` files, so Obsidian stays in sync ([docs](docs/obsidian-settings.md))
-- **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N. Open Random Note is in the command palette and the Go menu
-- **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync
+- **Wikilinks, daily notes, folders, and search** — the usual, without the chrome. New notes with ⌘N, new folders with ⇧⌘N. Search the vault with ⇧⌘F; replace across it with ⌥⇧⌘F (preview, then replace selected or all, with undo). Open Random Note is in the command palette and the Go menu
+- **Obsidian Sync and git** — optional, and only if you ask. A Sync Log is in the command palette, the footer badges, and Settings ▸ Sync. The git sidebar has a History tab for earlier versions of the current note.
 - **Dataview** — `dataview` and `dataviewjs` blocks in the reader, plus `= expr` and `$=` inline queries; unsupported queries show an error box
 
 ## Dataview
@@ -70,6 +71,7 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 - [Canvas and Kanban](docs/boards.md)
 - [Getting around](docs/navigation.md)
 - [Attachments](docs/attachments.md): drag, drop, paste, the file viewers, and image sizes
+- [Web clipper](docs/web-clipper.md): the bookmarklet, Clip Web Page…, templates, and `onyx://clip`
 - [Sync](docs/sync.md)
 - [Linter](docs/linter.md)
 - [Keyboard shortcuts](docs/shortcuts.md)
@@ -82,3 +84,16 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 ## License
 
 Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Third-party code
+
+- **Readability.js** 0.6.0 by Mozilla — Apache License 2.0 ([`Resources/web/clipper/LICENSE-Readability.md`](Resources/web/clipper/LICENSE-Readability.md)), used by the [web clipper](docs/web-clipper.md).
+
+## Fonts
+
+The bundled typefaces keep their own licenses, which are compatible with this AGPL distribution:
+
+- **Latin Modern** — GUST Font License ([`Resources/fonts/licenses/GUST-FONT-LICENSE.txt`](Resources/fonts/licenses/GUST-FONT-LICENSE.txt))
+- **ET Book** — MIT ([`Resources/fonts/licenses/ET-Book-MIT.txt`](Resources/fonts/licenses/ET-Book-MIT.txt))
+- **IBM Plex Mono** — SIL Open Font License 1.1 ([`Resources/fonts/licenses/IBM-Plex-OFL.txt`](Resources/fonts/licenses/IBM-Plex-OFL.txt))
+- **OpenDyslexic** — SIL Open Font License 1.1, with Reserved Font Name OpenDyslexic, by Abbie Gonzalez ([opendyslexic.org](https://opendyslexic.org), [source](https://github.com/antijingoist/opendyslexic)). License: [`Resources/fonts/licenses/OpenDyslexic-OFL.txt`](Resources/fonts/licenses/OpenDyslexic-OFL.txt). A typeset reading style in Settings ▸ Reading, next to Latin Modern and ET Book.

@@ -177,19 +177,8 @@ public struct VaultSnapshot: Sendable {
     }
 
     /// Notes mentioning this note's name in plain text without linking to it.
-    public func unlinkedMentions(of path: String, limit: Int = 50) -> [Backlink] {
-        guard let note = notes[path], note.name.count >= 3 else { return [] }
-        let needle = note.name.lowercased()
-        let linked = backlinks[path] ?? []
-        var out: [Backlink] = []
-        for (p, n) in notes where p != path && !linked.contains(p) && ByteSearch.count(needle, in: n.lowered, cap: 1) > 0 {
-            let lines = n.content.components(separatedBy: "\n")
-            if let i = lines.firstIndex(where: { $0.lowercased().contains(needle) }) {
-                out.append(Backlink(source: p, line: i, context: lines[i].trimmingCharacters(in: .whitespaces)))
-            }
-            if out.count >= limit { break }
-        }
-        return out.sorted { $0.source < $1.source }
+    public func unlinkedMentions(of path: String, limit: Int = 200) -> [UnlinkedMention] {
+        UnlinkedMentions.find(in: self, of: path, limit: limit)
     }
 
     // MARK: Building
@@ -444,7 +433,7 @@ public struct VaultSnapshot: Sendable {
         for p in notes.keys { box(for: (p as NSString).deletingLastPathComponent).files.append(p) }
         for p in attachments.keys { box(for: (p as NSString).deletingLastPathComponent).files.append(p) }
         func convert(_ b: Box) -> FileNode {
-            let folderNotePath = b.path.isEmpty ? nil : b.path + "/" + b.name + ".md"
+            let folderNotePath = FolderIndex.notePath(forFolder: b.path)
             let hasFolderNote = folderNotePath.map { notes[$0] != nil } ?? false
             let subs = b.folders.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }.map(convert)
             let files = b.files.filter { !(hasFolderNote && $0 == folderNotePath) }

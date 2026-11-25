@@ -54,11 +54,14 @@ public enum CommandCatalog {
         cmd("duplicate", "Duplicate Note", .file, [], "plus.square.on.square"),
         cmd("copypath", "Copy File Path", .file, [], "doc.on.clipboard"),
         cmd("openexternal", "Open in Default App", .file, [], "arrow.up.right.square"),
+        cmd("clip", "Clip Web Page…", .file, [.command("k", shift: true)], "scissors"),
         cmd("settings", "Open Settings…", .file, [], "gearshape"),
 
         // Edit
         cmd("find", "Find in Note…", .edit, [.command("f")]),
         cmd("findreplace", "Find and Replace…", .edit, [.command("f", option: true)]),
+        cmd("replacevault", "Replace in Vault…", .edit, [.command("f", shift: true, option: true)], "arrow.left.arrow.right"),
+        cmd("undoreplace", "Undo Last Replace", .edit, [], "arrow.uturn.backward"),
         cmd("searchsel", "Search Vault for Selection", .edit, [], "text.magnifyingglass"),
         cmd("spellcheck", "Toggle Spellcheck", .edit, [], "textformat.abc.dottedunderline"),
         cmd("merge", "Merge Current File With Another File…", .edit, [], "arrow.triangle.merge"),
@@ -108,6 +111,7 @@ public enum CommandCatalog {
         cmd("bookmarks", "Bookmarks", .view, [.command("b", shift: true)], "bookmark"),
         cmd("tags", "Tags", .view, [.command("t", shift: true)], "number"),
         cmd("git", "Source Control", .view, [.command("y", shift: true)], "arrow.triangle.branch"),
+        cmd("notehistory", "Version History", .view, [], "clock.arrow.circlepath"),
         cmd("inspector", "Inspector", .view, [.command("i", option: true)], "sidebar.right"),
         cmd("outline", "Outline", .view, [.command("1", option: true)], "list.bullet.indent"),
         cmd("backlinks", "Backlinks", .view, [.command("2", option: true)], "arrow.uturn.backward"),

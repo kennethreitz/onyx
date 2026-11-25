@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory, findReplace }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -26,6 +26,18 @@ enum InspectorTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self { case .outline: return "list.bullet.indent"; case .backlinks: return "arrow.uturn.backward"; case .properties: return "tablecells" }
     }
+}
+enum GitPanelSection: String, CaseIterable, Identifiable {
+    case status, history
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+/// The version chosen in the git pane, shown in the version-history overlay.
+struct NoteVersionPreview: Equatable {
+    var entry: NoteHistoryEntry
+    var notePath: String
+    var content: NoteVersionContent?
+    var currentText: String
 }
 
 /// Everything about one open vault: the index, the open note, panels, saving.
@@ -57,6 +69,7 @@ final class Workspace {
     private(set) var lastSaved: String = ""
     var mode: ViewMode = .read
     let finder = FindModel()
+    let replacer = FindReplaceModel()
     @ObservationIgnored weak var liveEditor: OnyxTextView?
     @ObservationIgnored weak var liveReader: ReaderView.Coordinator?
     /// Back/forward for the focused pane (each split pane keeps its own; see Pane).
@@ -66,7 +79,11 @@ final class Workspace {
     private(set) var scrollRequest: ScrollRequest? = nil
     @ObservationIgnored private var navigating = false
     var recent: [String] = []
-    var bookmarks: [String] = []
+    var bookmarkStore = BookmarkStore()
+    /// Whether the Bookmarks section at the top of the file tree is expanded.
+    var bookmarksExpanded = true
+    /// Last bytes we wrote or loaded, so our own save doesn't stomp in-memory IDs.
+    @ObservationIgnored private var bookmarksFingerprint: Data?
     /// The open note was typed in since it was opened or last linted (lint on save).
     @ObservationIgnored var editedSinceLint = false
     var conflict: String? = nil          // disk content that differs from both buffer and last save
@@ -78,6 +95,10 @@ final class Workspace {
     var sidebarPinned = true
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
+    /// Temporary shortcut sheet from holding ⌘; not persisted, unlike `showHints`.
+    var holdHints = false
+    @ObservationIgnored var commandHold = CommandHold()
+    @ObservationIgnored private var commandHoldTimer: DispatchWorkItem?
     var sidebarTab: SidebarTab = .files
     // Split panes. Empty = one pane. The focused pane's note lives in currentPath/text/mode;
     // the others keep their own path, text and mode until focused (swap model).
@@ -110,6 +131,16 @@ final class Workspace {
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
     var inspectorTab: InspectorTab = .outline
+    /// How far the Outline pane looks. Remembered across launches.
+    var outlineScope: OutlineScope = OutlineScope(rawValue: UserDefaults.standard.string(forKey: "onyx.outlineScope") ?? "") ?? .note {
+        didSet { if outlineScope != oldValue { UserDefaults.standard.set(outlineScope.rawValue, forKey: "onyx.outlineScope") } }
+    }
+    var outlineExpanded: Set<String> = []
+    /// Heading branches are open by default; ids listed here are collapsed.
+    var outlineCollapsed: Set<String> = []
+    /// The focused pane's source line, updated while scrolling when the Outline tab is open
+    /// so the current heading can highlight without refreshing the rest of the workspace.
+    var outlineTop: Double = 0
     var overlay: Overlay = .none { didSet { if overlay != oldValue { overlayChanged(from: oldValue) } } }
     var searchQuery = ""
     var focusSearch = 0
@@ -165,6 +196,9 @@ final class Workspace {
 
     /// Continuous git when the vault is a repository (see GitSync); nil otherwise.
     var git: GitSync?
+    /// Status vs. this-note history, in the git sidebar.
+    var gitPanelSection: GitPanelSection = .status
+    var versionPreview: NoteVersionPreview?
     /// Obsidian Sync, only for folders the user connected in Settings ▸ Sync (see VaultSync); nil otherwise.
     var obsidianSync: VaultSync?
     /// Recent git and Obsidian Sync activity for this vault, persisted in Application Support.
@@ -195,7 +229,8 @@ final class Workspace {
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
         loadTreeOrder()
-        bookmarks = UserDefaults.standard.stringArray(forKey: key("bookmarks")) ?? obsidianBookmarks()
+        loadBookmarks(migrateDefaults: true)
+        bookmarksExpanded = UserDefaults.standard.object(forKey: key("bookmarksExpanded")) as? Bool ?? true
         isIndexing = true
         let root = self.root!
         let ignore = obsidianIgnore()
@@ -280,7 +315,66 @@ final class Workspace {
     /// Obsidian (or Sync) changed a config file under `.obsidian`: pick up the new values.
     func obsidianConfigChanged(_ files: [String]) {
         if files.contains("daily-notes.json") { loadDailySettings() }
+        if files.contains("bookmarks.json") { loadBookmarks() }
         obsidianConfigRevision += 1
+    }
+
+    private func bookmarksURL() -> URL? {
+        root?.appendingPathComponent(".obsidian/bookmarks.json")
+    }
+
+    /// Read `.obsidian/bookmarks.json`. When `migrateDefaults` is set, paths previously
+    /// stored only in UserDefaults are appended (once) and that key is cleared.
+    func loadBookmarks(migrateDefaults: Bool = false) {
+        let url = bookmarksURL()
+        let data = url.flatMap { try? Data(contentsOf: $0) }
+        if let data, data == bookmarksFingerprint { return }
+        guard let parsed = BookmarkStore.parse(data: data) else {
+            toast = "Couldn’t read .obsidian/bookmarks.json: it isn’t valid JSON, so Onyx left it alone."
+            return
+        }
+        var store = parsed
+        if migrateDefaults {
+            let k = key("bookmarks")
+            if let paths = UserDefaults.standard.stringArray(forKey: k) {
+                if BookmarkStore.migrate(paths: paths, into: &store, now: bookmarkNow()) {
+                    bookmarkStore = store
+                    persistBookmarks()
+                } else {
+                    bookmarkStore = store
+                    bookmarksFingerprint = data
+                }
+                UserDefaults.standard.removeObject(forKey: k)
+                return
+            }
+        }
+        bookmarkStore = store
+        bookmarksFingerprint = data
+    }
+
+    func persistBookmarks() {
+        guard let url = bookmarksURL() else { return }
+        do {
+            _ = try ObsidianConfig.update(url, changes: ["items": bookmarkStore.itemsJSON])
+        } catch {
+            toast = "Couldn’t save .obsidian/bookmarks.json: it isn’t valid JSON, so Onyx left it alone."
+            return
+        }
+        bookmarksFingerprint = try? Data(contentsOf: url)
+        obsidianConfigRevision += 1
+        git?.edited()
+        obsidianSync?.edited()
+    }
+
+    private func bookmarkNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+
+    func isBookmarked(_ path: String, isFolder: Bool = false, subpath: String? = nil) -> Bool {
+        isFolder ? bookmarkStore.containsFolder(path: path) : bookmarkStore.containsFile(path: path, subpath: subpath)
+    }
+
+    func setBookmarksExpanded(_ on: Bool) {
+        bookmarksExpanded = on
+        UserDefaults.standard.set(on, forKey: key("bookmarksExpanded"))
     }
 
     /// Folder a new note goes in, honoring app.json's "Default location for new notes". With no
@@ -316,10 +410,6 @@ final class Workspace {
     }
     private func obsidianIgnore() -> [String] {
         ((obsidianJSON("app.json") as? [String: Any])?["userIgnoreFilters"] as? [String]) ?? []
-    }
-    private func obsidianBookmarks() -> [String] {
-        guard let b = obsidianJSON("bookmarks.json") as? [String: Any], let items = b["items"] as? [[String: Any]] else { return [] }
-        return items.compactMap { $0["type"] as? String == "file" ? $0["path"] as? String : nil }
     }
     private func obsidianRecent() -> [String] {
         guard let r = obsidianJSON("plugins/recent-files-obsidian/data.json") as? [String: Any], let f = r["recentFiles"] as? [[String: Any]] else { return [] }
@@ -369,6 +459,7 @@ final class Workspace {
         let alreadyOpen = currentPath == path
         if !alreadyOpen {
             liveTop = 0
+            outlineTop = 0
             speech.stop()
             editedSinceLint = false
         }
@@ -594,6 +685,25 @@ final class Workspace {
         }
         let title = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
         guard write("# \(title)\n\n", to: path, create: true) else { return nil }
+        openNote(path)
+        mode = .edit
+        return path
+    }
+
+    /// Create a folder note (`<folder>/<Folder>.md`) when the folder has none, seed
+    /// a modest index template, and open it in the editor. One file creation.
+    @discardableResult
+    func createIndex(in folder: String) -> String? {
+        guard let path = FolderIndex.notePath(forFolder: folder) else { return nil }
+        if snapshot?.notes[path] != nil
+            || FileManager.default.fileExists(atPath: root?.appendingPathComponent(path).path ?? "") {
+            toast = "This folder already has an index."
+            return nil
+        }
+        let body = snapshot.map { FolderIndex.draft(forFolder: folder, in: $0) }
+            ?? FolderIndex.draft(folder: folder, childNotes: [], childFolders: [])
+        guard write(body, to: path, create: true) else { return nil }
+        vaultMutated("Add Index", paths: [path])
         openNote(path)
         mode = .edit
         return path
@@ -1143,7 +1253,7 @@ final class Workspace {
             for (k, v) in treeOrder.overrides where k == from || k.hasPrefix(from + "/") { o[k] = nil; o[dest + String(k.dropFirst(from.count))] = v }
             treeOrder.overrides = o
         }
-        bookmarks = bookmarks.map(remap); UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        if bookmarkStore.remapPaths(plan.fileMoves) { persistBookmarks() }
         foldStore?.remapPaths(map)   // folds follow the note
         var parent = (dest as NSString).deletingLastPathComponent
         while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
@@ -1250,6 +1360,27 @@ final class Workspace {
 
     static func stamp() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HHmm"; return f.string(from: Date()) }
 
+
+    func updateSnapshotNote(_ path: String, content: String) {
+        snapshot?.update(path: path, content: content)
+    }
+
+    /// Keep open editor buffers in sync after a vault write so autosave cannot overwrite it.
+    func syncOpenBuffers(_ path: String, content: String) {
+        saveTask?.cancel()
+        if path == currentPath {
+            suppressTextChange = true
+            text = content
+            lastSaved = content
+            suppressTextChange = false
+            renderToken += 1
+        }
+        for i in panes.indices where panes[i].path == path {
+            if path == currentPath, i == focusedPane { continue }
+            panes[i].text = content
+        }
+    }
+
     /// The only place Onyx writes files. Refuses anything outside the vault.
     @discardableResult
     func write(_ content: String, to rel: String, create: Bool) -> Bool {
@@ -1310,6 +1441,63 @@ final class Workspace {
         flushSave()
     }
 
+    /// Write `new` to a vault note. If that note is open in the editor, the change goes
+    /// through the text view so ⌘Z can undo it; unfocused split panes stay in sync.
+    @discardableResult
+    func applyNoteText(_ new: String, to path: String, action: String) -> Bool {
+        if path == currentPath {
+            if let tv = liveEditor, tv.string == text, tv.isEditable {
+                let r = NSRange(location: 0, length: (tv.string as NSString).length)
+                if tv.shouldChangeText(in: r, replacementString: new) {
+                    tv.breakUndoCoalescing()
+                    tv.replaceCharacters(in: r, with: new)
+                    tv.didChangeText()
+                    tv.undoManager?.setActionName(action)
+                    tv.breakUndoCoalescing()
+                }
+            }
+            text = new
+            flushSave()
+            return true
+        }
+        for i in panes.indices where panes[i].path == path { panes[i].text = new }
+        guard write(new, to: path, create: false) else { return false }
+        snapshot?.update(path: path, content: new)
+        renderToken += 1
+        return true
+    }
+
+    /// Current body of a note: the open editor or pane buffer if that file is open, else the snapshot or disk.
+    func noteText(for path: String) -> String? {
+        if path == currentPath { return text }
+        if let pane = panes.first(where: { $0.path == path }) { return pane.text }
+        if let body = snapshot?.notes[path]?.content { return body }
+        guard let root else { return nil }
+        return try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    func linkUnlinkedMention(_ mention: UnlinkedMention, title: String) {
+        guard let body = noteText(for: mention.source),
+              let next = UnlinkedMentions.link(body, range: mention.range, title: title) else { return }
+        if applyNoteText(next, to: mention.source, action: "Link Mention") {
+            toast = "Linked “\(mention.matched)” in \(((mention.source as NSString).lastPathComponent as NSString).deletingPathExtension)"
+        }
+    }
+
+    func linkAllUnlinkedMentions(of path: String, mentions: [UnlinkedMention]) {
+        let title = snapshot?.notes[path]?.name ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        let groups = Dictionary(grouping: mentions, by: \.source)
+        var files = 0, count = 0
+        for (src, items) in groups {
+            guard let body = noteText(for: src) else { continue }
+            let (next, n) = UnlinkedMentions.linkAll(body, mentions: items, title: title)
+            guard n > 0, next != body else { continue }
+            if applyNoteText(next, to: src, action: "Link Mentions") { files += 1; count += n }
+        }
+        if count == 0 { toast = "Nothing to link" }
+        else { toast = "Linked \(count) mention\(count == 1 ? "" : "s") in \(files) note\(files == 1 ? "" : "s")" }
+    }
+
     func toggleTask(index: Int) {
         let lines = text.components(separatedBy: "\n")
         var out = lines
@@ -1350,7 +1538,6 @@ final class Workspace {
             renderToken += 1
         }
     }
-
 
     // MARK: External changes
 
@@ -1417,6 +1604,42 @@ final class Workspace {
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
     }
+    /// Open the git sidebar on this note's version history (does not hide a sidebar that's already open).
+    func showNoteHistory() {
+        gitPanelSection = .history
+        sidebarTab = .git
+        if !sidebarVisible { toggleSidebar() }
+    }
+    func openVersionPreview(_ preview: NoteVersionPreview) {
+        versionPreview = preview
+        show(.versionHistory)
+    }
+    /// Put historical text into the editor as an unsaved edit. Never runs git checkout or reset.
+    @discardableResult
+    func restoreNoteVersion(_ content: String) -> Bool {
+        guard let path = currentPath, !path.opensInFileView else { return false }
+        if text == content { toast = "Already the current text."; return false }
+        text = content
+        renderToken += 1
+        toast = "Restored this version as an unsaved edit."
+        return true
+    }
+    func confirmRestoreNoteVersion(entry: NoteHistoryEntry, content: String) {
+        let a = NSAlert()
+        a.messageText = "Restore this version?"
+        let when = Self.versionDate.string(from: entry.date)
+        var info = "Replace the current note with the version from \(when) (“\(entry.subject)”) by \(entry.author). It lands in the editor as an unsaved edit; the git repository is not reset or checked out."
+        if isDirty { info += " Unsaved changes in the editor will be replaced." }
+        a.informativeText = info
+        a.addButton(withTitle: "Restore")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn {
+            if restoreNoteVersion(content) { show(.none) }
+        }
+    }
+    private static let versionDate: DateFormatter = {
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
+    }()
     /// ⌥⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
         withAnimation(Motion.layout) {
@@ -1425,6 +1648,7 @@ final class Workspace {
             if inspectorVisible { hideInspector(animated: false) }
             else { if focusMode { toggleFocusMode() }; inspectorVisible = true; inspectorPinned = true; persistInspector() }
         }
+        if inspectorVisible, inspectorTab == .outline { syncOutlineTop() }
     }
     func hideInspector(animated: Bool = true) {
         let body = { self.inspectorVisible = false; self.inspectorPinned = false }
@@ -1453,6 +1677,19 @@ final class Workspace {
     @discardableResult
     func handleEscape(eventWindow: NSWindow?) -> Bool {
         let action = EscPrecedence.action(escapeSituation(eventWindow: eventWindow))
+        switch action {
+        case .passToSheet, .passToIME, .dismissSuggestions:
+            return false
+        default:
+            break
+        }
+        // Holding ⌘ may still be pending: cancel the timer, but only consume Esc
+        // if the hint sheet is actually visible.
+        if holdHints || commandHold.phase == .showing {
+            applyCommandHold(.escape)
+            return true
+        }
+        if commandHold.phase == .pending { applyCommandHold(.cancel) }
         switch action {
         case .passToSheet, .passToIME, .dismissSuggestions, .none:
             return false
@@ -1552,6 +1789,62 @@ final class Workspace {
     }
 
     func dismissHints() { withAnimation(.easeOut(duration: 0.2)) { showHints = false }; UserDefaults.standard.set(true, forKey: "onyx.hintsDismissed") }
+    /// Close the hint sheet without necessarily marking first-run hints as seen.
+    func dismissHintSheet() {
+        if showHints { dismissHints() }
+        if holdHints || commandHold.phase != .idle { applyCommandHold(.escape) }
+    }
+
+    /// Whether holding ⌘ should be allowed to start (or finish) showing the hint sheet.
+    func isCommandHoldEligible(eventWindow: NSWindow? = nil) -> Bool {
+        guard Prefs.commandHoldHintsEnabled else { return false }
+        if NSApp.modalWindow != nil { return false }
+        if MainWindow.current?.attachedSheet != nil { return false }
+        if let w = eventWindow, !MainWindow.isVaultWindow(w) { return false }
+        guard let key = NSApp.keyWindow, MainWindow.isVaultWindow(key) else { return false }
+        if let tv = key.firstResponder as? NSTextView, tv.hasMarkedText() { return false }
+        return true
+    }
+
+    func handleCommandHoldFlags(_ event: NSEvent) {
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        let ev = CommandHold.flagsEvent(
+            command: mods.contains(.command),
+            shift: mods.contains(.shift),
+            option: mods.contains(.option),
+            control: mods.contains(.control)
+        )
+        if ev == .commandAlone, !isCommandHoldEligible(eventWindow: event.window) { return }
+        applyCommandHold(ev)
+    }
+
+    func applyCommandHold(_ event: CommandHold.Event) {
+        switch commandHold.handle(event) {
+        case .none:
+            break
+        case .startTimer:
+            commandHoldTimer?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.applyCommandHold(.timerFired)
+            }
+            commandHoldTimer = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + CommandHold.duration, execute: work)
+        case .stopTimer:
+            commandHoldTimer?.cancel()
+            commandHoldTimer = nil
+        case .show:
+            commandHoldTimer = nil
+            if !isCommandHoldEligible() {
+                applyCommandHold(.cancel)
+                return
+            }
+            withAnimation(.easeIn(duration: 0.2)) { holdHints = true }
+        case .hide:
+            commandHoldTimer?.cancel()
+            commandHoldTimer = nil
+            withAnimation(.easeOut(duration: 0.2)) { holdHints = false }
+        }
+    }
     func toggleWorkspaceLayout() {
         withAnimation(Motion.layout) {
             let on = !(sidebarVisible && inspectorPinned && inspectorVisible)
@@ -1578,8 +1871,86 @@ final class Workspace {
     }
     func toggleBookmark() {
         guard let p = currentPath else { return }
-        if bookmarks.contains(p) { bookmarks.removeAll { $0 == p } } else { bookmarks.append(p) }
-        UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        toggleBookmark(path: p, isFolder: false)
+    }
+
+    func toggleBookmark(path: String, isFolder: Bool, subpath: String? = nil) {
+        setBookmarked([(path, isFolder, subpath)], pinned: nil)
+    }
+
+    /// `pinned` nil toggles each target; otherwise set that state (skipping ones already there).
+    func setBookmarked(_ targets: [(path: String, isFolder: Bool, subpath: String?)], pinned: Bool?) {
+        var store = bookmarkStore
+        let now = bookmarkNow()
+        var changed = false
+        for t in targets {
+            let already = t.isFolder ? store.containsFolder(path: t.path) : store.containsFile(path: t.path, subpath: t.subpath)
+            if let pinned, already == pinned { continue }
+            if t.isFolder {
+                _ = store.toggleFolder(path: t.path, now: now)
+            } else {
+                _ = store.toggleFile(path: t.path, subpath: t.subpath, now: now)
+            }
+            changed = true
+        }
+        guard changed else { return }
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func setBookmarked(_ targets: [(String, Bool)], pinned: Bool) {
+        setBookmarked(targets.map { ($0.0, $0.1, nil) }, pinned: pinned)
+    }
+
+    func removeBookmark(id: UUID) {
+        var store = bookmarkStore
+        guard store.remove(id: id) != nil else { return }
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func moveBookmark(id: UUID, parent: UUID?, before beforeID: UUID?) {
+        var store = bookmarkStore
+        store.move(id: id, parent: parent, before: beforeID)
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func openBookmark(_ item: BookmarkItem) {
+        switch item.type {
+        case "file":
+            guard let path = item.path else { return }
+            if let heading = BookmarkSubpath.headingName(item.subpath) {
+                openNote(path, heading: heading)
+            } else if let line = item.subpath.flatMap({ sub in
+                snapshot?.notes[path].map { BookmarkSubpath.line(subpath: sub, text: $0.content, headings: $0.summary.headings) } ?? nil
+            }) {
+                openNote(path, line: line + 1)
+            } else {
+                openNote(path)
+            }
+        case "folder":
+            guard let path = item.path else { return }
+            selectedFolder = path
+            for parent in TreeReveal.ancestors(of: path) { expanded.insert(parent) }
+            expanded.insert(path)
+            revealToken += 1
+            if sidebarTab != .files { sidebarTab = .files }
+            if let fn = FolderIndex.notePath(forFolder: path), snapshot?.notes[fn] != nil {
+                openNote(fn, revealInTree: false)
+            }
+        case "search":
+            searchQuery = item.query ?? ""
+            toggleSidebar(.search)
+            focusSearch += 1
+        case "url":
+            if let raw = item.url, let url = URL(string: raw) { NSWorkspace.shared.open(url) }
+        case "graph":
+            graphAtlas = true
+            if overlay != .graph { show(.graph) }
+        default:
+            break
+        }
     }
 
     // MARK: Read aloud
@@ -1736,7 +2107,35 @@ extension Workspace {
         if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
             FileHandle.standardError.write("[top] \(pane.map { String($0.uuidString.prefix(4)) } ?? "live") \(String(format: "%.2f", line)) \(mode)\n".data(using: .utf8)!)
         }
+        if inspectorVisible, inspectorTab == .outline, isFocusedPane(pane), Int(outlineTop) != Int(line) {
+            outlineTop = line
+        }
     }
+    /// Keep the outline highlight in sync when the pane is opened or focus changes.
+    func syncOutlineTop() {
+        let line: Double
+        if isSplit, panes.indices.contains(focusedPane), let t = paneTop[panes[focusedPane].id] {
+            line = t
+        } else {
+            line = liveTop
+        }
+        if outlineTop != line { outlineTop = line }
+    }
+    func isFocusedPane(_ pane: UUID?) -> Bool {
+        if !isSplit { return true }
+        if let pane { return panes.indices.contains(focusedPane) && panes[focusedPane].id == pane }
+        return false
+    }
+    func jumpToOutlineHeading(path: String, index: Int, line: Int) {
+        if currentPath != path { openNote(path) }
+        readerJump = index
+        editorJump = line
+    }
+    func scrollToNoteTop() {
+        scrollRequest = ScrollRequest(line: 0, id: (scrollRequest?.id ?? 0) + 1)
+        editorJump = 0
+    }
+
     /// Where a newly created view should open.
     func initialTop(_ pane: UUID?) -> Double { pane.map { paneTop[$0] ?? 0 } ?? liveTop }
 

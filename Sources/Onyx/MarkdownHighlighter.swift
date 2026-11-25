@@ -17,7 +17,7 @@ struct MarkdownHighlighter {
     static let url = try! NSRegularExpression(pattern: #"https?://[^\s)>\]]+"#)
     static let footnote = try! NSRegularExpression(pattern: #"\[\^[^\]]+\]"#)
 
-    var lineHeight: CGFloat { (Theme.editorSize * Theme.editorLineHeight).rounded() }
+    var lineHeight: CGFloat { (Theme.editorBodySize * Theme.editorLineHeight).rounded() }
 
     func baseParagraph(indent: CGFloat = 0) -> NSMutableParagraphStyle {
         let p = NSMutableParagraphStyle()
@@ -29,7 +29,7 @@ struct MarkdownHighlighter {
 
     var baseAttributes: [NSAttributedString.Key: Any] {
         [.font: Theme.editorFont(), .foregroundColor: Theme.ink, .paragraphStyle: baseParagraph(),
-         .kern: -0.14, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorSize * 1.3) / 2]
+         .kern: Theme.editorKern, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorBodySize * 1.3) / 2]
     }
 
     /// What `InlineFields` leaves out (inline code, %% and <!-- --> comments, scanned together,
@@ -94,7 +94,7 @@ struct MarkdownHighlighter {
         if fm.bodyOffset > 0, let r = clip(NSRange(location: 0, length: fm.bodyOffset)) {
             ts.addAttributes([.foregroundColor: Theme.faint], range: r)
         }
-        for r in codeBlocks { if let r = clip(r) { ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) } }
+        for r in codeBlocks { if let r = clip(r) { ts.addAttributes([.font: Theme.editorMonoFont(), .foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) } }
 
         for f in InlineFields.parse(s, lines: region) where !f.isFrontmatter {
             let r = NSRange(location: f.keyRange.location, length: f.keyRange.length + 2)
@@ -114,7 +114,7 @@ struct MarkdownHighlighter {
                 for ch in line { if ch == "#" { level += 1 } else { break } }
                 if level <= 6, line.dropFirst(level).hasPrefix(" ") {
                     let scale: [CGFloat] = [1.44, 1.2, 1.1, 1, 1, 1]
-                    let size = (Theme.editorSize * scale[level - 1]).rounded()
+                    let size = (Theme.editorBodySize * scale[level - 1]).rounded()
                     let p = baseParagraph(); p.minimumLineHeight = max(lineHeight, size * 1.6); p.maximumLineHeight = p.minimumLineHeight
                     if level <= 2 { p.paragraphSpacingBefore = lineHeight * 0.35 }
                     ts.addAttributes([.font: Theme.editorFont(size, bold: true), .paragraphStyle: p], range: lr)
@@ -178,7 +178,7 @@ struct MarkdownHighlighter {
             ts.addAttributes(faint, range: m.range)
             ts.addAttributes([.backgroundColor: NSColor(hex: hex, alpha: 0.55), .foregroundColor: Theme.ink], range: m.range(at: 2))
         }
-        each(Self.code) { m in ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: m.range) }
+        each(Self.code) { m in ts.addAttributes([.font: Theme.editorMonoFont(currentSize(ts, m.range.location)), .foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: m.range) }
         each(Self.url) { m in ts.addAttributes([.foregroundColor: Theme.muted, .underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: Theme.border], range: m.range) }
         each(Self.mdLink) { m in
             ts.addAttributes(faint, range: m.range)
@@ -204,7 +204,7 @@ struct MarkdownHighlighter {
     }
 
     private func currentSize(_ ts: NSTextStorage, _ loc: Int) -> CGFloat {
-        (ts.attribute(.font, at: loc, effectiveRange: nil) as? NSFont)?.pointSize ?? Theme.editorSize
+        (ts.attribute(.font, at: loc, effectiveRange: nil) as? NSFont)?.pointSize ?? Theme.editorBodySize
     }
 }
 

@@ -273,6 +273,7 @@ struct FileTreeView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    BookmarksSection(ws: ws)
                     if let tree = ws.snapshot?.tree {
                         ForEach(ws.treeChildren(tree)) { node in TreeNodeView(ws: ws, node: node, depth: 0) }
                     } else {
@@ -515,8 +516,14 @@ struct FileMenu: View {
             Button("Open") { ws.openNote(note) }
             Button("Open in Split") { ws.split(.vertical); ws.openNote(note) }
         }
+        Button(ws.isBookmarked(path, isFolder: isFolder) ? "Remove Bookmark" : "Bookmark") {
+            ws.toggleBookmark(path: path, isFolder: isFolder)
+        }
         if isFolder {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
+            if folderNote == nil, FolderIndex.notePath(forFolder: path) != nil {
+                Button("New Index Here") { ws.createIndex(in: path) }
+            }
             Button("New Folder") { ws.newFolder(in: path) }
             Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
             Button("Lint Notes in Folder…") { DispatchQueue.main.async { ws.previewLintFolder(path) } }
@@ -540,6 +547,10 @@ struct SelectionMenu: View {
     var paths: [String]
     var body: some View {
         Button("Open") {}.disabled(true)
+        Button(selectionAllBookmarked(paths) ? "Remove Bookmarks" : "Bookmark \(paths.count) Items") {
+            let pinned = !selectionAllBookmarked(paths)
+            ws.setBookmarked(paths.map { ($0, ws.snapshot?.folders.contains($0) == true) }, pinned: pinned)
+        }
         Button("Export Selection as PDF…") { NoteBookPrinter.run(paths, ws: ws) }
         Divider()
         Button("Rename…") {}.disabled(true)
@@ -551,6 +562,10 @@ struct SelectionMenu: View {
         Button("Open in Obsidian") {}.disabled(true)
         Divider()
         Button("Delete \(paths.count) Items…", role: .destructive) { DispatchQueue.main.async { ws.confirmTrash(paths) } }
+    }
+
+    func selectionAllBookmarked(_ paths: [String]) -> Bool {
+        paths.allSatisfy { ws.isBookmarked($0, isFolder: ws.snapshot?.folders.contains($0) == true) }
     }
 }
 
@@ -577,11 +592,25 @@ struct NoteRow: View {
     var path: String
     var detail: String? = nil
     var preview = false
+    /// 0-based source line to open at, when set.
+    var line: Int? = nil
+    var linkTitle: String? = nil
+    var onLink: (() -> Void)? = nil
     @State private var hover = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(((path as NSString).lastPathComponent as NSString).deletingPathExtension).font(.system(size: 12.5)).foregroundStyle(Color.ink).lineLimit(1)
-            Text(detail ?? (path as NSString).deletingLastPathComponent).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(detail == nil ? 1 : 3)
+        HStack(alignment: .top, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(((path as NSString).lastPathComponent as NSString).deletingPathExtension).font(.system(size: 12.5)).foregroundStyle(Color.ink).lineLimit(1)
+                Text(detail ?? (path as NSString).deletingLastPathComponent).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(detail == nil ? 1 : 3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let onLink, let linkTitle {
+                Button(linkTitle, action: onLink)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+                    .padding(.top, 2)
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -590,7 +619,10 @@ struct NoteRow: View {
         .background { if preview { GraphPreviewTrigger(ws: ws, path: path) } }
         .contextMenu { FileMenu(ws: ws, path: path) }
         .onHover { hover = $0 }
-        .onTapGesture { GraphPreviewController.shared.close(); ws.openNote(path) }
+        .onTapGesture {
+            GraphPreviewController.shared.close()
+            if let line { ws.openNote(path, line: line + 1) } else { ws.openNote(path) }
+        }
     }
 }
 
@@ -606,6 +638,15 @@ struct SearchPanel: View {
                 Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Color.faint)
                 TextField("Search vault  ·  tag:  path:  \"phrase\"", text: $ws.searchQuery)
                     .textFieldStyle(.plain).font(.system(size: 12.5)).focused($focused)
+                Button {
+                    ws.openVaultReplace(query: ws.searchQuery)
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 11)).foregroundStyle(Color.muted)
+                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Replace in vault (⌥⇧⌘F)")
             }
             .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
             .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(focused ? Color.cursorBlue.opacity(0.55) : Color.hairline, lineWidth: focused ? 1 : 0.8))
@@ -648,11 +689,18 @@ struct BookmarksPanel: View {
     @Bindable var ws: Workspace
     var body: some View {
         VStack(spacing: 0) {
-            PathList(ws: ws, paths: ws.bookmarks, empty: "No bookmarks yet.", hint: "Bookmark a note from the button below or the command palette.")
+            if ws.bookmarkStore.items.isEmpty {
+                QuietEmpty(title: "No bookmarks yet.", hint: "Bookmark a note from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+            } else {
+                ScrollView {
+                    BookmarksList(ws: ws, items: ws.bookmarkStore.items, parent: nil, depth: 0)
+                    BookmarksAppendTarget(ws: ws, parent: nil)
+                }.padding(.vertical, 6).thinScrollers()
+            }
             if let p = ws.currentPath {
                 Divider().overlay(Color.hairline)
                 Button { ws.toggleBookmark() } label: {
-                    Label(ws.bookmarks.contains(p) ? "Remove bookmark" : "Bookmark this note", systemImage: ws.bookmarks.contains(p) ? "bookmark.slash" : "bookmark")
+                    Label(ws.isBookmarked(p) ? "Remove bookmark" : "Bookmark this note", systemImage: ws.isBookmarked(p) ? "bookmark.slash" : "bookmark")
                         .font(.system(size: 11.5)).frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(.plain).foregroundStyle(Color.muted).padding(10)
             }
@@ -707,37 +755,26 @@ struct InspectorView: View {
         VStack(spacing: 0) {
             PanelHeader(tabs: InspectorTab.allCases, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned)
             Divider().overlay(Color.hairline)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let note = ws.currentNote, let snap = ws.snapshot {
-                        switch ws.inspectorTab {
-                        case .outline: outline(note)
-                        case .backlinks: backlinks(note, snap)
-                        case .properties: properties(note, snap)
+            if ws.inspectorTab == .outline {
+                OutlinePane(ws: ws)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let note = ws.currentNote, let snap = ws.snapshot {
+                            switch ws.inspectorTab {
+                            case .outline: EmptyView()
+                            case .backlinks: backlinks(note, snap)
+                            case .properties: properties(note, snap)
+                            }
                         }
-                    }
-                }.padding(.vertical, 8).thinScrollers()
+                    }.padding(.vertical, 8).thinScrollers()
+                }
             }
         }
     }
 
     func sectionTitle(_ s: String) -> some View {
         Text(s.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 4)
-    }
-
-    @ViewBuilder func outline(_ note: NoteRecord) -> some View {
-        let hs = NoteParser.parseHeadings(ws.settledText)
-        if hs.isEmpty { QuietEmpty(title: "No headings yet.", hint: "Lines that start with # build the outline.").padding(.top, Space.xs) }
-        let minLevel = hs.map(\.level).min() ?? 1
-        ForEach(Array(hs.enumerated()), id: \.offset) { i, h in
-            Text(h.text)
-                .font(Theme.serif(h.level == minLevel ? 14 : 13, bold: h.level == minLevel))
-                .foregroundStyle(h.level <= minLevel + 1 ? Color.ink : Color.muted)
-                .lineLimit(2)
-                .padding(.leading, 14 + CGFloat(h.level - minLevel) * 12).padding(.trailing, 12).padding(.vertical, 3.5)
-                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                .onTapGesture { ws.readerJump = i; ws.editorJump = h.line }
-        }
     }
 
     @ViewBuilder func relations(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
@@ -750,16 +787,31 @@ struct InspectorView: View {
         sectionTitle("Linked mentions · \(links.count)")
         if links.isEmpty { QuietEmpty(title: "Nothing links here yet.", hint: "Write [[\(note.name)]] in another note.") }
         ForEach(links, id: \.self) { b in
-            NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context))
+            NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context), line: b.line)
         }
-        Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
-            HStack(spacing: Space.xs) { Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold)); Text("UNLINKED MENTIONS").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8) }
-                .foregroundStyle(Color.faint)
-        }.buttonStyle(.plain).padding(.horizontal, 14).padding(.top, 14)
+        let unlinked = snap.unlinkedMentions(of: note.path)
+        HStack(spacing: Space.s) {
+            Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
+                HStack(spacing: Space.xs) {
+                    Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold))
+                    Text("UNLINKED MENTIONS · \(unlinked.count)").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8)
+                }.foregroundStyle(Color.faint)
+            }.buttonStyle(.plain)
+            Spacer(minLength: 0)
+            if showUnlinked && !unlinked.isEmpty {
+                Button("Link all") { ws.linkAllUnlinkedMentions(of: note.path, mentions: unlinked) }
+                    .font(.system(size: 10.5, weight: .medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+            }
+        }.padding(.horizontal, 14).padding(.top, 14)
         if showUnlinked {
-            let unlinked = snap.unlinkedMentions(of: note.path)
-            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.") }
-            ForEach(unlinked, id: \.self) { b in NoteRow(ws: ws, path: b.source, detail: b.context) }
+            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.", hint: "Plain-text uses of this note's title or aliases, outside code and links.") }
+            ForEach(unlinked, id: \.self) { m in
+                NoteRow(ws: ws, path: m.source, detail: m.context, line: m.line, linkTitle: "Link") {
+                    ws.linkUnlinkedMention(m, title: note.name)
+                }
+            }
         }
     }
 
@@ -817,42 +869,67 @@ struct GitPanel: View {
                     Spacer()
                     Button { ws.git?.syncNow(); refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("Sync now")
                 }.padding(.horizontal, 12).padding(.top, 10)
-                if let g = ws.git {
-                    Text(g.help).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(4).padding(.horizontal, 12)
-                    ForEach(g.conflictCopies, id: \.self) { c in
-                        Button { ws.openNote(c) } label: {
-                            Label((c as NSString).lastPathComponent, systemImage: "doc.on.doc").font(.system(size: 11.5)).lineLimit(1)
-                        }.buttonStyle(.plain).foregroundStyle(Color.ink).padding(.horizontal, 12)
-                        .help("Both versions were kept. Merge what you need into the original, then delete this copy.")
-                    }
+                sectionPicker
+                if ws.gitPanelSection == .history {
+                    NoteHistoryList(ws: ws, isRepo: isRepo)
                 } else {
-                    Text("Auto-sync is off (git not found).").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.horizontal, 12)
+                    statusPane
                 }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(changes, id: \.1) { c in
-                            HStack(spacing: 8) {
-                                Text(c.0).font(.custom("IBMPlexMono", size: 10.5)).foregroundStyle(Color.muted).frame(width: 20, alignment: .leading)
-                                Text(c.1).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
-                            }.padding(.horizontal, 12).padding(.vertical, 3)
-                        }
-                    }.thinScrollers()
-                }
-                if changes.isEmpty { QuietEmpty(title: "Working tree clean.").padding(.horizontal, -2) }
-                TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)
-                HStack {
-                    Button("Commit all") { commit() }.disabled(changes.isEmpty)
-                    Spacer()
-                    Text(status).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(2)
-                }.padding(.horizontal, 10).padding(.bottom, 10)
             }
         }
         .onAppear { refresh() }
     }
+
+    var sectionPicker: some View {
+        HStack(spacing: 1) {
+            ForEach(GitPanelSection.allCases) { s in
+                Button { withAnimation(Motion.quick) { ws.gitPanelSection = s } } label: {
+                    Text(s.title)
+                        .font(.system(size: 11, weight: ws.gitPanelSection == s ? .semibold : .regular))
+                        .foregroundStyle(ws.gitPanelSection == s ? Color.ink : Color.faint)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(ws.gitPanelSection == s ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
+                }.buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+        }.padding(.horizontal, 10)
+    }
+
+    @ViewBuilder var statusPane: some View {
+        if let g = ws.git {
+            Text(g.help).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(4).padding(.horizontal, 12)
+            ForEach(g.conflictCopies, id: \.self) { c in
+                Button { ws.openNote(c) } label: {
+                    Label((c as NSString).lastPathComponent, systemImage: "doc.on.doc").font(.system(size: 11.5)).lineLimit(1)
+                }.buttonStyle(.plain).foregroundStyle(Color.ink).padding(.horizontal, 12)
+                .help("Both versions were kept. Merge what you need into the original, then delete this copy.")
+            }
+        } else {
+            Text("Auto-sync is off (git not found).").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.horizontal, 12)
+        }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(changes, id: \.1) { c in
+                    HStack(spacing: 8) {
+                        Text(c.0).font(.custom("IBMPlexMono", size: 10.5)).foregroundStyle(Color.muted).frame(width: 20, alignment: .leading)
+                        Text(c.1).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
+                    }.padding(.horizontal, 12).padding(.vertical, 3)
+                }
+            }.thinScrollers()
+        }
+        if changes.isEmpty { QuietEmpty(title: "Working tree clean.").padding(.horizontal, -2) }
+        TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)
+        HStack {
+            Button("Commit all") { commit() }.disabled(changes.isEmpty)
+            Spacer()
+            Text(status).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(2)
+        }.padding(.horizontal, 10).padding(.bottom, 10)
+    }
+
     func git(_ args: [String]) -> (Int32, String) {
         guard let root = ws.root else { return (1, "") }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        p.executableURL = URL(fileURLWithPath: NoteHistory.gitBinary() ?? "/usr/bin/git")
         p.arguments = ["-C", root.path] + args
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe
         do { try p.run() } catch { return (1, error.localizedDescription) }
