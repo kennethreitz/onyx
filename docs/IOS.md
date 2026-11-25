@@ -147,4 +147,4 @@ Limited writing is intentional: only bookmarks, linking a mention, and vault rep
 
 ## App icon
 
-`Resources/iOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` is the Mac icon's stone and Latin Modern "O", full-bleed and opaque (iOS masks the corners). Regenerate it with `swift scripts/make-ios-icon.swift`; `project.yml` sets `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`.
+`Resources/iOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` is the Mac app icon (`Resources/AppIcon.icns`, the onyx crystal with its note graph) with its rounded tile scaled to fill the square, opaque and full-bleed (iOS masks the corners). Regenerate it with `swift scripts/make-ios-icon.swift` after the Mac icon changes; `project.yml` sets `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`.
