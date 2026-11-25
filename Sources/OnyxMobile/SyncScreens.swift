@@ -77,7 +77,7 @@ struct SyncConnectScreen: View {
 
     func run(_ label: String, _ op: () async throws -> Void) async {
         busy = label; error = nil
-        do { try await op() } catch { self.error = "\(error)" }
+        do { try await op() } catch { self.error = SyncErrorText.describe(error) }
         busy = nil
     }
 

@@ -96,9 +96,11 @@ uninstall:
 
 # iOS simulator app (branch ios). Regenerates Onyx.xcodeproj from project.yml.
 # Does not touch /Applications or a running Mac Onyx.
+# Ad-hoc signed ("Sign to Run Locally", no team): the simulator then grants the app its application-identifier,
+# which the Keychain needs. An unsigned build (CODE_SIGNING_ALLOWED=NO) gets errSecMissingEntitlement (-34018).
 ios:
 	xcodegen generate
-	xcodebuild -project Onyx.xcodeproj -scheme OnyxMobile -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath .build/DerivedData CODE_SIGNING_ALLOWED=NO build
+	xcodebuild -project Onyx.xcodeproj -scheme OnyxMobile -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath .build/DerivedData CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= build
 
 clean:
 	rm -rf .build build

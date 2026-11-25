@@ -34,6 +34,7 @@ The iOS app uses it for **sync-only vaults** (see [sync.md](sync.md#sync-only-va
 - A sync icon next to the vault name in the toolbar shows the status; tapping it (or Vault ▸ Manage Sync…) opens **Manage Sync**: Sync Now, Pause/Resume, Continue Anyway (after a mass-delete pause), Disconnect (keeps the local copy), Reconnect, other sync-only vaults on the device, and Delete Local Copy (confirmed, and it warns when the vault isn't fully synced).
 - Sync runs while Onyx is in the foreground (the engine's 30 s rescan and edits trigger passes; returning to the app syncs at once). On leaving the app Onyx asks iOS for a short background grace period (up to about 25 s) to finish the current sync. There is no background refresh (`BGAppRefreshTask`) yet, so changes made elsewhere arrive the next time Onyx is opened.
 - The note list rescans as files arrive (at most every few seconds during a large first pull, and once when it finishes).
+- `make ios` signs the simulator build ad hoc ("Sign to Run Locally") so the app has an `application-identifier` and can use the Keychain. An unsigned build (`CODE_SIGNING_ALLOWED=NO`, as before) gets errSecMissingEntitlement (-34018) from the Keychain; Onyx then keeps the sign-in token and vault keys in an owner-only, data-protected file under `Application Support/Onyx/Secrets` instead of failing.
 - The same unofficial-protocol caveats as on the Mac apply; try a throwaway vault first.
 
 ### Mac-only (`Sources/Onyx` and a few Core types)

@@ -9,7 +9,8 @@ import UIKit
 @MainActor
 final class MobileSyncAccount: ObservableObject {
     static let shared = MobileSyncAccount()
-    let store: any SecretStore = KeychainStore()
+    /// Keychain, or a protected file when this build has no Keychain access (unsigned simulator builds).
+    let store: any SecretStore = ResilientSecretStore(onFallback: SyncSignIn.defaultLog)
     let api = ObsidianAPI()
     static let signedInKey = "onyx.sync.signedIn"
     static let emailKey = "onyx.sync.email"
@@ -29,18 +30,18 @@ final class MobileSyncAccount: ObservableObject {
     enum SignInResult { case ok, needsCode }
 
     func signIn(email: String, password: String, code: String?) async throws -> SignInResult {
-        do {
-            let r = try await api.signIn(email: email, password: password, mfa: code ?? "")
-            guard let t = r.token else { throw ObsidianAPI.APIError(message: "No token in the sign-in response") }
-            try store.set("token", Data(t.utf8))
+        // Idempotent (SyncSignIn): reuses a token that still works, retries "Already logged in" once, and keeps
+        // the token for this session even if it can't be stored.
+        switch try await SyncSignIn(api: api, store: store).signIn(email: email, password: password, code: code, heldToken: cachedToken) {
+        case .needsCode:
+            return .needsCode
+        case .signedIn(let t, let e, _):
             cachedToken = t
-            self.email = r.email ?? email
-            UserDefaults.standard.set(self.email, forKey: Self.emailKey)
+            self.email = e
+            UserDefaults.standard.set(e, forKey: Self.emailKey)
             UserDefaults.standard.set(true, forKey: Self.signedInKey)
             signedIn = true
             return .ok
-        } catch where code == nil && ObsidianAPI.needsMFA(error) {
-            return .needsCode
         }
     }
 
@@ -136,7 +137,7 @@ extension MobileVault {
             syncStatus = SyncStatus(phase: .connecting, lastSynced: nil, initialMerge: true)
             Task { await e.start() }
         } catch {
-            syncStatus = SyncStatus(phase: .error("\(error)"), lastSynced: nil, initialMerge: false)
+            syncStatus = SyncStatus(phase: .error(SyncErrorText.describe(error)), lastSynced: nil, initialMerge: false)
         }
     }
 
@@ -203,7 +204,7 @@ extension MobileVault {
     /// Delete this device's copy of a sync-only vault (closing it first if it's open). The remote vault is untouched.
     func removeLocalCopy(_ v: ManagedVault) {
         if managed?.id == v.id { forgetVault() }
-        do { try MobileSyncAccount.shared.syncOnly.removeLocalCopy(v) } catch { self.error = "\(error)" }
+        do { try MobileSyncAccount.shared.syncOnly.removeLocalCopy(v) } catch { self.error = SyncErrorText.describe(error) }
         objectWillChange.send()
     }
 
