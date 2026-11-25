@@ -26,6 +26,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Folding** — fold a heading’s section or a nested list from a quiet margin chevron, in the editor and the reader. Folds are display only, remembered per note, and open themselves when Find, the outline, or a link lands inside ([docs](docs/folding.md))
 - **Note composer** — merge two notes (links follow, the source goes to the Trash), or extract a selection or heading into a new note, or append it to one you pick. Settings ▸ Editor
 - **PDF and print** — a note as a book page, with margin notes and a running head; or a folder or selection as one typeset book, with a table of contents. Contents rows and in-note heading links are clickable, and the PDF has an outline of the contents and headings.
+- **Hierarchical tags** — `#parent/child/grandchild` (inline or in frontmatter) as a collapsible tree with nested counts, a filter box, and the notes of the selected tag; rename or move a tag and its whole subtree across the vault with a preview, or drag it onto another tag; `#` completion by path segment in the editor ([docs](docs/tags.md))
 - **Graph and atlas** — travel by clicking nodes, or zoom out over the whole vault
 - **`partOf::` relationships** — an ancestry path in the title bar, a parts tree and link-valued fields in the inspector, field and note completion after `key::`, and a hierarchy-only graph
 - **Canvas, Kanban, and Bases** — Obsidian boards and `.base` views, in place. Edit columns, views, filters, and formulas; table views have a summaries row

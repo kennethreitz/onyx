@@ -70,6 +70,8 @@ final class Workspace {
     var mode: ViewMode = .read
     let finder = FindModel()
     let replacer = FindReplaceModel()
+    /// The Tags pane: tree state, selection, rename (TagsUI.swift).
+    let tags = TagsModel()
     @ObservationIgnored weak var liveEditor: OnyxTextView?
     @ObservationIgnored weak var liveReader: ReaderView.Coordinator?
     /// Back/forward for the focused pane (each split pane keeps its own; see Pane).

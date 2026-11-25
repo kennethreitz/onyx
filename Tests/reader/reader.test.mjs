@@ -642,3 +642,12 @@ test('rich diffs keep heading markup around an inline change', () => {
   assert.match(out, /<del class="onyx-diff-del">world<\/del>/);
   assert.match(out, /<ins class="onyx-diff-ins">there<\/ins>/);
 });
+
+test('tags: nested and Unicode, links to the tag; numbers and trailing slashes are not', () => {
+  const out = html('see #area/health/sleep and #café and #📚 but not #2024, end #a/b/\n');
+  assert.match(out, /<a class="tag" data-tag="area\/health\/sleep">#area\/health\/sleep<\/a>/);
+  assert.match(out, /data-tag="café"/);
+  assert.match(out, /data-tag="📚"/);
+  assert.doesNotMatch(out, /data-tag="2024"/);
+  assert.match(out, /<a class="tag" data-tag="a\/b">#a\/b<\/a>\//);
+});

@@ -105,10 +105,11 @@
   };
   const tag = {
     name: 'tag', level: 'inline',
-    start(src) { const m = src.match(/(^|\s)#[A-Za-z0-9_\-\/]*[A-Za-z_\-\/]/); return m ? m.index + m[1].length : undefined; },
+    // Nested (#a/b/c) and Unicode (#café, #📚) like Obsidian; all-digit (#2024) is not a tag.
+    start(src) { const m = src.match(/(^|\s)#[\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*[\p{L}\p{M}\p{So}\p{Sk}_\-\u200d\ufe0f]/u); return m ? m.index + m[1].length : undefined; },
     tokenizer(src) {
-      const m = /^#([A-Za-z0-9_\-\/]*[A-Za-z_\-\/][A-Za-z0-9_\-\/]*)/.exec(src);
-      if (m) return { type: 'tag', raw: m[0], tag: m[1] };
+      const m = /^#([\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*[\p{L}\p{M}\p{So}\p{Sk}_\-\u200d\ufe0f][\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f]*?)\/*(?![\p{L}\p{N}\p{M}\p{So}\p{Sk}_\-\/\u200d\ufe0f])/u.exec(src);
+      if (m) return { type: 'tag', raw: m[0].replace(/\/+$/, ''), tag: m[1] };
     },
     renderer(t) { return `<a class="tag" data-tag="${esc(t.tag)}">#${esc(t.tag)}</a>`; }
   };

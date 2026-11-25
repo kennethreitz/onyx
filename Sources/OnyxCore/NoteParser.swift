@@ -38,7 +38,6 @@ public struct NoteSummary: Sendable {
 
 public enum NoteParser {
     static let wikiRegex = try! NSRegularExpression(pattern: #"(!?)\[\[([^\[\]\n]+?)\]\]"#)
-    static let tagRegex = try! NSRegularExpression(pattern: #"(?<![\w/&#])#([A-Za-z0-9_\-/]*[A-Za-z_\-/][A-Za-z0-9_\-/]*)"#)
     static let mdLinkRegex = try! NSRegularExpression(pattern: #"\]\(([^)\s]+\.md)\)"#)
     static let fenceRegex = try! NSRegularExpression(pattern: #"^ {0,3}(`{3,}|~{3,})"#)
 
@@ -134,17 +133,8 @@ public enum NoteParser {
         let mdLinks = mdLinkRegex.matches(in: text, range: body).filter { !inCode($0.range) }.map {
             ns.substring(with: $0.range(at: 1)).removingPercentEncoding ?? ns.substring(with: $0.range(at: 1))
         }
-        var tags = Set<String>()
-        for m in tagRegex.matches(in: text, range: body) where !inCode(m.range) {
-            // skip headings: "# " never matches because tag needs a non-space char after '#'
-            tags.insert(ns.substring(with: m.range(at: 1)))
-        }
-        if let t = fm["tags"] ?? fm["tag"] {
-            for s in t.strings { for part in s.split(whereSeparator: { $0 == " " || $0 == "," }) {
-                let clean = part.hasPrefix("#") ? String(part.dropFirst()) : String(part)
-                if !clean.isEmpty { tags.insert(clean) }
-            } }
-        }
+        // inline and frontmatter, hierarchical, case-insensitive; never in code, links or URLs
+        let tags = TagScanner.names(text, code: code, frontmatter: fm)
         let headings = parseHeadings(text, skipping: code, from: fm.bodyOffset)
         let words = countWords(ns.substring(with: body))
         return NoteSummary(frontmatter: fm, links: links, fields: fields, markdownLinks: mdLinks, tags: tags.sorted(), headings: headings, wordCount: words)

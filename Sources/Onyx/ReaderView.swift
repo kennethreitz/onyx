@@ -256,7 +256,7 @@ struct ReaderView: NSViewRepresentable {
                 }
             case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
             case "tag":
-                if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
+                if let t = body["tag"] as? String { ws.revealTag(t) }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }
             case "dvtask":
                 if !preview, let p = body["path"] as? String, let i = body["index"] as? Int {

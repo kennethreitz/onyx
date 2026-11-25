@@ -777,44 +777,6 @@ struct BookmarksPanel: View {
     }
 }
 
-struct TagsPanel: View {
-    @Bindable var ws: Workspace
-    func sortedTags() -> [(String, Int)] {
-        let pairs: [(String, Int)] = (ws.snapshot?.tags ?? [:]).map { (k, v) in (k, v.count) }
-        return pairs.sorted { (a: (String, Int), b: (String, Int)) -> Bool in a.1 == b.1 ? a.0 < b.0 : a.1 > b.1 }
-    }
-    var body: some View {
-        let tags = sortedTags()
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                ForEach(tags, id: \.0) { t in
-                    TagRow(name: t.0, count: t.1) { ws.searchQuery = "tag:" + t.0; ws.sidebarTab = .search }
-                }
-            }.padding(.vertical, 6).thinScrollers()
-        }
-    }
-}
-
-/// One tag in the Tags panel: the same hover wash as note rows, counts in tabular figures.
-struct TagRow: View {
-    var name: String
-    var count: Int
-    var action: () -> Void
-    @State private var hover = false
-    var body: some View {
-        HStack {
-            Text("#" + name).font(.custom("IBMPlexMono", size: 11.5)).foregroundStyle(Color.ink).lineLimit(1)
-            Spacer()
-            Text("\(count)").font(.system(size: TypeScale.caption).monospacedDigit()).foregroundStyle(Color.faint)
-        }
-        .padding(.horizontal, 12).frame(height: 24)
-        .background(RoundedRectangle(cornerRadius: Radius.control).fill(Color.ink.opacity(hover ? 0.04 : 0)).padding(.horizontal, 5))
-        .contentShape(Rectangle())
-        .onHover { hover = $0 }
-        .onTapGesture(perform: action)
-    }
-}
-
 // MARK: - Inspector
 
 struct InspectorView: View {
@@ -901,7 +863,13 @@ struct InspectorView: View {
         info("Words", "\(s.wordCount)")
         info("Links out", "\(s.links.count)")
         info("Backlinks", "\(snap.backlinks[note.path]?.count ?? 0)")
-        if !s.tags.isEmpty { info("Tags", s.tags.map { "#" + $0 }.joined(separator: " ")) }
+        if !s.tags.isEmpty {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Tags").font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 98, alignment: .leading)
+                TagChips(ws: ws, tags: s.tags)
+                Spacer(minLength: 0)
+            }.padding(.horizontal, 14).padding(.vertical, 3)
+        }
         info("Modified", note.mtime.formatted(date: .abbreviated, time: .shortened))
         info("Created", note.ctime.formatted(date: .abbreviated, time: .omitted))
         info("Path", note.path)

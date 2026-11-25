@@ -143,6 +143,11 @@ foldclick <n>         # click the nth fold region's chevron (through mouseDown)
 select <offset>       # a programmatic caret move, as Find does (opens folds)
 foldstate             # folded count, hidden ranges, text height, text intact?
 rfold [command id]    # reader: run a fold command, print foldable/folded/hidden counts
+tagtree               # the Tags pane tree, fully expanded, with own/total counts
+tagreveal <tag>       # what clicking a #tag does: select it in the Tags pane
+tagsuggest <query>    # the editor's #tag completion rows
+tagrename <from> -> <to>  # plan and write a tag rename (no sheet)
+tagundo               # undo the last tag rename
 ```
 
 There are more workspace commands for tree selection, previews, and relations; see `TypeSelfTest` in `Sources/Onyx/LinkSuggest.swift`. Never set `ONYX_TYPE_TEST` in normal use.

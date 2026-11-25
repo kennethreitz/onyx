@@ -195,6 +195,22 @@ enum TypeSelfTest {
             let parts = arg.components(separatedBy: " -> "); if parts.count == 2 { ws.move(parts[0], toFolder: parts[1]) }
         case "rename":   // rename <path> -> <new path>
             let parts = arg.components(separatedBy: " -> "); if parts.count == 2 { ws.relocate(parts[0], to: parts[1], reason: "Rename \((parts[0] as NSString).lastPathComponent) → \((parts[1] as NSString).lastPathComponent)") }
+        case "tagtree":   // the Tags pane rows, everything expanded: key own/total
+            let t = ws.tagTree()
+            let rows = t.rows(expanded: Set(t.roots.flatMap { t.subtreeKeys($0.key) }))
+            print("[tagtree] " + rows.map { String(repeating: "  ", count: $0.depth) + "#\($0.node.path) \($0.node.ownCount)/\($0.node.totalCount)" }.joined(separator: " | "))
+        case "tagreveal":   // tagreveal <tag>: what clicking a reader/editor #tag does
+            ws.revealTag(arg)
+            print("[tagreveal] tab=\(ws.sidebarTab) selected=\(ws.tags.selected ?? "-") expanded=\(ws.tags.expanded.sorted()) notes=\(ws.taggedNotes(arg, exact: ws.tags.exactOnly).map(\.path))")
+        case "tagsuggest":   // tagsuggest <query>: the editor's #tag completion rows
+            print("[tagsuggest] " + ws.tagSuggestions(arg).map { "\($0.title)→\($0.insert)" }.joined(separator: ", "))
+        case "tagrename":   // tagrename <from> -> <to>: plan and write (no sheet)
+            let parts = arg.components(separatedBy: " -> ")
+            if parts.count == 2 {
+                let p = ws.planTagRename(from: parts[0], to: parts[1])
+                print("[tagrename] notes=\(p.changes.map(\.path)) places=\(p.occurrences) merges=\(p.merges) renames=\(p.renames.map { "\($0.0)→\($0.1)" }) wrote=\(ws.applyTagRename(p))")
+            }
+        case "tagundo": print("[tagundo] \(ws.undoTagRename())")
         case "cat":
             if let r = ws.root, let t = try? String(contentsOf: r.appendingPathComponent(arg), encoding: .utf8) { print("[cat] \(arg): " + t.replacingOccurrences(of: "\n", with: " ⏎ ")) } else { print("[cat] \(arg): (missing)") }
         case "click", "shiftclick", "cmdclick":   // tree clicks through the same path as the view

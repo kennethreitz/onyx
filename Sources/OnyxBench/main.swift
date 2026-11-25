@@ -76,6 +76,16 @@ let g = bench("graph: GraphIndex.build") { GraphIndex.build(snap) }
 bench("graph: Atlas.build (folders)", 2) { Atlas.build(g, grouping: .folders, include: { _ in true }, includeOrphans: false) }
 bench("graph: GraphData.build") { GraphData.build(snap) }
 
+let tagTree = bench("tags: TagTree build (\(snap.tags.count) tags)") { TagTree(tags: snap.tags, sort: .count) }
+bench("tags: rows, everything expanded") { tagTree.rows(expanded: Set(tagTree.roots.flatMap { tagTree.subtreeKeys($0.key) })).count }
+bench("tags: filter \"a\"") { tagTree.filtered("a").tree.roots.count }
+bench("tags: completion \"p\"") { TagCompletion.suggestions("p", paths: tagTree.allPaths).count }
+if let top = tagTree.roots.first {
+    let texts = Dictionary(uniqueKeysWithValues: tagTree.notes(for: top.key).compactMap { p in snap.notes[p].map { (p, $0.content) } })
+    bench("tags: rename plan #\(top.path) (\(texts.count) notes)") { TagRename.plan(texts: texts, from: top.path, to: "renamed/" + top.path, existing: tagTree).changes.count }
+}
+bench("keystroke: TagScanner.names(biggest)") { TagScanner.names(text) }
+
 let dvQueries = [
     "LIST FROM \"System 777\" WHERE type = \"alter\"",
     "TABLE file.mtime, length(file.inlinks) AS links SORT file.mtime DESC LIMIT 50",
