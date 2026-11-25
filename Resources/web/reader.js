@@ -497,20 +497,53 @@
   function relayoutWide() {
     if (window.OnyxTypeset && OnyxTypeset.layoutTables) OnyxTypeset.layoutTables(page);
     layoutMermaids();
+    page.querySelectorAll('.table-wide').forEach(ensureZoomHint);
   }
 
-  /** Bleed, modest scale-to-fit (~25% over the bled width), or scroll at
-      natural size. Records natural dimensions once so a resize can recompute
+  /** Bleed, scale-to-fit while labels stay ≥ ~11px, or scroll (starting
+      centered). Records natural dimensions once so a resize can recompute
       without compounding. */
-  const MERMAID_SCALE_LIMIT = 1.25;
+  function mermaidLabelFontPx(svg) {
+    const t = svg.querySelector && svg.querySelector('text');
+    if (t) {
+      const raw = (t.getAttribute('font-size') || (t.style && t.style.fontSize) || '').trim();
+      const n = parseFloat(raw);
+      if (n > 0) return n;
+      try {
+        const c = parseFloat(getComputedStyle(t).fontSize);
+        if (c > 0) return c;
+      } catch (e) { }
+    }
+    return (window.OnyxTypeset && OnyxTypeset.MERMAID_FONT_PX) || 15;
+  }
+
+  function ensureZoomHint(el) {
+    if (!el || el.querySelector(':scope > .onyx-zoom-hint')) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'onyx-zoom-hint';
+    b.title = 'Double-click to view full size';
+    b.setAttribute('aria-label', 'View full size');
+    b.addEventListener('click', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      openLightbox(el);
+    });
+    el.appendChild(b);
+  }
+
   function layoutMermaids() {
-    const cue = window.OnyxTypeset && OnyxTypeset.updateScrollCue;
+    const T = window.OnyxTypeset;
+    const cue = T && T.updateScrollCue;
+    const fitFn = T && T.mermaidFit;
     page.querySelectorAll('pre.mermaid').forEach(node => {
       const svg = node.querySelector && node.querySelector('svg');
       if (!svg) return;
-      node.classList.remove('mermaid-wide', 'is-scrollable', 'at-end');
+      node.classList.remove('mermaid-wide', 'is-scrollable', 'at-end', 'at-start');
+      if (T && T.clearBleed) T.clearBleed(node);
       svg.style.width = '';
       svg.style.height = '';
+      svg.style.maxWidth = '';
       if (svg.getAttribute('width') === '100%') {
         const m = (svg.getAttribute('style') || '').match(/max-width:\s*([\d.]+)px/);
         if (m) { svg.setAttribute('width', m[1]); svg.style.maxWidth = ''; }
@@ -532,27 +565,46 @@
       const measure = node.clientWidth;
       if (!natural || !measure || natural <= measure + 1) {
         if (cue) cue(node);
+        ensureZoomHint(node);
         return;
       }
       node.classList.add('mermaid-wide');
-      const bleedW = node.clientWidth;
-      if (natural <= bleedW + 1) {
-        if (cue) cue(node);
-        return;
-      }
+      const bleedW = (T && T.applyBleed) ? T.applyBleed(node, measure) : (node.clientWidth || measure);
       const nh = parseFloat(svg.dataset.naturalHeight || '');
-      if (natural <= bleedW * MERMAID_SCALE_LIMIT + 0.5) {
-        const scale = bleedW / natural;
-        svg.style.width = bleedW + 'px';
-        svg.style.height = nh ? (nh * scale) + 'px' : 'auto';
+      const plan = fitFn ? fitFn(natural, bleedW, mermaidLabelFontPx(svg))
+        : { mode: natural <= bleedW + 1 ? 'natural' : 'scroll', scale: 1, layoutWidth: natural, scrollable: natural > bleedW + 1 };
+      svg.style.maxWidth = 'none';
+      if (plan.mode === 'natural') {
+        svg.style.width = natural + 'px';
+        if (nh) svg.style.height = nh + 'px';
+        node.scrollLeft = 0;
         if (cue) cue(node);
+        ensureZoomHint(node);
         return;
       }
-      // Keep natural size and scroll. Explicit layout width so the scroll
-      // container includes the full SVG and nothing is unreachable.
-      svg.style.width = natural + 'px';
-      if (nh) svg.style.height = nh + 'px';
-      if (cue) cue(node);
+      if (plan.mode === 'fit') {
+        svg.style.width = plan.layoutWidth + 'px';
+        svg.style.height = nh ? (nh * plan.scale) + 'px' : 'auto';
+        node.scrollLeft = 0;
+        if (cue) cue(node);
+        ensureZoomHint(node);
+        return;
+      }
+      // Scroll the remainder. Explicit layout width so the scroll container
+      // includes the full SVG (no max-width, useMaxWidth already false).
+      svg.style.width = plan.layoutWidth + 'px';
+      if (nh) svg.style.height = (nh * plan.scale) + 'px';
+      // is-scrollable (flex-start) must be on before we measure scrollWidth,
+      // or a centered too-wide flex child clips the start edge.
+      node.classList.add('is-scrollable');
+      const center = () => {
+        const max = node.scrollWidth - node.clientWidth;
+        if (max > 1) node.scrollLeft = max / 2;
+        if (cue) cue(node);
+      };
+      center();
+      requestAnimationFrame(center);
+      ensureZoomHint(node);
     });
   }
 
@@ -783,6 +835,168 @@
     hideGrip(true);
   });
 
+  // --- Figure lightbox (mermaid, wide tables) ---------------------------------
+  let LB = null;
+
+  function lightboxSourceKind(el) {
+    if (!el || !el.closest) return null;
+    if (el.closest('#onyx-lightbox')) return null;
+    if (el.closest('.kanban.editable .card') || el.closest('.kb-menu') || el.closest('#img-grip')) return null;
+    const mermaid = el.closest('pre.mermaid');
+    if (mermaid && mermaid.querySelector('svg')) return mermaid;
+    const table = el.closest('.table-wide');
+    if (table) return table;
+    return null;
+  }
+
+  function closeLightbox(immediate) {
+    const root = document.getElementById('onyx-lightbox');
+    if (!root) return;
+    if (LB && LB.onResize) window.removeEventListener('resize', LB.onResize);
+    const done = () => {
+      root.remove();
+      document.body.classList.remove('onyx-lb-open');
+      LB = null;
+    };
+    if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+    root.classList.remove('is-open');
+    root.classList.add('is-closing');
+    setTimeout(done, 200);
+  }
+
+  function openLightbox(source) {
+    if (!source) return;
+    closeLightbox(true);
+    window.getSelection && window.getSelection().removeAllRanges();
+    const root = document.createElement('div');
+    root.id = 'onyx-lightbox';
+    root.setAttribute('role', 'dialog');
+    root.setAttribute('aria-modal', 'true');
+    root.setAttribute('aria-label', 'Expanded figure');
+    const backdrop = document.createElement('div');
+    backdrop.className = 'onyx-lb-backdrop';
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.className = 'onyx-lb-close';
+    closeBtn.setAttribute('aria-label', 'Close');
+    closeBtn.textContent = '×';
+    const stage = document.createElement('div');
+    stage.className = 'onyx-lb-stage';
+    const inner = document.createElement('div');
+    inner.className = 'onyx-lb-inner';
+
+    const svg0 = source.querySelector && source.querySelector('svg');
+    let content, nw, nh;
+    if (source.matches && source.matches('pre.mermaid') && svg0) {
+      content = svg0.cloneNode(true);
+      content.style.width = '';
+      content.style.height = '';
+      content.style.maxWidth = 'none';
+      nw = parseFloat(svg0.dataset.naturalWidth || content.getAttribute('width')) || 0;
+      nh = parseFloat(svg0.dataset.naturalHeight || content.getAttribute('height')) || 0;
+      if ((!nw || !nh) && content.viewBox && content.viewBox.baseVal) {
+        if (!nw) nw = content.viewBox.baseVal.width;
+        if (!nh) nh = content.viewBox.baseVal.height;
+      }
+      if (nw) { content.setAttribute('width', String(nw)); content.style.width = nw + 'px'; }
+      if (nh) { content.setAttribute('height', String(nh)); content.style.height = nh + 'px'; }
+    } else {
+      const table = source.querySelector('table') || source;
+      content = table.cloneNode(true);
+      content.style.maxWidth = 'none';
+      document.body.appendChild(inner);
+      inner.appendChild(content);
+      nw = content.scrollWidth || content.getBoundingClientRect().width;
+      nh = content.scrollHeight || content.getBoundingClientRect().height;
+      inner.remove();
+    }
+    if (!nw) nw = 800;
+    if (!nh) nh = 600;
+    inner.style.width = nw + 'px';
+    inner.style.height = nh + 'px';
+    inner.appendChild(content);
+    stage.appendChild(inner);
+    root.appendChild(backdrop);
+    root.appendChild(closeBtn);
+    root.appendChild(stage);
+    document.body.appendChild(root);
+    document.body.classList.add('onyx-lb-open');
+
+    let s = 1, tx = 0, ty = 0, dragging = false, lastX = 0, lastY = 0, gestureBase = 1;
+    const apply = () => {
+      inner.style.transform = 'translate(' + tx + 'px, ' + ty + 'px) scale(' + s + ')';
+    };
+    const fit = () => {
+      const pad = 56;
+      const aw = Math.max(80, stage.clientWidth - pad), ah = Math.max(80, stage.clientHeight - pad);
+      s = Math.min(aw / nw, ah / nh);
+      if (!isFinite(s) || s <= 0) s = 1;
+      tx = 0; ty = 0;
+      apply();
+    };
+    const zoomAt = (cx, cy, factor) => {
+      const ns = Math.max(0.2, Math.min(8, s * factor));
+      const r = stage.getBoundingClientRect();
+      const px = cx - r.left - r.width / 2, py = cy - r.top - r.height / 2;
+      // Keep the point under the cursor fixed.
+      tx = px - (px - tx) * (ns / s);
+      ty = py - (py - ty) * (ns / s);
+      s = ns;
+      apply();
+    };
+
+    LB = { root, onResize: fit };
+    fit();
+    requestAnimationFrame(() => root.classList.add('is-open'));
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+    };
+    stage.addEventListener('wheel', onWheel, { passive: false });
+    stage.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+      stage.classList.add('is-dragging');
+      stage.setPointerCapture(e.pointerId);
+    });
+    stage.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      tx += e.clientX - lastX; ty += e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY;
+      apply();
+    });
+    stage.addEventListener('pointerup', e => {
+      dragging = false; stage.classList.remove('is-dragging');
+      try { stage.releasePointerCapture(e.pointerId); } catch (err) { }
+    });
+    stage.addEventListener('gesturestart', e => { e.preventDefault(); gestureBase = s; });
+    stage.addEventListener('gesturechange', e => {
+      e.preventDefault();
+      const target = Math.max(0.2, Math.min(8, gestureBase * e.scale));
+      zoomAt(e.clientX || (stage.clientWidth / 2), e.clientY || (stage.clientHeight / 2), target / s);
+    });
+    backdrop.addEventListener('click', () => closeLightbox(false));
+    closeBtn.addEventListener('click', () => closeLightbox(false));
+    window.addEventListener('resize', fit);
+  }
+
+  document.addEventListener('dblclick', e => {
+    const src = lightboxSourceKind(e.target);
+    if (!src) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.getSelection && window.getSelection().removeAllRanges();
+    openLightbox(src);
+  }, true);
+
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape' || !document.getElementById('onyx-lightbox')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    closeLightbox(false);
+  }, true);
+
   window.Onyx = {
     render(payload) {
       P = payload;
@@ -818,6 +1032,7 @@
       if (payload.sidenotes) { layoutSidenotes(); if (document.fonts) document.fonts.ready.then(scheduleNotes); }
       document.body.classList.toggle('has-notes', !!page.querySelector('.sidenote'));
       mermaids();
+      page.querySelectorAll('.table-wide').forEach(ensureZoomHint);
       setupFolds();
       if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;
       if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
@@ -834,6 +1049,7 @@
         requestAnimationFrame(() => { page.classList.remove('instant'); requestAnimationFrame(() => page.classList.add('shown')); });
       }
     },
+    layoutWide() { relayoutWide(); },
     setType(size, measure) {
       document.documentElement.style.setProperty('--font-text-size', size + 'px');
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');

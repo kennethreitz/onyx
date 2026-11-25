@@ -318,3 +318,115 @@ test('image CSS never upscales past the column, and the resize grip is styled', 
   assert.match(css, /img \{[^}]*max-width: 100%/);
   assert.match(css, /#img-grip \{[^}]*cursor: nwse-resize/);
 });
+
+
+// --- Wide Mermaid / table scroll cues + lightbox --------------------------------
+
+const Tset = () => ctx.window.OnyxTypeset;
+
+test('mermaidFit scales to the bled width until labels would drop below 11px', () => {
+  const T = Tset();
+  assert.equal(T.MERMAID_FONT_PX, 15);
+  assert.equal(T.MERMAID_MIN_LABEL_PX, 11);
+  // Fits in the wrap: leave natural, no scroll.
+  const natural = T.mermaidFit(400, 500, 15);
+  assert.equal(natural.mode, 'natural');
+  assert.equal(natural.scrollable, false);
+  assert.equal(natural.scale, 1);
+  // 20% over the bleed: 15px * (1/1.2) = 12.5px, still above 11 — fit and center.
+  const modest = T.mermaidFit(1200, 1000, 15);
+  assert.equal(modest.mode, 'fit');
+  assert.equal(modest.scrollable, false);
+  assert.equal(modest.layoutWidth, 1000);
+  assert.ok(Math.abs(modest.scale - 1000 / 1200) < 1e-9);
+  assert.ok(15 * modest.scale >= 11);
+  // Previously the cap was 25% over; 40% over still fits at 15 * (1/1.4) ≈ 10.71, just under 11...
+  // 15 * 11/15 = 11 exactly at scale 11/15 ≈ 0.733, i.e. natural / bleed ≤ 15/11 ≈ 1.3636.
+  const atFloor = T.mermaidFit(1363.6, 1000, 15);
+  assert.equal(atFloor.mode, 'fit');
+  assert.ok(15 * atFloor.scale + 1e-6 >= 11);
+  // Wider than that: shrink only to the 11px floor and scroll the rest.
+  const wide = T.mermaidFit(2000, 1000, 15);
+  assert.equal(wide.mode, 'scroll');
+  assert.equal(wide.scrollable, true);
+  assert.ok(Math.abs(wide.scale - 11 / 15) < 1e-9);
+  assert.ok(Math.abs(wide.layoutWidth - 2000 * 11 / 15) < 1e-6);
+  assert.ok(wide.layoutWidth > 1000);
+  // Effective labels stay at 11px.
+  assert.ok(Math.abs(15 * wide.scale - 11) < 1e-9);
+});
+
+test('mermaidFit honors a measured label font when it differs from 15px', () => {
+  // 18px labels can shrink further (18 * s >= 11 ⇒ s >= 11/18) and still fit a wider figure.
+  const fit = Tset().mermaidFit(1600, 1000, 18);
+  assert.equal(fit.mode, 'fit');
+  assert.ok(18 * fit.scale >= 11);
+  const scroll = Tset().mermaidFit(2000, 1000, 18);
+  assert.equal(scroll.mode, 'scroll');
+  assert.ok(Math.abs(scroll.scale - 11 / 18) < 1e-9);
+});
+
+test('reader CSS fades both overflow edges, hides the native bar, and styles the lightbox', () => {
+  const css = fs.readFileSync(path.join(web, 'reader.css'), 'utf8');
+  // The global rule hid native bars with display: none; mermaid/table use a custom 4px track.
+  assert.match(css, /::-webkit-scrollbar \{ width: 0; height: 0; display: none; \}/);
+  assert.match(css, /\.onyx-hscroll \{/);
+  assert.match(css, /height: 4px/);
+  assert.match(css, /is-scrollable:not\(\.at-end\)::after/);
+  assert.match(css, /is-scrollable:not\(\.at-start\)::before/);
+  assert.match(css, /cursor: zoom-in/);
+  assert.match(css, /#onyx-lightbox/);
+  assert.match(css, /\.onyx-lb-backdrop/);
+  assert.match(css, /\.onyx-lb-close/);
+  assert.doesNotMatch(css, /up to ~25%/);
+});
+
+test('updateScrollCue marks both ends and only shows a scrollbar when content overflows', () => {
+  const T = Tset();
+  const calls = [];
+  const el = {
+    clientWidth: 100,
+    scrollWidth: 100,
+    scrollLeft: 0,
+    className: '',
+    classes: new Set(),
+    classList: {
+      toggle(name, on) { if (on) el.classes.add(name); else el.classes.delete(name); },
+    },
+    querySelector() { return null; },
+    addEventListener(type) { calls.push(type); },
+  };
+  T.updateScrollCue(el);
+  assert.equal(el.classes.has('is-scrollable'), false);
+  assert.equal(el.classes.has('at-start'), true);
+  assert.equal(el.classes.has('at-end'), true);
+  assert.deepEqual(calls, []);
+
+  el.scrollWidth = 300;
+  el.scrollLeft = 100;
+  T.updateScrollCue(el);
+  assert.equal(el.classes.has('is-scrollable'), true);
+  assert.equal(el.classes.has('at-start'), false);
+  assert.equal(el.classes.has('at-end'), false);
+  assert.deepEqual(calls, ['scroll']);
+
+  el.scrollLeft = 0;
+  T.updateScrollCue(el);
+  assert.equal(el.classes.has('at-start'), true);
+  assert.equal(el.classes.has('at-end'), false);
+
+  el.scrollLeft = 200;
+  T.updateScrollCue(el);
+  assert.equal(el.classes.has('at-start'), false);
+  assert.equal(el.classes.has('at-end'), true);
+});
+
+test('bleedSide caps at 8rem and leaves a 1.2rem gutter', () => {
+  const T = Tset();
+  // measure 656, viewport 980, rem 16: side = min(128, (980-656)/2 - 19.2) = 128
+  assert.equal(T.bleedSide(656, 980, 16), 128);
+  // already close to the pane: little or no bleed
+  assert.equal(T.bleedSide(900, 980, 16), Math.min(128, Math.max(0, (980-900)/2 - 19.2)));
+  assert.ok(T.bleedSide(900, 980, 16) < 40);
+  assert.equal(T.bleedSide(980, 980, 16), 0);
+});
