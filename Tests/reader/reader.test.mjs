@@ -238,6 +238,11 @@ test('numeric table cells are recognised for right alignment', () => {
   for (const v of ['2.0 beta', 'n/a', 'Python 3', 'v1.0']) assert.ok(!T().NUM.test(v), v);
 });
 
+test('compact table cells (dates, numbers, short tokens) are marked nowrap', () => {
+  for (const v of ['2026-11-09', '11/9/26', '4.2', '1,234', 'OK', 'v1.0']) assert.ok(T().isCompact(v), v);
+  for (const v of ['2026-11-09 notes', 'A long title', 'Python 3 docs']) assert.ok(!T().isCompact(v), v);
+});
+
 test('the specimen fixture parses: notes, table, figure and code survive', () => {
   const fx = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures/typeset-specimen.md'), 'utf8');
   const out = html(fx.replace(/^---[\s\S]*?\n---\n/, ''));

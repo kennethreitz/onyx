@@ -1,7 +1,7 @@
 // Onyx typesetting pass: the things TeX does for you, done to the rendered page.
 // Smart quotes, dashes and ellipses; ties after short words; true small caps for
 // acronyms; a small-caps lead-in (or drop cap) to open the text; epigraphs with
-// attributions; figures and table captions; numeric table columns; optical margin
+// attributions; figures and table captions; numeric and compact table columns; optical margin
 // kerns for quotes. Code, math, tags and interface text are never touched.
 // Pure string helpers are exported for Tests/reader; apply() works on the DOM.
 (function () {
@@ -225,6 +225,15 @@
   const escape = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   const NUM = /^[\s(]*[-+\u2212\u2013]?[$€£¥]?\s?\d[\d,.\u2009\u00a0 ]*(%|[kKMB]|x|×)?\)?\s*$/;
+  const DATE = /^\s*(?:\d{4}-\d{2}-\d{2}|\d{1,2}[./]\d{1,2}[./]\d{2,4})\s*$/;
+  const SHORT = 12;
+  /** A date, a numeric cell, or a short token with no spaces — keep it on one line. */
+  function isCompact(s) {
+    const t = String(s || '').trim();
+    if (!t) return true;
+    if (NUM.test(t) || DATE.test(t)) return true;
+    return t.length <= SHORT && !/\s/.test(t);
+  }
   /** Columns of figures align on the right in tabular lining numerals (booktabs habit). */
   function numericColumns(table) {
     const rows = [...table.querySelectorAll('tbody tr')];
@@ -238,6 +247,27 @@
       const th = table.querySelector(`thead tr`) && table.querySelector('thead tr').cells[c];
       if (th) th.classList.add('num');
     }
+  }
+
+  /** Mark compact columns (dates, numbers, short tokens) so CSS can nowrap them. */
+  function compactColumns(table) {
+    const rows = [...table.querySelectorAll('tr')];
+    if (!rows.length) return;
+    const n = Math.max(...rows.map(r => r.cells.length));
+    for (let c = 0; c < n; c++) {
+      const cells = rows.map(r => r.cells[c]).filter(Boolean);
+      const filled = cells.filter(td => td.textContent.trim());
+      if (!filled.length || !filled.every(td => isCompact(td.textContent))) continue;
+      cells.forEach(td => td.classList.add('nowrap'));
+    }
+  }
+
+  /** Always run, even when Typeset reading is off: column classes drive the CSS. */
+  function layoutTables(page) {
+    page.querySelectorAll('.table-wrap table').forEach(table => {
+      numericColumns(table);
+      compactColumns(table);
+    });
   }
 
   /** Language for hyphenation dictionaries: frontmatter `lang` or `language`, else English. */
@@ -255,7 +285,7 @@
     const doc = page.ownerDocument;
     if (doc && doc.documentElement) doc.documentElement.lang = lang;
     if (doc && doc.body) doc.body.lang = lang;
-    if (!opts.on) return;
+    if (!opts.on) { layoutTables(page); return; }
     smartenDOM(page);
     quotes(page);
     // A short line right under the title (or under its epigraph) is a date or byline: \date.
@@ -267,7 +297,8 @@
     if (opts.smallCaps !== false) smallCapsDOM(page);
     hangQuotes(page);
     opening(page, opts.opening || 'smallcaps');
+    layoutTables(page);
   }
 
-  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM };
+  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact };
 })();

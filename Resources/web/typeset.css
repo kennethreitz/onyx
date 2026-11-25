@@ -162,7 +162,7 @@ body.print :is(figure, table, pre, blockquote, .callout, .mermaid, img, .sidenot
 body.print :is(p, li) { orphans: 2; widows: 2; }
 body.print pre { white-space: pre-wrap; overflow: visible; }
 body.print :is(pre, .table-wrap, .table-wrap table).may-break, body.print .table-wrap.may-break table { break-inside: auto; page-break-inside: auto; }
-body.print .table-wrap { overflow: visible; }
+body.print .table-wrap { overflow: visible; width: auto; min-width: 0; max-width: none; margin-left: 0; margin-right: 0; }
 body.print .kanban { margin: 1em 0; flex-wrap: wrap; overflow: visible; }
 body.print .footnotes { break-before: auto; }
 
