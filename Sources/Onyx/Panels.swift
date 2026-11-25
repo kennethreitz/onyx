@@ -330,6 +330,9 @@ struct TreeNodeView: View {
         ws.currentPath == node.path || (node.folderNote != nil && ws.currentPath == node.folderNote) || (node.isFolder && ws.selectedFolder == node.path)
     }
     var isSelected: Bool { ws.treeSelection.contains(node.path) }
+    /// The Homepage plugin's note when set, otherwise Home.md at the vault root.
+    var isHome: Bool { node.path == ws.homePath || node.folderNote == ws.homePath }
+    var treeNameWeight: Font.Weight { isHome ? .semibold : (node.isFolder ? .medium : .regular) }
     /// Selected rows get the full highlight; with a multi-selection the open note (if not part
     /// of it) keeps only a faint one so it's clear what a menu or ⌘⌫ will act on.
     var fill: Double {
@@ -371,7 +374,7 @@ struct TreeNodeView: View {
                     .frame(maxWidth: .infinity, minHeight: 18, maxHeight: 22)
                 } else {
                     Text(node.displayName)
-                        .font(.system(size: 12.5, weight: node.isFolder ? .medium : .regular))
+                        .font(.system(size: 12.5, weight: treeNameWeight))
                         .foregroundStyle(node.isNote || node.isFolder || node.path.isCanvasPath || node.path.isBasePath ? Color.ink : Color.faint)
                         .underline(node.folderNote != nil, color: Color.faint.opacity(0.45))
                         .lineLimit(1).truncationMode(.middle)
