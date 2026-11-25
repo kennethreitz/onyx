@@ -276,24 +276,58 @@
       .mermaid-wide CSS: up to 8rem, leaving a 1.2rem gutter to the pane edge.
       JS applies the margins in pixels so the bleed does not depend on `vw`
       percentages resolving (they can stay 0 in some WKWebView layouts). */
-  function bleedSide(measure, vw, rem) {
+  function remSize(rem) {
     const root = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
     let r = rem;
     if (!(r > 0) && root && typeof getComputedStyle === 'function') {
       r = parseFloat(getComputedStyle(root).fontSize);
     }
     if (!(r > 0)) r = 16;
+    return r;
+  }
+  function bleedSide(measure, vw, rem) {
+    const r = remSize(rem);
     const view = (vw > 0 ? vw : (typeof window !== 'undefined' ? window.innerWidth : measure));
     return Math.min(8 * r, Math.max(0, (view - measure) / 2 - 1.2 * r));
   }
+  /** Visible room on each side of an already-unbled element, leaving the
+      1.2rem gutter. Limits bleed so a sidenote shift or a tight pane cannot
+      hide the figure under a sidebar or past the web-view edge. */
+  function bleedRoom(el, vw, rem) {
+    const r = remSize(rem);
+    const gutter = 1.2 * r;
+    if (!el || typeof el.getBoundingClientRect !== 'function') {
+      return { left: Infinity, right: Infinity };
+    }
+    const rect = el.getBoundingClientRect();
+    if (!rect || typeof rect.left !== 'number' || typeof rect.right !== 'number') {
+      return { left: Infinity, right: Infinity };
+    }
+    const view = (vw > 0 ? vw : (typeof window !== 'undefined' ? window.innerWidth : 0));
+    return {
+      left: Math.max(0, rect.left - gutter),
+      right: Math.max(0, view - rect.right - gutter)
+    };
+  }
   function applyBleed(el, measure, vw) {
-    const side = bleedSide(measure, vw);
-    if (side > 0.5) {
-      el.style.marginLeft = -side + 'px';
-      el.style.marginRight = -side + 'px';
-    } else {
-      el.style.marginLeft = '';
-      el.style.marginRight = '';
+    // Measure the unbled box: .table-wide / .mermaid-wide CSS margins must
+    // not shrink the leftover room (or double-count an earlier bleed).
+    if (el && el.style) {
+      el.style.marginLeft = '0px';
+      el.style.marginRight = '0px';
+    }
+    const desired = bleedSide(measure, vw);
+    const room = bleedRoom(el, vw);
+    // Same inset on both sides, never more than the tighter visible side.
+    const side = Math.min(desired, room.left, room.right);
+    if (el && el.style) {
+      if (side > 0.5) {
+        el.style.marginLeft = -side + 'px';
+        el.style.marginRight = -side + 'px';
+      } else {
+        el.style.marginLeft = '';
+        el.style.marginRight = '';
+      }
     }
     return measure + 2 * side;
   }
@@ -305,12 +339,13 @@
 
   /** Mermaid theme font and the smallest label we will scale to (px). */
   const MERMAID_FONT_PX = 15;
-  const MERMAID_MIN_LABEL_PX = 11;
+  const MERMAID_MIN_LABEL_PX = 13;
 
   /** How to present a Mermaid SVG of `natural` CSS pixels in a bled wrap of
       `bleedW`. Scale to fit as long as labels stay at least MERMAID_MIN_LABEL_PX
-      (from `fontPx`, defaulting to Mermaid's 15px). Wider than that, shrink
-      only to the font floor and scroll the rest. */
+      (from `fontPx`, defaulting to Mermaid's 15px). That floor is high enough
+      to keep a wide tree readable; wider than that, shrink only to the floor
+      and scroll the rest from the left edge. */
   function mermaidFit(natural, bleedW, fontPx) {
     const font = (fontPx > 0 ? fontPx : MERMAID_FONT_PX);
     const minScale = MERMAID_MIN_LABEL_PX / font;
@@ -381,6 +416,12 @@
     el.classList.toggle('is-scrollable', overflow);
     el.classList.toggle('at-start', !overflow || el.scrollLeft <= 1);
     el.classList.toggle('at-end', !overflow || el.scrollLeft >= max - 1);
+    // Overlays (fades, track, zoom button) are absolutely positioned inside
+    // the scroll container, so they would scroll with the content. Pin them
+    // to the visible edges by shifting them by the scroll offset.
+    if (el.style && typeof el.style.setProperty === 'function') {
+      el.style.setProperty('--onyx-sl', (overflow ? el.scrollLeft : 0) + 'px');
+    }
     if (overflow && !el._onyxScrollCue) {
       el.addEventListener('scroll', () => updateScrollCue(el), { passive: true });
       el._onyxScrollCue = true;
@@ -445,5 +486,5 @@
     layoutTables(page);
   }
 
-  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact, layoutTables, sizeWideTables, updateScrollCue, mermaidFit, bleedSide, applyBleed, clearBleed, MERMAID_FONT_PX, MERMAID_MIN_LABEL_PX };
+  window.OnyxTypeset = { apply, smarten, tie, smallCapsRanges, language, NUM, DATE, isCompact, layoutTables, sizeWideTables, updateScrollCue, mermaidFit, bleedSide, bleedRoom, applyBleed, clearBleed, MERMAID_FONT_PX, MERMAID_MIN_LABEL_PX };
 })();

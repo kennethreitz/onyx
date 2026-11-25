@@ -165,6 +165,55 @@
   const embedMarked = new marked.Marked({ gfm: true, breaks: true });
   embedMarked.use({ extensions: [wikilink, highlight, tag], renderer });
 
+  /** GFM table rows split on `|`. Pipes inside `[[wikilinks]]` (alias
+      separators, escaped or not) must not become cell breaks — Obsidian
+      leaves the wikilink intact. Escape those pipes before marked lexes
+      the table; the wikilink tokenizer still treats `\|` as `|`. */
+  function escapePipesInsideWikilinks(line) {
+    let out = '', i = 0, n = line.length;
+    while (i < n) {
+      if (line[i] === '`') {
+        const ticks = (/^`+/.exec(line.slice(i)) || ['`'])[0];
+        const end = line.indexOf(ticks, i + ticks.length);
+        if (end < 0) { out += line.slice(i); break; }
+        out += line.slice(i, end + ticks.length);
+        i = end + ticks.length;
+        continue;
+      }
+      const wiki = line[i] === '[' && line[i + 1] === '['
+        || (line[i] === '!' && line[i + 1] === '[' && line[i + 2] === '[');
+      if (wiki) {
+        const open = line[i] === '!' ? i + 1 : i;
+        const end = line.indexOf(']]', open + 2);
+        if (end < 0) { out += line.slice(i); break; }
+        out += line.slice(i, end + 2).replace(/(^|[^\\])\|/g, '$1\\|');
+        i = end + 2;
+        continue;
+      }
+      out += line[i++];
+    }
+    return out;
+  }
+  function escapeWikilinkPipesInTables(md) {
+    const lines = String(md).split('\n');
+    let fence = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const open = /^( {0,3})(`{3,}|~{3,})/.exec(line);
+      if (open) {
+        const marker = open[2];
+        if (!fence) fence = marker;
+        else if (marker[0] === fence[0] && marker.length >= fence.length) fence = null;
+        continue;
+      }
+      if (fence) continue;
+      if (line.indexOf('|') < 0) continue;
+      if (!/^\s*\|/.test(line) && !/\|.+\|/.test(line)) continue;
+      lines[i] = escapePipesInsideWikilinks(line);
+    }
+    return lines.join('\n');
+  }
+
   function stripComments(md) { return md.replace(/%%[\s\S]*?%%/g, m => m.replace(/[^\n]/g, '')); }  // keep line numbers
 
   function withMath(md, parse) {
@@ -181,6 +230,7 @@
   const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
   function parseWithLines(md, base) {
     const prep = window.OnyxMath ? window.OnyxMath.protect(md) : { text: md, slots: [] };
+    prep.text = escapeWikilinkPipesInTables(prep.text);
     const toks = mainMarked.lexer(prep.text);
     // marked-footnote injects a `footnotes` token at the start of the lexer
     // list and moves it to the end in walkTokens — but only in that original
@@ -500,8 +550,8 @@
     page.querySelectorAll('.table-wide').forEach(ensureZoomHint);
   }
 
-  /** Bleed, scale-to-fit while labels stay ≥ ~11px, or scroll (starting
-      centered). Records natural dimensions once so a resize can recompute
+  /** Bleed, scale-to-fit while labels stay ≥ ~13px, or scroll (starting
+      at the left edge). Records natural dimensions once so a resize can recompute
       without compounding. */
   function mermaidLabelFontPx(svg) {
     const t = svg.querySelector && svg.querySelector('text');
@@ -522,7 +572,8 @@
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'onyx-zoom-hint';
-    b.title = 'Double-click to view full size';
+    b.title = 'View full size (or double-click the figure)';
+    b.textContent = '⤢';
     b.setAttribute('aria-label', 'View full size');
     b.addEventListener('click', e => {
       e.preventDefault();
@@ -597,13 +648,14 @@
       // is-scrollable (flex-start) must be on before we measure scrollWidth,
       // or a centered too-wide flex child clips the start edge.
       node.classList.add('is-scrollable');
-      const center = () => {
-        const max = node.scrollWidth - node.clientWidth;
-        if (max > 1) node.scrollLeft = max / 2;
+      // Overflowing content starts at the left edge so every node is
+      // reachable; only a figure that fits is centered (by flex).
+      const start = () => {
+        node.scrollLeft = 0;
         if (cue) cue(node);
       };
-      center();
-      requestAnimationFrame(center);
+      start();
+      requestAnimationFrame(start);
       ensureZoomHint(node);
     });
   }
@@ -1120,6 +1172,7 @@
     },
     // test hook (Tests/reader): the HTML for a note body, line markers included, no DOM work
     _html(md) { return parseWithLines(stripComments(md), 0); },
+    _escapeWikilinkPipesInTables: escapeWikilinkPipesInTables,
     setFolds(lines) { FOLDS = new Set(lines.map(Number)); refreshFolds(); },
     foldCommand(id) {
       const heads = foldHeads().filter(h => h.classList.contains('foldable'));
