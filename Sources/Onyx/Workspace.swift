@@ -1971,7 +1971,10 @@ final class Workspace {
         if !bookmarksExpanded { setBookmarksExpanded(true) }
     }
 
-    func openBookmark(_ item: BookmarkItem) {
+    func openBookmark(_ item: BookmarkItem, inNewPane: Bool = false) {
+        if inNewPane, item.type == "file" || item.type == "folder" {
+            split(.vertical)
+        }
         switch item.type {
         case "file":
             guard let path = item.path else { return }

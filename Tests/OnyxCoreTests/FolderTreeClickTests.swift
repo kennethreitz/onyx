@@ -104,4 +104,16 @@ final class TreePointerSessionTests: XCTestCase {
         XCTAssertEqual(s.mouseDown(command: false, canDrag: true), .clickNow)
         XCTAssertEqual(s.mouseUp(), .none)
     }
+
+    func testDeferredClickWaitsForMouseUpUnlessADragStarts() {
+        var s = TreePointerSession()
+        XCTAssertEqual(s.mouseDown(deferClick: true, canDrag: true), .deferClick)
+        XCTAssertEqual(s.mouseUp(), .clickNow)
+
+        var d = TreePointerSession()
+        XCTAssertEqual(d.mouseDown(deferClick: true, canDrag: true), .deferClick)
+        XCTAssertEqual(d.mouseDragged(distanceSquared: 15), .none)
+        XCTAssertEqual(d.mouseDragged(distanceSquared: 16), .startDrag)
+        XCTAssertEqual(d.mouseUp(), .none)
+    }
 }

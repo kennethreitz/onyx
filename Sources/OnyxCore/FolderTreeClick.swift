@@ -73,8 +73,14 @@ public struct TreePointerSession: Equatable, Sendable {
     public init() {}
 
     public mutating func mouseDown(command: Bool, canDrag: Bool) -> Down {
+        mouseDown(deferClick: command && canDrag, canDrag: canDrag)
+    }
+
+    /// `deferClick` waits for mouse-up so a follow-through drag can start
+    /// without also firing the click (bookmark rows, or a file-tree ⌘-click).
+    public mutating func mouseDown(deferClick: Bool, canDrag: Bool) -> Down {
         dragging = false
-        if command, canDrag {
+        if deferClick {
             armed = true
             clickFired = false
             return .deferClick

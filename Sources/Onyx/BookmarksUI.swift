@@ -1,16 +1,6 @@
 import AppKit
 import SwiftUI
-import UniformTypeIdentifiers
 import OnyxCore
-
-/// In-app drag payload for reordering bookmarks. A private type so Finder drops
-/// and file-tree moves aren't accepted as a reorder.
-struct BookmarkDragID: Codable, Transferable, Equatable {
-    var id: UUID
-    static var transferRepresentation: some TransferRepresentation {
-        CodableRepresentation(contentType: UTType(exportedAs: "org.kennethreitz.onyx.bookmark-id"))
-    }
-}
 
 /// Bookmarks at the top of the file sidebar. Always shown so a note can be
 /// dropped here even when the list is still empty.
@@ -101,10 +91,7 @@ struct BookmarkRow: View {
     var depth: Int
     @State private var hover = false
     @State private var groupOpen = true
-    @State private var reorderArmed = false
-    @State private var fileArmed = false
-
-    var dropArmed: Bool { reorderArmed || fileArmed }
+    @State private var dropArmed = false
 
     var isCurrent: Bool {
         switch item.type {
@@ -166,20 +153,16 @@ struct BookmarkRow: View {
             }
             .contentShape(Rectangle())
             .onHover { hover = $0 }
-            .onTapGesture { activate() }
             .contextMenu { menu }
-            .draggable(BookmarkDragID(id: item.id))
-            .dropDestination(for: BookmarkDragID.self) { drops, _ in
-                guard let drag = drops.first, drag.id != item.id else { return false }
-                if item.isGroup {
-                    ws.moveBookmark(id: drag.id, parent: item.id, before: nil)
-                } else {
-                    ws.moveBookmark(id: drag.id, parent: parent, before: item.id)
-                }
-                return true
-            } isTargeted: { reorderArmed = $0 }
             .overlay {
-                BookmarksDropCatcher(ws: ws, parent: dropParent, before: dropBefore) { fileArmed = $0 }
+                BookmarksDropCatcher(
+                    ws: ws,
+                    parent: dropParent,
+                    before: dropBefore,
+                    itemID: item.id,
+                    dragTitle: item.displayTitle,
+                    onClick: { flags in activate(command: flags.contains(.command)) }
+                ) { dropArmed = $0 }
             }
 
             if item.isGroup, groupOpen {
@@ -199,11 +182,14 @@ struct BookmarkRow: View {
         }
     }
 
-    func activate() {
-        if item.isGroup {
+    func activate(command: Bool = false) {
+        switch BookmarkActivation.action(type: item.type, command: command) {
+        case .toggleGroup:
             withAnimation(Motion.quick) { groupOpen.toggle() }
-        } else {
+        case .open:
             ws.openBookmark(item)
+        case .openInNewPane:
+            ws.openBookmark(item, inNewPane: true)
         }
     }
 
@@ -225,9 +211,7 @@ struct BookmarksAppendTarget: View {
     @Bindable var ws: Workspace
     var parent: UUID?
     var visibleWhenEmpty: Bool = true
-    @State private var reorderArmed = false
-    @State private var fileArmed = false
-    var dropArmed: Bool { reorderArmed || fileArmed }
+    @State private var dropArmed = false
     var body: some View {
         if visibleWhenEmpty || !ws.bookmarkStore.items.isEmpty || parent != nil {
             Color.clear
@@ -244,13 +228,8 @@ struct BookmarksAppendTarget: View {
                             .padding(.horizontal, 5)
                     }
                 }
-                .dropDestination(for: BookmarkDragID.self) { drops, _ in
-                    guard let drag = drops.first else { return false }
-                    ws.moveBookmark(id: drag.id, parent: parent, before: nil)
-                    return true
-                } isTargeted: { reorderArmed = $0 }
                 .overlay {
-                    BookmarksDropCatcher(ws: ws, parent: parent, before: nil) { fileArmed = $0 }
+                    BookmarksDropCatcher(ws: ws, parent: parent, before: nil) { dropArmed = $0 }
                 }
         }
     }
@@ -260,9 +239,7 @@ struct BookmarksAppendTarget: View {
 struct BookmarksEmptyDrop: View {
     @Bindable var ws: Workspace
     var parent: UUID?
-    @State private var reorderArmed = false
-    @State private var fileArmed = false
-    var dropArmed: Bool { reorderArmed || fileArmed }
+    @State private var dropArmed = false
     var body: some View {
         Text("Drop notes here")
             .font(.system(size: 11.5).italic())
@@ -284,44 +261,51 @@ struct BookmarksEmptyDrop: View {
                 }
             }
             .contentShape(Rectangle())
-            .dropDestination(for: BookmarkDragID.self) { drops, _ in
-                guard let drag = drops.first else { return false }
-                ws.moveBookmark(id: drag.id, parent: parent, before: nil)
-                return true
-            } isTargeted: { reorderArmed = $0 }
             .overlay {
-                BookmarksDropCatcher(ws: ws, parent: parent, before: nil) { fileArmed = $0 }
+                BookmarksDropCatcher(ws: ws, parent: parent, before: nil) { dropArmed = $0 }
             }
     }
 }
 
-/// AppKit drop target for file-tree rows, Finder, search, backlinks, and recent
-/// notes. Clicks pass through; bookmark-id reorders stay on the SwiftUI
-/// `dropDestination` so the two don't steal each other's drags.
+/// AppKit click, reorder, and drop target for Bookmarks rows. SwiftUI's
+/// `.draggable` was swallowing taps, and leftover drag-pasteboard types on the
+/// drop overlay could steal a click after a previous drag. A row click is
+/// deferred until mouse-up; a drag to reorder starts only after 4pt of movement.
+/// File-tree, Finder, search, and backlinks drops still pin a note here.
 struct BookmarksDropCatcher: NSViewRepresentable {
     var ws: Workspace
     var parent: UUID?
     var before: UUID?
+    var itemID: UUID? = nil
+    var dragTitle: String? = nil
+    var onClick: ((NSEvent.ModifierFlags) -> Void)? = nil
     var onArmed: (Bool) -> Void
 
     func makeNSView(context: Context) -> Catcher {
         let v = Catcher()
-        v.registerForDraggedTypes(Catcher.fileTypes)
+        v.registerForDraggedTypes(Catcher.dropTypes)
         v.apply(self)
         return v
     }
     func updateNSView(_ v: Catcher, context: Context) { v.apply(self) }
 
-    final class Catcher: NSView {
+    final class Catcher: NSView, NSDraggingSource {
         static let filenames = NSPasteboard.PasteboardType("NSFilenamesPboardType")
         static let fileTypes: [NSPasteboard.PasteboardType] = [
             .onyxTreePaths, .onyxVaultPaths, .fileURL, filenames,
         ]
+        static let dropTypes: [NSPasteboard.PasteboardType] = fileTypes + [.onyxBookmarkID]
 
         var ws: Workspace?
         var parent: UUID?
         var before: UUID?
+        var itemID: UUID?
+        var dragTitle: String?
+        var onClick: ((NSEvent.ModifierFlags) -> Void)?
         var onArmed: ((Bool) -> Void)?
+        private var pointer = TreePointerSession()
+        private var pendingClick: NSEvent?
+        private var pendingPoint: NSPoint = .zero
         private var armed = false {
             didSet { if armed != oldValue { onArmed?(armed) } }
         }
@@ -330,32 +314,121 @@ struct BookmarksDropCatcher: NSViewRepresentable {
             ws = s.ws
             parent = s.parent
             before = s.before
+            itemID = s.itemID
+            dragTitle = s.dragTitle
+            onClick = s.onClick
             onArmed = s.onArmed
         }
 
+        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
         override func hitTest(_ point: NSPoint) -> NSView? {
             guard bounds.contains(point) else { return nil }
-            return Self.hasFileDrop(NSPasteboard(name: .drag)) ? self : nil
+            let e = NSApp.currentEvent
+            let claims = BookmarkPointerHit.claimsHit(
+                isRow: onClick != nil,
+                isLeftMouseDown: e?.type == .leftMouseDown,
+                isLeftMouseUp: e?.type == .leftMouseUp,
+                isControlClick: e?.modifierFlags.contains(.control) == true,
+                mouseButtonHeld: NSEvent.pressedMouseButtons & 1 != 0,
+                eventIsDrag: e?.type == .leftMouseDragged,
+                pasteboardHasDrop: Self.hasDrop(NSPasteboard(name: .drag))
+            )
+            return claims ? self : nil
+        }
+
+        override func mouseDown(with event: NSEvent) {
+            if event.modifierFlags.contains(.control) {
+                pointer.cancel()
+                pendingClick = nil
+                nextResponder?.mouseDown(with: event)
+                return
+            }
+            guard onClick != nil else { return }
+            let loc = convert(event.locationInWindow, from: nil)
+            switch pointer.mouseDown(deferClick: true, canDrag: itemID != nil) {
+            case .deferClick, .clickNow:
+                pendingClick = event
+                pendingPoint = loc
+            }
+        }
+
+        override func mouseDragged(with event: NSEvent) {
+            guard let start = pendingClick, let id = itemID else { return }
+            let loc = convert(event.locationInWindow, from: nil)
+            let dx = loc.x - pendingPoint.x, dy = loc.y - pendingPoint.y
+            guard pointer.mouseDragged(distanceSquared: Double(dx * dx + dy * dy)) == .startDrag else { return }
+            pendingClick = nil
+            beginReorderDrag(id: id, event: start)
+        }
+
+        override func mouseUp(with event: NSEvent) {
+            let fire = pointer.mouseUp() == .clickNow
+            if fire, let start = pendingClick {
+                onClick?(start.modifierFlags)
+            }
+            pendingClick = nil
+        }
+
+        override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
+
+        private func beginReorderDrag(id: UUID, event: NSEvent) {
+            let pb = NSPasteboardItem()
+            pb.setString(id.uuidString, forType: .onyxBookmarkID)
+            let item = NSDraggingItem(pasteboardWriter: pb)
+            let title = dragTitle ?? "Bookmark"
+            let img = Self.previewImage(title: title)
+            let size = img.size
+            let loc = convert(event.locationInWindow, from: nil)
+            item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
+            item.imageComponentsProvider = {
+                let c = NSDraggingImageComponent(key: .icon)
+                c.contents = img
+                c.frame = NSRect(origin: .zero, size: size)
+                return [c]
+            }
+            beginDraggingSession(with: [item], event: event, source: self)
+        }
+
+        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
+        func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
+            pointer.cancel()
+            pendingClick = nil
         }
 
         override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { hover(sender) }
         override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation { hover(sender) }
         override func draggingExited(_ sender: NSDraggingInfo?) { armed = false }
-        override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
-            !(items(from: sender.draggingPasteboard)?.isEmpty ?? true)
-        }
+        override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool { canDrop(sender) }
         override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
             armed = false
-            guard let ws, let paths = items(from: sender.draggingPasteboard), !paths.isEmpty else { return false }
+            guard let ws else { return false }
+            let pb = sender.draggingPasteboard
+            if let id = Self.bookmarkID(from: pb) {
+                guard id != itemID else { return false }
+                ws.moveBookmark(id: id, parent: parent, before: before)
+                return true
+            }
+            guard let paths = items(from: pb), !paths.isEmpty else { return false }
             ws.bookmarkDropped(paths: paths, parent: parent, before: before)
             return true
         }
         override func draggingEnded(_ sender: NSDraggingInfo) { armed = false }
 
         private func hover(_ sender: NSDraggingInfo) -> NSDragOperation {
+            if let id = Self.bookmarkID(from: sender.draggingPasteboard) {
+                let ok = id != itemID
+                armed = ok
+                return ok ? .move : []
+            }
             let ok = !(items(from: sender.draggingPasteboard)?.isEmpty ?? true)
             armed = ok
             return ok ? .copy : []
+        }
+
+        private func canDrop(_ sender: NSDraggingInfo) -> Bool {
+            if let id = Self.bookmarkID(from: sender.draggingPasteboard) { return id != itemID }
+            return !(items(from: sender.draggingPasteboard)?.isEmpty ?? true)
         }
 
         private func items(from pb: NSPasteboard) -> [(path: String, isFolder: Bool)]? {
@@ -366,8 +439,15 @@ struct BookmarksDropCatcher: NSViewRepresentable {
             }
         }
 
-        static func hasFileDrop(_ pb: NSPasteboard) -> Bool {
-            pb.availableType(from: fileTypes) != nil
+        static func hasDrop(_ pb: NSPasteboard) -> Bool {
+            pb.availableType(from: dropTypes) != nil
+        }
+
+        static func bookmarkID(from pb: NSPasteboard) -> UUID? {
+            if let s = pb.string(forType: .onyxBookmarkID) { return UUID(uuidString: s) }
+            return pb.pasteboardItems?.compactMap { item in
+                item.string(forType: .onyxBookmarkID).flatMap(UUID.init(uuidString:))
+            }.first
         }
 
         static func urls(from pb: NSPasteboard) -> [URL] {
@@ -401,9 +481,26 @@ struct BookmarksDropCatcher: NSViewRepresentable {
             }
             return false
         }
+
+        static func previewImage(title: String) -> NSImage {
+            let font = NSFont.systemFont(ofSize: 12.5)
+            let attr = NSAttributedString(string: title, attributes: [
+                .font: font,
+                .foregroundColor: NSColor.labelColor,
+            ])
+            let textSize = attr.size()
+            let size = NSSize(width: min(textSize.width + 16, 260), height: 24)
+            let img = NSImage(size: size)
+            img.lockFocus()
+            attr.draw(at: NSPoint(x: 8, y: (size.height - textSize.height) / 2))
+            img.unlockFocus()
+            img.isTemplate = false
+            return img
+        }
     }
 }
 
 extension NSPasteboard.PasteboardType {
     static let onyxVaultPaths = NSPasteboard.PasteboardType("app.onyx.vault-paths")
+    static let onyxBookmarkID = NSPasteboard.PasteboardType("org.kennethreitz.onyx.bookmark-id")
 }
