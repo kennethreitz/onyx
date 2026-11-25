@@ -1,6 +1,6 @@
 # Web clipper
 
-Onyx saves web pages into your vault as clean Markdown notes, the way Obsidian Web Clipper does: readable text only (no menus, ads or comments), frontmatter with the source, images downloaded into your attachment folder, and the note filed in a Clippings folder.
+Onyx saves web pages into your vault as clean Markdown notes, the way Obsidian Web Clipper does: readable text only (no menus, ads or comments), frontmatter with the source, images linked to where they live on the web (nothing is downloaded), and the note filed in a Clippings folder.
 
 There are three ways to clip: the Safari extension (or the Share menu), a bookmarklet for any browser, and Clip Web Page… inside Onyx.
 
@@ -66,7 +66,7 @@ The article, as Markdown…
 ```
 
 - **class** and **tags** follow the clippings already in that folder (the most common `class:` and `tags:`, folder indexes ignored), so a new clipping matches the rest of your collection. With an empty folder they are `Source` and `clippings`. Set either in Settings to override.
-- **Images** are downloaded (up to 60 per page, 25 MB each) into the attachment folder from Settings ▸ Files & Links (Obsidian's `attachmentFolderPath`) and linked the way new attachments are (`![[image.png]]`, or `![](…)` with Markdown links). Images that can't be downloaded keep their web address. Turn downloading off in Settings to keep every image remote.
+- **Images** are hotlinked, not downloaded: each becomes `![alt](https://…)` pointing at the image on the web, so clipping adds nothing to your attachment folder. Onyx picks the largest candidate from `srcset` (and a `<picture>`'s `<source>`s), reads lazy-loaded images from `data-src`, `data-srcset`, `data-original` and similar, and makes relative and protocol-relative (`//cdn…`) addresses absolute. Inline `data:` images, `blob:` addresses, and tracking pixels (1–2 px images and known analytics beacons) are left out. If the site later removes or blocks an image, the note shows a broken image.
 - The Markdown keeps headings, bold and italic, links (made absolute), nested and numbered lists, task lists, block quotes, fenced code with its language, tables, highlights, strikethrough, figure captions, and YouTube embeds. `$`, `*`, `_`, `[` and the like in the text are escaped so they stay literal.
 - The note opens when it's saved, and Onyx comes to the front. With git sync on, the clipping is committed right away.
 
@@ -79,7 +79,6 @@ Settings ▸ Files & Links ▸ Web Clipper (stored in Onyx's preferences, not th
 | Clippings folder | `Clippings` |
 | Class | match the folder, else `Source` |
 | Tags | match the folder, else `clippings` |
-| Download images into the attachment folder | on |
 | Template note | built-in |
 
 A **template note** is any note in the vault (path with or without `.md`). Onyx replaces `{{title}}`, `{{url}}` (or `{{source}}`), `{{author}}`, `{{published}}`, `{{date}}` (or `{{created}}`, `YYYY-MM-DD`), `{{time}}` (`HH:mm`), `{{description}}`, `{{site}}`, `{{tags}}` (comma-separated), `{{class}}` and `{{content}}`. Values are inserted as is; quote them in YAML yourself if a title might contain `:`. Without `{{content}}` the article is appended after the template.

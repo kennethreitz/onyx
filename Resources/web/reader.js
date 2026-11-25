@@ -1088,6 +1088,11 @@
     return inner;
   }
   function renderDiffBlock(b) {
+    if (b.op === 'collapsed') {
+      const n = +b.count || 0;
+      const label = n === 1 ? 'Show 1 unchanged line' : `Show ${n} unchanged lines`;
+      return `<p class="onyx-diff-collapse"><button type="button" class="onyx-diff-expand" data-index="${+b.index || 0}">${label}</button></p>`;
+    }
     if (b.kind === 'blank' && b.op === 'equal') return '';
     if (b.op === 'change' && Array.isArray(b.spans)) return wrapDiff('change', renderDiffSpans(b));
     const inner = parseWithLines(b.markdown || '', 0);
@@ -1265,6 +1270,8 @@
   });
   document.addEventListener('click', (e) => {
     post({ type: 'previewEnd' });
+    const expand = e.target.closest('button.onyx-diff-expand');
+    if (expand) { e.preventDefault(); post({ type: 'diffExpand', index: +expand.dataset.index }); return; }
     const dv = e.target.closest('input[type=checkbox][data-dv-task]');
     if (dv) { e.preventDefault(); post({ type: 'dvtask', path: dv.dataset.path || '', index: +dv.dataset.index }); return; }
     const cb = e.target.closest('input[type=checkbox][data-task]');

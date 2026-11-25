@@ -285,7 +285,6 @@ struct ClipperSettingsSection: View {
     @AppStorage(WebClip.Settings.folderKey) private var folder = WebClip.Settings.defaultFolder
     @AppStorage(WebClip.Settings.classKey) private var noteClass = ""
     @AppStorage(WebClip.Settings.tagsKey) private var tags = ""
-    @AppStorage(WebClip.Settings.imagesKey) private var images = true
     @AppStorage(WebClip.Settings.templateKey) private var template = ""
     @State private var copied = false
 
@@ -294,7 +293,6 @@ struct ClipperSettingsSection: View {
             VaultPathField(ws: ws, title: "Clippings folder", value: folder) { folder = $0 }
             CommitField(title: "Class", value: noteClass, placeholder: "Match the folder (else Source)") { noteClass = $0.trimmingCharacters(in: .whitespaces) }
             CommitField(title: "Tags", value: tags, placeholder: "Match the folder (else clippings)") { tags = $0.trimmingCharacters(in: .whitespaces) }
-            Toggle("Download images into the attachment folder", isOn: $images)
             CommitField(title: "Template note", value: template, placeholder: "Built-in (Obsidian Web Clipper style)") { template = $0.trimmingCharacters(in: .whitespaces) }
             caption("A template can use {{title}}, {{url}}, {{author}}, {{published}}, {{date}}, {{time}}, {{description}}, {{site}}, {{tags}}, {{class}} and {{content}}.")
             HStack {

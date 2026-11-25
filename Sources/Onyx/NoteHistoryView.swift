@@ -77,19 +77,32 @@ struct NoteHistoryList: View {
         guard let root = ws.root, let store = NoteHistoryStore.detect(root) else { return }
         let current = ws.text
         let path = ws.currentPath ?? e.path
+        let older: NoteHistoryEntry? = {
+            guard let i = entries.firstIndex(where: { $0.id == e.id }), i + 1 < entries.count else { return nil }
+            return entries[i + 1]
+        }()
         DispatchQueue.global(qos: .userInitiated).async {
             let content = store.content(of: e)
+            var previousText: String? = nil
+            var previousHash: String? = nil
+            if let older {
+                if case .text(let t) = store.content(of: older) { previousText = t }
+                previousHash = older.shortHash
+            }
             DispatchQueue.main.async {
-                ws.openVersionPreview(NoteVersionPreview(entry: e, notePath: path, content: content, currentText: current))
+                ws.openVersionPreview(NoteVersionPreview(
+                    entry: e, notePath: path, content: content, currentText: current,
+                    previousText: previousText, previousHash: previousHash
+                ))
             }
         }
     }
 
     func refresh() {
         guard isRepo, let root = ws.root, let path = ws.currentPath, !path.opensInFileView else {
-            entries = []; loadedPath = nil; loading = false; return
+            entries = []; loadedPath = nil; loading = false; selected = nil; return
         }
-        if loadedPath != path { entries = [] }
+        if loadedPath != path { entries = []; selected = nil }
         loading = true
         let store = NoteHistoryStore.detect(root)
         DispatchQueue.global(qos: .userInitiated).async {
@@ -99,6 +112,9 @@ struct NoteHistoryList: View {
                 entries = found
                 loadedPath = path
                 loading = false
+                if selected == nil, let first = found.first {
+                    open(first)
+                }
             }
         }
     }
@@ -111,12 +127,15 @@ struct NoteHistoryList: View {
     }()
 }
 
-/// Dimmed overlay: a rendered diff against the current note (raw line diff and the full version as alternatives), and Restore.
+/// Dimmed overlay: a rendered diff against the current note or the previous revision,
+/// a raw line diff, a full preview of the chosen version, and Restore.
 struct NoteVersionView: View {
     @Bindable var ws: Workspace
     var preview: NoteVersionPreview
     var dismiss: () -> Void
     @State private var tab: Tab = .diff
+    @State private var expanded: Set<Int> = []
+    @AppStorage("onyx.versionCompareMode") private var compareRaw = VersionCompareMode.latest.rawValue
 
     enum Tab: String, CaseIterable, Identifiable {
         case diff, raw, preview
@@ -130,6 +149,8 @@ struct NoteVersionView: View {
         }
     }
 
+    var compare: VersionCompareMode { VersionCompareMode(rawValue: compareRaw) ?? .latest }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -140,10 +161,12 @@ struct NoteVersionView: View {
             Divider().overlay(Color.hairline)
             footer
         }
-        .frame(width: 720)
-        .frame(maxHeight: 560)
+        .frame(minWidth: 720, minHeight: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .panelChrome()
         .onKeyPress(.escape) { dismiss(); return .handled }
+        .onChange(of: preview.entry.id) { expanded = [] }
+        .onChange(of: compareRaw) { expanded = [] }
     }
 
     var header: some View {
@@ -176,9 +199,43 @@ struct NoteVersionView: View {
                         .background(tab == t ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
                 }.buttonStyle(.plain)
             }
-            Spacer()
+            Spacer(minLength: 12)
+            if tab != .preview {
+                comparePicker
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 6)
+    }
+
+    var comparePicker: some View {
+        HStack(spacing: 1) {
+            ForEach(VersionCompareMode.allCases) { m in
+                Button { withAnimation(Motion.quick) { compareRaw = m.rawValue } } label: {
+                    Text(m.title)
+                        .font(.system(size: 11.5, weight: compare == m ? .semibold : .regular))
+                        .foregroundStyle(compare == m ? Color.ink : Color.faint)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(compare == m ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
+                }
+                .buttonStyle(.plain)
+                .disabled(m == .previous && preview.previousText == nil)
+                .help(m == .previous && preview.previousText == nil ? "This is the first recorded version." : m.title)
+            }
+        }
+    }
+
+    /// Old / new texts and labels for the current compare mode.
+    /// Compare with latest: this revision vs the current note.
+    /// vs previous: the older revision vs this one (what the commit changed).
+    var sides: (old: String, new: String, oldLabel: String, newLabel: String)? {
+        guard case .text(let selected) = preview.content else { return nil }
+        switch compare {
+        case .latest:
+            return (selected, preview.currentText, preview.entry.shortHash, "current")
+        case .previous:
+            guard let prev = preview.previousText else { return nil }
+            return (prev, selected, preview.previousHash ?? "previous", preview.entry.shortHash)
+        }
     }
 
     @ViewBuilder var content: some View {
@@ -195,9 +252,19 @@ struct NoteVersionView: View {
         case .text(let text):
             switch tab {
             case .diff:
-                richDiffView(old: text)
+                if let s = sides {
+                    richDiffView(old: s.old, new: s.new)
+                } else {
+                    QuietEmpty(title: "This is the first recorded version of this note.", hint: "There isn’t an earlier commit to compare with.")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             case .raw:
-                diffView(old: text)
+                if let s = sides {
+                    diffView(old: s.old, new: s.new, oldLabel: s.oldLabel, newLabel: s.newLabel)
+                } else {
+                    QuietEmpty(title: "This is the first recorded version of this note.", hint: "There isn’t an earlier commit to compare with.")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
             case .preview:
                 ReaderView(ws: ws, fontSize: 16, measure: 56, source: (preview.notePath, text), preview: true)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -205,63 +272,129 @@ struct NoteVersionView: View {
         }
     }
 
-    func richDiffView(old: String) -> some View {
-        let blocks = NoteDiff.rich(old: old, new: preview.currentText)
+    var matchMessage: String {
+        compare == .latest ? "This version matches the current note." : "This version matches the previous one."
+    }
+
+    func richDiffView(old: String, new: String) -> some View {
+        let blocks = displayRichBlocks(old: old, new: new)
         return Group {
-            if !NoteDiff.richHasChanges(blocks) {
-                QuietEmpty(title: "This version matches the current note.")
+            if !NoteDiff.richHasChanges(NoteDiff.rich(old: old, new: new)) {
+                QuietEmpty(title: matchMessage)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                ReaderView(ws: ws, fontSize: 16, measure: 56, source: (preview.notePath, old), preview: true, richDiff: blocks)
+                ReaderView(ws: ws, fontSize: 16, measure: 56, source: (preview.notePath, old), preview: true, richDiff: blocks, onDiffExpand: { expanded.insert($0) })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    func diffView(old: String) -> some View {
+    func displayRichBlocks(old: String, new: String) -> [NoteDiff.RichBlock] {
+        let blocks = NoteDiff.rich(old: old, new: new)
+        let segs = NoteDiff.collapsed(blocks, isChange: \.isChange)
+        var out: [NoteDiff.RichBlock] = []
+        for (i, seg) in segs.enumerated() {
+            switch seg {
+            case .visible(let b):
+                out.append(b)
+            case .hunk(_, let items):
+                if expanded.contains(i) {
+                    out.append(contentsOf: items)
+                } else {
+                    let lines = items.reduce(0) { $0 + NoteDiff.lineCount(of: $1) }
+                    out.append(NoteDiff.RichBlock(op: .collapsed, kind: .paragraph, text: "", hiddenCount: lines, segmentIndex: i))
+                }
+            }
+        }
+        return out
+    }
 
-        let rows = NoteDiff.lines(old: old, new: preview.currentText)
+    func diffView(old: String, new: String, oldLabel: String, newLabel: String) -> some View {
+        let rows = NoteDiff.numbered(NoteDiff.lines(old: old, new: new))
+        let segs = NoteDiff.collapsed(rows, isChange: \.isChange)
         let changed = rows.contains { $0.isChange }
         return Group {
             if !changed {
-                QuietEmpty(title: "This version matches the current note.")
+                QuietEmpty(title: matchMessage)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             } else {
-                ScrollView([.horizontal, .vertical]) {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        Text("— \(preview.entry.shortHash)    + current")
-                            .font(.custom("IBMPlexMono", size: 10.5))
-                            .foregroundStyle(Color.faint)
-                            .padding(.bottom, 6)
-                        ForEach(Array(rows.enumerated()), id: \.offset) { _, line in
-                            diffLine(line)
+                GeometryReader { geo in
+                    ScrollView(.vertical) {
+                        LazyVStack(alignment: .leading, spacing: 0) {
+                            Text("— \(oldLabel)    + \(newLabel)")
+                                .font(.custom("IBMPlexMono", size: 10.5))
+                                .foregroundStyle(Color.faint)
+                                .padding(.horizontal, 16)
+                                .padding(.top, 12)
+                                .padding(.bottom, 6)
+                            ForEach(Array(segs.enumerated()), id: \.offset) { i, seg in
+                                switch seg {
+                                case .visible(let line):
+                                    diffLine(line)
+                                case .hunk(let count, let items):
+                                    if expanded.contains(i) {
+                                        ForEach(Array(items.enumerated()), id: \.offset) { _, line in
+                                            diffLine(line)
+                                        }
+                                    } else {
+                                        collapseControl(count: count, index: i)
+                                    }
+                                }
+                            }
                         }
+                        .frame(minWidth: geo.size.width, maxWidth: .infinity, alignment: .leading)
                     }
-                    .padding(.horizontal, 16).padding(.vertical, 12)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .thinScrollers()
                 }
-                .thinScrollers()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
 
-    func diffLine(_ line: NoteDiff.Line) -> some View {
+    func collapseControl(count: Int, index: Int) -> some View {
+        Button { expanded.insert(index) } label: {
+            Text("Show \(count) unchanged line\(count == 1 ? "" : "s")")
+                .font(.system(size: 11.5))
+                .foregroundStyle(Color.faint)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Color.ink.opacity(0.05))
+        }
+        .buttonStyle(.plain)
+        .help("Show the hidden unchanged lines")
+    }
+
+    func diffLine(_ line: NoteDiff.NumberedLine) -> some View {
         let (mark, color, bg): (String, Color, Color) = {
-            switch line {
+            switch line.line {
             case .same: return (" ", Color.ink.opacity(0.82), .clear)
             case .insert: return ("+", Self.add, Self.add.opacity(0.10))
             case .delete: return ("-", Color.danger, Color.danger.opacity(0.10))
             }
         }()
         return HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(mark).font(.custom("IBMPlexMono", size: 11)).foregroundStyle(color).frame(width: 10)
-            Text(line.text.isEmpty ? " " : line.text)
+            Text(line.oldNumber.map(String.init) ?? " ")
+                .font(.custom("IBMPlexMono", size: 10))
+                .foregroundStyle(Color.faint)
+                .frame(width: 36, alignment: .trailing)
+            Text(line.newNumber.map(String.init) ?? " ")
+                .font(.custom("IBMPlexMono", size: 10))
+                .foregroundStyle(Color.faint)
+                .frame(width: 36, alignment: .trailing)
+            Text(mark)
+                .font(.custom("IBMPlexMono", size: 11))
+                .foregroundStyle(color)
+                .frame(width: 12, alignment: .center)
+            Text(line.line.text.isEmpty ? " " : line.line.text)
                 .font(.custom("IBMPlexMono", size: 11.5))
                 .foregroundStyle(color)
                 .textSelection(.enabled)
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.vertical, 1)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(bg)
     }

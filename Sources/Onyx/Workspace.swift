@@ -38,6 +38,20 @@ struct NoteVersionPreview: Equatable {
     var notePath: String
     var content: NoteVersionContent?
     var currentText: String
+    /// The next-older version in this note's history, for “vs previous”.
+    var previousText: String? = nil
+    var previousHash: String? = nil
+}
+
+enum VersionCompareMode: String, CaseIterable, Identifiable {
+    case latest, previous
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .latest: return "Compare with latest"
+        case .previous: return "vs previous"
+        }
+    }
 }
 
 /// Everything about one open vault: the index, the open note, panels, saving.

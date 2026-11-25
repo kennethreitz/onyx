@@ -2,7 +2,8 @@ import Foundation
 
 /// The pure half of Onyx's web clipper: reading `onyx://clip` requests (from the bookmarklet),
 /// naming the clipping, filling the note template, and matching the vault's clipping conventions.
-/// Fetching, Readability extraction, and image downloads live in the app (WebClipper.swift).
+/// Fetching and Readability extraction live in the app (WebClipper.swift). Images stay on the
+/// web: the note hotlinks them.
 public enum WebClip {
     // MARK: Requests
 
@@ -142,38 +143,6 @@ public enum WebClip {
         return (t.isEmpty ? "Clipping" : t) + ".md"
     }
 
-    /// A name for a downloaded image: the URL's file name (made safe), with an extension from the
-    /// MIME type when the URL has none.
-    public static func imageName(url: String, mimeType: String?, index: Int) -> String {
-        let u = URL(string: url)
-        var base = (u?.lastPathComponent.removingPercentEncoding ?? u?.lastPathComponent ?? "")
-        if base == "/" { base = "" }
-        var ext = (base as NSString).pathExtension.lowercased()
-        var stem = (base as NSString).deletingPathExtension
-        let fromMime: String? = {
-            switch mimeType?.lowercased().split(separator: ";").first.map({ $0.trimmingCharacters(in: .whitespaces) }) {
-            case "image/jpeg", "image/jpg", "image/pjpeg": return "jpg"
-            case "image/png": return "png"
-            case "image/gif": return "gif"
-            case "image/webp": return "webp"
-            case "image/svg+xml": return "svg"
-            case "image/avif": return "avif"
-            case "image/heic": return "heic"
-            case "image/bmp": return "bmp"
-            case "image/tiff": return "tiff"
-            default: return nil
-            }
-        }()
-        if !Attachments.imageExts.contains(ext) {
-            if !ext.isEmpty { stem = base }
-            ext = fromMime ?? "png"
-        }
-        stem = Attachments.sanitize(stem)
-        if stem == "Untitled" || stem.count < 2 { stem = "Clipped image \(index + 1)" }
-        if stem.count > 80 { stem = String(stem.prefix(80)).trimmingCharacters(in: .whitespaces) }
-        return stem + "." + ext
-    }
-
     // MARK: Conventions
 
     /// Clipper preferences (stored by the app in UserDefaults).
@@ -181,7 +150,6 @@ public enum WebClip {
         public static let folderKey = "onyx.clip.folder"
         public static let classKey = "onyx.clip.class"
         public static let tagsKey = "onyx.clip.tags"
-        public static let imagesKey = "onyx.clip.downloadImages"
         public static let templateKey = "onyx.clip.template"
         public static let defaultFolder = "Clippings"
         public static let defaultClass = "Source"
@@ -193,14 +161,13 @@ public enum WebClip {
         public var noteClass: String
         /// `tags:`; empty = match the folder's existing clippings (else `clippings`).
         public var tags: String
-        public var downloadImages: Bool
         /// A vault note used as the template; empty = the built-in one.
         public var templatePath: String
 
         public init(folder: String = Settings.defaultFolder, noteClass: String = "", tags: String = "",
-                    downloadImages: Bool = true, templatePath: String = "") {
+                    templatePath: String = "") {
             self.folder = folder; self.noteClass = noteClass; self.tags = tags
-            self.downloadImages = downloadImages; self.templatePath = templatePath
+            self.templatePath = templatePath
         }
 
         public init(defaults d: UserDefaults) {
@@ -208,7 +175,6 @@ public enum WebClip {
             self.init(folder: f,
                       noteClass: d.string(forKey: Self.classKey) ?? "",
                       tags: d.string(forKey: Self.tagsKey) ?? "",
-                      downloadImages: d.object(forKey: Self.imagesKey) as? Bool ?? true,
                       templatePath: d.string(forKey: Self.templateKey) ?? "")
         }
     }
