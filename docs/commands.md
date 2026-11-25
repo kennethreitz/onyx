@@ -22,6 +22,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Duplicate Note | — |
 | Copy File Path | — |
 | Open in Default App | — |
+| Clip Web Page… | <kbd>⇧⌘K</kbd> |
 | Open Settings… | — |
 
 <kbd>⌘⌫</kbd> is not bound to Delete Note…, so the editor can use it to delete to the start of the line. When the file tree has focus, <kbd>⌘⌫</kbd> still deletes the selected file(s) to the Trash, after a confirm, like Finder. The command stays in the File menu and the palette.

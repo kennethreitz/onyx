@@ -17,6 +17,7 @@ A native Mac app for your Obsidian vault, typeset like a book.</p>
 - **Linter** — tidy Markdown like Obsidian Linter: one undoable edit for the current note, a preview before linting a folder, and optional lint on save ([docs](docs/linter.md))
 - **Read Aloud** — the current note or your selection, from the command palette, with macOS voices
 - **Drag, drop, and paste attachments.** Drop files from Finder, drop images from a browser, or paste a screenshot. Each one is copied to your attachments folder and linked as `![[…]]`, following Obsidian's Files and links settings ([docs](docs/attachments.md))
+- **Web clipper** — a bookmarklet for any browser, or File ▸ Clip Web Page… (⇧⌘K), saves the readable article (Mozilla Readability) or just your selection as a Markdown note in Clippings, with Obsidian Web Clipper-style frontmatter, the class and tags your other clippings use, and images downloaded into your attachment folder ([docs](docs/web-clipper.md))
 - **Attachments open in place** — click an image, PDF, audio file, or video and it opens in the pane: an image viewer with zoom and pan, PDFKit with find, a native audio player with a waveform, speed control, and your Record Audio transcript, and AVKit for video. ⌘[ goes back ([docs](docs/attachments.md#opening-attachments))
 - **Image sizes** — `![[photo.png|300]]`, `|300x200`, and `![alt|300](…)` size images the way Obsidian does, and in the reader you can drag an image's corner to resize it; the new width is written into that embed ([docs](docs/attachments.md#image-size))
 - **Record Audio** — record a voice memo into the current note (`![[Recording ….m4a]]` in your attachments folder) with an automatic on-device transcript below it
@@ -68,6 +69,7 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 - [Canvas and Kanban](docs/boards.md)
 - [Getting around](docs/navigation.md)
 - [Attachments](docs/attachments.md): drag, drop, paste, the file viewers, and image sizes
+- [Web clipper](docs/web-clipper.md): the bookmarklet, Clip Web Page…, templates, and `onyx://clip`
 - [Sync](docs/sync.md)
 - [Linter](docs/linter.md)
 - [Keyboard shortcuts](docs/shortcuts.md)
@@ -80,6 +82,10 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 ## License
 
 Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Third-party code
+
+- **Readability.js** 0.6.0 by Mozilla — Apache License 2.0 ([`Resources/web/clipper/LICENSE-Readability.md`](Resources/web/clipper/LICENSE-Readability.md)), used by the [web clipper](docs/web-clipper.md).
 
 ## Fonts
 

@@ -54,6 +54,7 @@ public enum CommandCatalog {
         cmd("duplicate", "Duplicate Note", .file, [], "plus.square.on.square"),
         cmd("copypath", "Copy File Path", .file, [], "doc.on.clipboard"),
         cmd("openexternal", "Open in Default App", .file, [], "arrow.up.right.square"),
+        cmd("clip", "Clip Web Page…", .file, [.command("k", shift: true)], "scissors"),
         cmd("settings", "Open Settings…", .file, [], "gearshape"),
 
         // Edit

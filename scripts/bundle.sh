@@ -60,6 +60,13 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>NSSupportsAutomaticTermination</key><false/>
   <key>NSMicrophoneUsageDescription</key><string>Onyx records audio into your notes when you choose Record Audio.</string>
   <key>NSSpeechRecognitionUsageDescription</key><string>Onyx transcribes your recordings on this Mac.</string>
+  <key>NSAppTransportSecurity</key>
+  <dict><key>NSAllowsArbitraryLoadsInWebContent</key><true/></dict>
+  <key>CFBundleURLTypes</key>
+  <array><dict>
+    <key>CFBundleURLName</key><string>org.kennethreitz.onyx</string>
+    <key>CFBundleURLSchemes</key><array><string>onyx</string></array>
+  </dict></array>
   <key>CFBundleDocumentTypes</key>
   <array><dict>
     <key>CFBundleTypeName</key><string>Folder</string>

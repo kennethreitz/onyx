@@ -207,6 +207,8 @@ struct FilesSettingsPage: View {
             .onChange(of: ws.obsidianConfigRevision) { ignoreDraft = ignoreLines(ws.config("app.json")) }
         } header: { settingsHeader("Vault") }
 
+        ClipperSettingsSection(ws: ws)
+
         Section { caption("Saved to \(ws.root?.lastPathComponent ?? "")/.obsidian/app.json, the same file Obsidian uses. Changes made in Obsidian, or arriving through Sync, show up here.") }
     }
 
@@ -273,5 +275,37 @@ struct DailySettingsPage: View {
         } header: { settingsHeader("Templates") }
 
         Section { caption("Saved to .obsidian/daily-notes.json and templates.json, the same files Obsidian uses.") }
+    }
+}
+
+/// Settings ▸ Files & Links ▸ Web Clipper. Stored in Onyx's preferences, not the vault.
+struct ClipperSettingsSection: View {
+    @Bindable var ws: Workspace
+    @AppStorage(WebClip.Settings.folderKey) private var folder = WebClip.Settings.defaultFolder
+    @AppStorage(WebClip.Settings.classKey) private var noteClass = ""
+    @AppStorage(WebClip.Settings.tagsKey) private var tags = ""
+    @AppStorage(WebClip.Settings.imagesKey) private var images = true
+    @AppStorage(WebClip.Settings.templateKey) private var template = ""
+    @State private var copied = false
+
+    var body: some View {
+        Section {
+            VaultPathField(ws: ws, title: "Clippings folder", value: folder) { folder = $0 }
+            CommitField(title: "Class", value: noteClass, placeholder: "Match the folder (else Source)") { noteClass = $0.trimmingCharacters(in: .whitespaces) }
+            CommitField(title: "Tags", value: tags, placeholder: "Match the folder (else clippings)") { tags = $0.trimmingCharacters(in: .whitespaces) }
+            Toggle("Download images into the attachment folder", isOn: $images)
+            CommitField(title: "Template note", value: template, placeholder: "Built-in (Obsidian Web Clipper style)") { template = $0.trimmingCharacters(in: .whitespaces) }
+            caption("A template can use {{title}}, {{url}}, {{author}}, {{published}}, {{date}}, {{time}}, {{description}}, {{site}}, {{tags}}, {{class}} and {{content}}.")
+            HStack {
+                Button(copied ? "Copied" : "Copy Bookmarklet") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(WebClip.bookmarklet, forType: .string)
+                    copied = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
+                }
+                Spacer()
+            }
+            caption("Make a bookmark in Safari, Chrome or Firefox and paste this as its address. Clicking it clips the page, or just the selection when text is selected. File ▸ Clip Web Page… (⇧⌘K) clips a URL from inside Onyx.")
+        } header: { settingsHeader("Web Clipper") }
     }
 }

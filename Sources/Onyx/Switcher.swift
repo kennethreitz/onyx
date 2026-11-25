@@ -327,6 +327,7 @@ enum PaletteCommands {
             item("duplicate") { ws.duplicateCurrent() },
             item("copypath") { ws.copyFilePath() },
             item("openexternal") { ws.openInDefaultApp() },
+            item("clip") { DispatchQueue.main.async { ws.promptClip() } },
             item("zoomin") { ws.zoom(1) },
             item("zoomout") { ws.zoom(-1) },
             item("zoomreset") { ws.zoom(0) },

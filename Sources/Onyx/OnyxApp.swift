@@ -8,6 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before windows come up or boot() restores session state: ask any
         // other packaged Onyx to quit and wait for it to finish saving.
         SingleInstanceHandover.takeOverIfNeeded()
+        // onyx://clip?url=… (the web clipper bookmarklet). Handled here rather than by SwiftUI,
+        // which would open a new window for every URL.
+        NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
+                                                     forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
+    }
+    @objc func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
+        guard let s = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: s) else { return }
+        MainActor.assumeIsolated { WebClipper.shared.receive(url) }
     }
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -15,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ScrollSelfTest.scheduleIfRequested()
         TypeSelfTest.scheduleIfRequested()
         KeySelfTest.scheduleIfRequested()
+        WebClipper.scheduleSelfTestIfRequested()
         // ⌃⌘F belongs to focus mode; Enter Full Screen keeps its menu item and the green button.
         for delay in [0.3, 1.0, 3.0] { DispatchQueue.main.asyncAfter(deadline: .now() + delay) { Self.freeControlCommandF() } }
         if ProcessInfo.processInfo.environment["ONYX_DUMP_MENUS"] != nil {
@@ -155,6 +164,7 @@ struct OnyxApp: App {
     func boot() {
         apply(appearance)
         TypeSelfTest.ws = ws
+        WebClipper.shared.ws = ws
         // Observers are installed once: closing and reopening the window
         // runs boot() again, but the vault (and Workspace) is already live.
         AppLifecycle.install(ws: ws)
@@ -232,6 +242,8 @@ struct OnyxApp: App {
             Divider()
             ShortcutMenus.button("copypath", disabled: ws.currentPath == nil) { ws.copyFilePath() }
             ShortcutMenus.button("openexternal", disabled: ws.currentPath == nil) { ws.openInDefaultApp() }
+            Divider()
+            ShortcutMenus.button("clip", disabled: ws.root == nil) { ws.promptClip() }
         }
         // The command palette takes ⌘P by default (Obsidian's habit), so Print defaults to ⌥⌘P.
         CommandGroup(replacing: .printItem) {
