@@ -80,3 +80,12 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 ## License
 
 Onyx is licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Fonts
+
+The bundled typefaces keep their own licenses, which are compatible with this AGPL distribution:
+
+- **Latin Modern** — GUST Font License ([`Resources/fonts/licenses/GUST-FONT-LICENSE.txt`](Resources/fonts/licenses/GUST-FONT-LICENSE.txt))
+- **ET Book** — MIT ([`Resources/fonts/licenses/ET-Book-MIT.txt`](Resources/fonts/licenses/ET-Book-MIT.txt))
+- **IBM Plex Mono** — SIL Open Font License 1.1 ([`Resources/fonts/licenses/IBM-Plex-OFL.txt`](Resources/fonts/licenses/IBM-Plex-OFL.txt))
+- **OpenDyslexic** — SIL Open Font License 1.1, with Reserved Font Name OpenDyslexic, by Abbie Gonzalez ([opendyslexic.org](https://opendyslexic.org), [source](https://github.com/antijingoist/opendyslexic)). License: [`Resources/fonts/licenses/OpenDyslexic-OFL.txt`](Resources/fonts/licenses/OpenDyslexic-OFL.txt). Optional, off by default, in Settings ▸ Reading.

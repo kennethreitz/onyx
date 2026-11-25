@@ -10,6 +10,10 @@
 @font-face { font-family: 'Latin Modern Mono'; font-weight: 400; src: url(../fonts/LatinModernMono-Regular.woff2) format('woff2'); }
 @font-face { font-family: 'Latin Modern Mono'; font-weight: 700; src: url(../fonts/LatinModernMono-Bold.woff2) format('woff2'); }
 @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; src: url(../fonts/IBMPlexMono-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-style: normal; src: url(../fonts/OpenDyslexic-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-style: normal; src: url(../fonts/OpenDyslexic-Bold.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-style: italic; src: url(../fonts/OpenDyslexic-Italic.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-style: italic; src: url(../fonts/OpenDyslexic-BoldItalic.woff2) format('woff2'); }
 
 :root {
   --font-text: 'Latin Modern Roman', Georgia, 'Times New Roman', serif;

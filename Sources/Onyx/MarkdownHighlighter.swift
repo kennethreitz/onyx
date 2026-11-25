@@ -29,7 +29,7 @@ struct MarkdownHighlighter {
 
     var baseAttributes: [NSAttributedString.Key: Any] {
         [.font: Theme.editorFont(), .foregroundColor: Theme.ink, .paragraphStyle: baseParagraph(),
-         .kern: -0.14, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorSize * 1.3) / 2]
+         .kern: Theme.editorKern, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorSize * 1.3) / 2]
     }
 
     /// What `InlineFields` leaves out (inline code, %% and <!-- --> comments, scanned together,
@@ -94,7 +94,7 @@ struct MarkdownHighlighter {
         if fm.bodyOffset > 0, let r = clip(NSRange(location: 0, length: fm.bodyOffset)) {
             ts.addAttributes([.foregroundColor: Theme.faint], range: r)
         }
-        for r in codeBlocks { if let r = clip(r) { ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) } }
+        for r in codeBlocks { if let r = clip(r) { ts.addAttributes([.font: Theme.editorMonoFont(), .foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: r) } }
 
         for f in InlineFields.parse(s, lines: region) where !f.isFrontmatter {
             let r = NSRange(location: f.keyRange.location, length: f.keyRange.length + 2)
@@ -178,7 +178,7 @@ struct MarkdownHighlighter {
             ts.addAttributes(faint, range: m.range)
             ts.addAttributes([.backgroundColor: NSColor(hex: hex, alpha: 0.55), .foregroundColor: Theme.ink], range: m.range(at: 2))
         }
-        each(Self.code) { m in ts.addAttributes([.foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: m.range) }
+        each(Self.code) { m in ts.addAttributes([.font: Theme.editorMonoFont(currentSize(ts, m.range.location)), .foregroundColor: Theme.muted, .backgroundColor: Theme.paperAlt], range: m.range) }
         each(Self.url) { m in ts.addAttributes([.foregroundColor: Theme.muted, .underlineStyle: NSUnderlineStyle.single.rawValue, .underlineColor: Theme.border], range: m.range) }
         each(Self.mdLink) { m in
             ts.addAttributes(faint, range: m.range)

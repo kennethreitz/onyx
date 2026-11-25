@@ -30,19 +30,22 @@ enum Typeset {
     static let face = "onyx.typeface"              // "lm" (Latin Modern, Reitz LaTeX) | "et" (ET Book, Tufte)
     static let opening = "onyx.opening"            // "smallcaps" | "dropcap" | "none"
     static let justify = "onyx.justify"            // justified paragraphs; off = ragged right (default)
+    static let openDyslexic = "onyx.openDyslexic"  // dyslexia-friendly body font; default off
 
     static func bool(_ k: String, dflt: Bool = true) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? dflt }
     static var faceName: String { UserDefaults.standard.string(forKey: face) ?? "lm" }
     static var openingName: String { UserDefaults.standard.string(forKey: opening) ?? "smallcaps" }
+    static var openDyslexicEnabled: Bool { UserDefaults.standard.object(forKey: openDyslexic) as? Bool ?? false }
 
     /// The `typeset` object the reader's typeset.js and typeset.css key off.
     static func options(preview: Bool = false, print: [String: Any]? = nil) -> [String: Any] {
         var o: [String: Any] = ["on": bool(on), "onum": bool(oldstyle), "hyphens": bool(hyphens), "smallCaps": bool(smallCaps),
-                                "justify": bool(justify, dflt: false), "face": faceName, "opening": preview ? "none" : openingName]
+                                "justify": bool(justify, dflt: false), "face": faceName, "opening": preview ? "none" : openingName,
+                                "dyslexic": openDyslexicEnabled]
         if let print { o["print"] = print }
         return o
     }
-    static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(bool(justify, dflt: false))\(faceName)\(openingName)" }
+    static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(bool(justify, dflt: false))\(faceName)\(openingName)\(openDyslexicEnabled)" }
 }
 
 /// Pages in the Settings window. `ONYX_SETTINGS_TAB` opens one at launch (screenshots).
@@ -316,6 +319,7 @@ struct ReadingSettingsPage: View {
     @AppStorage(Typeset.face) private var face = "lm"
     @AppStorage(Typeset.opening) private var opening = "smallcaps"
     @AppStorage(Typeset.justify) private var justify = false
+    @AppStorage(Typeset.openDyslexic) private var openDyslexic = false
 
     var body: some View {
         Form {
@@ -329,7 +333,7 @@ struct ReadingSettingsPage: View {
                 Toggle("Footnotes as sidenotes in the margin", isOn: $sidenotes)
                 Button("Restore Reitz LaTeX defaults") {
                     readerSize = 19; editorSize = 14; measure = 41; sidenotes = true
-                    typeset = true; oldstyle = true; hyphens = true; smallCaps = true; justify = false; face = "lm"; opening = "smallcaps"
+                    typeset = true; oldstyle = true; hyphens = true; smallCaps = true; justify = false; face = "lm"; opening = "smallcaps"; openDyslexic = false
                 }
                     .buttonStyle(.link).font(.system(size: 11.5))
             } header: { settingsHeader("Typography") }
@@ -341,6 +345,12 @@ struct ReadingSettingsPage: View {
                         Text("Latin Modern (Reitz LaTeX)").tag("lm")
                         Text("ET Book (Tufte)").tag("et")
                     }
+                }
+                .disabled(!typeset)
+                Toggle("OpenDyslexic (dyslexia-friendly)", isOn: $openDyslexic)
+                Text("Overrides the body font in the reader and the editor, whether typeset reading is on or off. Code stays monospace. Sidenotes and line width are unchanged.")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+                Group {
                     Picker("Opening paragraph", selection: $opening) {
                         Text("Small-caps lead-in").tag("smallcaps")
                         Text("Drop cap").tag("dropcap")

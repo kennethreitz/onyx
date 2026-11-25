@@ -14,6 +14,7 @@ enum AppResources {
 
     static func registerFonts() {
         guard let files = try? FileManager.default.contentsOfDirectory(at: fonts, includingPropertiesForKeys: nil) else { return }
+        // Latin Modern, ET Book, IBM Plex Mono, and OpenDyslexic (all bundled as woff2).
         let urls = files.filter { $0.pathExtension == "woff2" }
         CTFontManagerRegisterFontURLs(urls as CFArray, .process, false, nil)
     }

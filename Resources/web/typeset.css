@@ -170,3 +170,22 @@ body.print .footnotes { break-before: auto; }
 
 /* Note references ride on the baseline grid: a raised figure must not open up its line. */
 body.typeset .markdown-preview-view sup, body.typeset .sidenote .num { line-height: 0; }
+
+/* OpenDyslexic (Settings ▸ Reading) overrides the body font whether typeset is on or off.
+   Loaded after face-et so it wins when both would apply. Code stays monospace. */
+body.face-dyslexic {
+  --font-text: 'OpenDyslexic', 'Latin Modern Roman', Georgia, sans-serif;
+  --font-title: 'OpenDyslexic', var(--font-text);
+  --font-small: 'OpenDyslexic', var(--font-text);
+  --font-caps: 'OpenDyslexic', var(--font-text);
+  --line-height-normal: 1.55;
+}
+body.face-dyslexic .markdown-preview-view {
+  letter-spacing: 0.04em;
+  word-spacing: 0.08em;
+}
+body.face-dyslexic .markdown-preview-view :is(code, pre, kbd, .tag) {
+  letter-spacing: 0;
+  word-spacing: normal;
+  font-family: var(--font-monospace);
+}
