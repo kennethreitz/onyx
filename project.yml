@@ -21,6 +21,7 @@ targets:
       - path: Resources/fonts
         type: folder
         buildPhase: resources
+      - path: Resources/iOS/Assets.xcassets
     dependencies:
       - package: Onyx
         product: OnyxCore
@@ -28,6 +29,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: org.kennethreitz.onyx.ios
         PRODUCT_NAME: Onyx
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         MARKETING_VERSION: "0.1.15"
         CURRENT_PROJECT_VERSION: "1"
         TARGETED_DEVICE_FAMILY: "1,2"

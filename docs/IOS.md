@@ -144,3 +144,7 @@ Limited writing is intentional: only bookmarks, linking a mention, and vault rep
 - `ReaderPayload` lives in OnyxCore so both apps share it
 - `Sources/OnyxMobile` — SwiftUI app, document picker, list, search, daily note, typeset reader
 - `project.yml` generates `Onyx.xcodeproj`
+
+## App icon
+
+`Resources/iOS/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png` is the Mac icon's stone and Latin Modern "O", full-bleed and opaque (iOS masks the corners). Regenerate it with `swift scripts/make-ios-icon.swift`; `project.yml` sets `ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon`.
