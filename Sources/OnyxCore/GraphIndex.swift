@@ -157,6 +157,23 @@ public struct Atlas: Sendable {
     public var subEdges: [(Int, Int, Int)] = []
     public var orphans: [Int] = []
     public static let spacing = 13.0
+    /// Minimum edge-to-edge gap between top-level cluster circles, in layout units.
+    public static let clusterGap = 28.0
+    /// Gap between sub-clusters packed inside a parent.
+    public static let subClusterGap = 16.0
+    /// Floor so a small folder (and its label) stays visible next to giants.
+    public static let minClusterRadius = 52.0
+    /// Soft ceiling so a huge folder cannot swallow the canvas.
+    public static let maxClusterRadius = 300.0
+
+    /// Visual radius for a folder (or tag) cluster from its note count.
+    /// A compressed power of the count, clamped into
+    /// [`minClusterRadius`, `maxClusterRadius`].
+    public static func radius(forCount count: Int) -> Double {
+        let n = Double(max(count, 1))
+        let curved = 40 + 20 * pow(n, 0.36)
+        return min(maxClusterRadius, max(minClusterRadius, curved))
+    }
 
     public static func build(_ g: GraphIndex, grouping: Grouping, include: (Int) -> Bool, includeOrphans: Bool) -> Atlas {
         var atlas = Atlas()
@@ -203,19 +220,44 @@ public struct Atlas: Sendable {
             subLocal[k] = (spacing * sqrt(Double(sorted.count) + 0.5) + 16, pos)
         }
 
-        // top clusters: pack their sub-clusters
+        // top clusters: pack their sub-clusters, then scale to a compressed display radius
         var topSubs: [String: [String]] = [:]
         for (k, ms) in subMembers { topSubs[topKey[ms[0]]!, default: []].append(k) }
-        struct TopTmp { var key: String; var radius: Double; var subs: [(String, SIMD2<Double>, Double)] }
-        var tops: [TopTmp] = []
-        for (t, subs) in topSubs {
-            let circles = pack(subs.map { ($0, subLocal[$0]!.radius) }, gap: 10)
-            let extent = circles.map { simd_length($0.1) + $0.2 }.max() ?? 20
-            tops.append(TopTmp(key: t, radius: extent + 26, subs: circles))
+        struct TopTmp {
+            var key: String
+            var radius: Double
+            var scale: Double
+            var subs: [(String, SIMD2<Double>, Double)]
         }
-        tops.sort { $0.radius > $1.radius }
+        var tops: [TopTmp] = []
+        for (t, subs) in topSubs.sorted(by: { $0.key < $1.key }) {
+            var subCircles = pack(subs.map { ($0, subLocal[$0]!.radius) }, gap: subClusterGap)
+            var subCenters = subCircles.map(\.1)
+            separate(&subCenters, radii: subCircles.map(\.2), gap: subClusterGap)
+            recenter(&subCenters, radii: subCircles.map(\.2))
+            subCircles = zip(subCircles, subCenters).map { circle, center in (circle.0, center, circle.2) }
+            let extent = subCircles.map { simd_length($0.1) + $0.2 }.max() ?? 20
+            let packed = extent + 32
+            let count = subs.reduce(0) { $0 + subMembers[$1]!.count }
+            let display = radius(forCount: count)
+            let scale = packed > 0 ? display / packed : 1
+            // Scale to the compressed radius, then re-separate so the sub-cluster
+            // gap is not itself scaled down.
+            var scaled = subCircles.map { ($0.0, $0.1 * scale, $0.2 * scale) }
+            var scaledCenters = scaled.map(\.1)
+            separate(&scaledCenters, radii: scaled.map(\.2), gap: subClusterGap)
+            recenter(&scaledCenters, radii: scaled.map(\.2))
+            scaled = zip(scaled, scaledCenters).map { circle, center in (circle.0, center, circle.2) }
+            let fitted = scaled.map { simd_length($0.1) + $0.2 }.max() ?? 20
+            let parentRadius = max(display, fitted + 32)
+            tops.append(TopTmp(key: t, radius: parentRadius, scale: scale, subs: scaled))
+        }
+        tops.sort {
+            if $0.radius != $1.radius { return $0.radius > $1.radius }
+            return $0.key < $1.key
+        }
 
-        // place top clusters: weighted attraction by cross-links, hard collision
+        // place top clusters: mild attraction by cross-links, then a hard separation pass
         var topIndex: [String: Int] = [:]
         for (k, t) in tops.enumerated() { topIndex[t.key] = k }
         var w = [[Int]](repeating: [Int](repeating: 0, count: tops.count), count: tops.count)
@@ -223,19 +265,30 @@ public struct Atlas: Sendable {
             let a = topIndex[topKey[i]!]!, b = topIndex[topKey[j]!]!
             if a != b { w[a][b] += 1; w[b][a] += 1 }
         } }
-        var centers: [SIMD2<Double>] = pack(tops.map { ($0.key, $0.radius) }, gap: 40).map { $0.1 }
-        for _ in 0..<500 {
+        var centers: [SIMD2<Double>] = pack(tops.map { ($0.key, $0.radius) }, gap: clusterGap).map(\.1)
+        separate(&centers, radii: tops.map(\.radius), gap: clusterGap)
+        for _ in 0..<240 {
             var d = [SIMD2<Double>](repeating: .zero, count: tops.count)
-            for a in tops.indices { for b in tops.indices where a < b {
-                var v = centers[b] - centers[a]
-                var dist = simd_length(v); if dist < 1 { v = SIMD2(1, 0); dist = 1 }
-                let minD = tops[a].radius + tops[b].radius + 40
-                var f = 0.0
-                if dist < minD { f = (dist - minD) * 0.5 } else { f = Double(w[a][b]) > 0 ? min(4, log(1 + Double(w[a][b]))) * 0.6 : -0.0 }
-                d[a] += v / dist * f; d[b] -= v / dist * f
-            } }
-            for a in tops.indices { d[a] -= centers[a] * 0.004; centers[a] += d[a] }
+            for a in tops.indices {
+                for b in tops.indices where a < b {
+                    var v = centers[b] - centers[a]
+                    var dist = simd_length(v)
+                    if dist < 1 { v = SIMD2(1, 0); dist = 1 }
+                    let minD = tops[a].radius + tops[b].radius + clusterGap
+                    // Attract linked clusters, but only through the slack outside the reserved gap.
+                    if dist > minD, w[a][b] > 0 {
+                        let f = min(4, log(1 + Double(w[a][b]))) * 0.35
+                        let pull = min(f, (dist - minD) * 0.15)
+                        d[a] += v / dist * pull
+                        d[b] -= v / dist * pull
+                    }
+                }
+            }
+            for a in tops.indices { centers[a] += d[a] }
         }
+        separate(&centers, radii: tops.map(\.radius), gap: clusterGap)
+        recenter(&centers, radii: tops.map(\.radius))
+
         // emit clusters
         for (k, t) in tops.enumerated() {
             let label = t.key.isEmpty ? "Vault" : t.key
@@ -248,7 +301,7 @@ public struct Atlas: Sendable {
                 let label = sk == t.key ? (t.key.isEmpty ? "Vault" : t.key) + " ·" : String(sk.split(separator: "/").last ?? Substring(sk))
                 let ci = atlas.clusters.count
                 atlas.clusters.append(AtlasCluster(key: sk, label: label, level: 1, parent: k, center: c, radius: r, members: subMembers[sk]!))
-                for (i, p) in subLocal[sk]!.pos { atlas.notePos[i] = c + p; atlas.noteCluster[i] = ci }
+                for (i, p) in subLocal[sk]!.pos { atlas.notePos[i] = c + p * t.scale; atlas.noteCluster[i] = ci }
             }
         }
         // weighted edges between clusters
@@ -265,9 +318,13 @@ public struct Atlas: Sendable {
         return atlas
     }
 
-    /// Greedy circle packing around the origin, largest first.
-    static func pack(_ items: [(String, Double)], gap: Double) -> [(String, SIMD2<Double>, Double)] {
-        let sorted = items.sorted { $0.1 > $1.1 }
+    /// Greedy circle packing around the origin, largest first. Deterministic: equal
+    /// radii break ties by key, and candidate angles are a fixed spiral.
+    public static func pack(_ items: [(String, Double)], gap: Double) -> [(String, SIMD2<Double>, Double)] {
+        let sorted = items.sorted {
+            if $0.1 != $1.1 { return $0.1 > $1.1 }
+            return $0.0 < $1.0
+        }
         var out: [(String, SIMD2<Double>, Double)] = []
         for (key, r) in sorted {
             if out.isEmpty { out.append((key, .zero, r)); continue }
@@ -290,5 +347,48 @@ public struct Atlas: Sendable {
             out.append((key, best ?? .zero, r))
         }
         return out
+    }
+
+    /// Push overlapping circles apart until every pair has at least `gap` between
+    /// their edges. Index order keeps the result deterministic. Completely coincident
+    /// centers are nudged along a fixed golden-angle direction.
+    public static func separate(_ centers: inout [SIMD2<Double>], radii: [Double], gap: Double, iterations: Int = 200) {
+        precondition(centers.count == radii.count)
+        guard centers.count > 1 else { return }
+        for _ in 0..<iterations {
+            var moved = false
+            for a in centers.indices {
+                for b in centers.indices where a < b {
+                    let minD = radii[a] + radii[b] + gap
+                    var v = centers[b] - centers[a]
+                    var dist = simd_length(v)
+                    if dist < 1e-9 {
+                        let ang = Double(a * 2 + b) * 2.399963
+                        v = SIMD2(cos(ang), sin(ang))
+                        dist = 1e-9
+                    }
+                    if dist < minD {
+                        let push = (minD - dist) / 2
+                        let u = v / dist
+                        centers[a] -= u * push
+                        centers[b] += u * push
+                        moved = true
+                    }
+                }
+            }
+            if !moved { break }
+        }
+    }
+
+    /// Translate so the bounding box of the (center ± radius) discs sits on the origin.
+    public static func recenter(_ centers: inout [SIMD2<Double>], radii: [Double]) {
+        guard !centers.isEmpty, radii.count == centers.count else { return }
+        var lo = SIMD2(Double.infinity, Double.infinity), hi = -lo
+        for i in centers.indices {
+            lo = simd_min(lo, centers[i] - radii[i])
+            hi = simd_max(hi, centers[i] + radii[i])
+        }
+        let mid = (lo + hi) / 2
+        for i in centers.indices { centers[i] -= mid }
     }
 }

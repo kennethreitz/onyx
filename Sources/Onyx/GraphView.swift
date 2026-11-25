@@ -14,6 +14,9 @@ final class GraphStore {
     /// Test hook: increment to zoom the visible graph out to the floor; `zoomReport` is the last camera.
     var zoomOutToken = 0
     var zoomReport = "no graph"
+    /// Esc is offered here first when the atlas overlay is open. Return true if it was handled
+    /// (fit all after a folder filled the view) so the overlay stays up.
+    var atlasEscapesToFit: (() -> Bool)?
 
     func ensureIndex(_ snap: VaultSnapshot, gen: Int) async {
         guard builtGen != gen, !building else { return }
@@ -42,8 +45,10 @@ struct Camera: Equatable { var zoom: Double; var pan: SIMD2<Double> }
 /// and re-center (neighborhood browse); double-click or ↩ opens that note in this pane and
 /// dismisses the overlay; ⌫ steps back along the trail; Esc closes the overlay and returns
 /// focus to the note. Atlas uses the same overlay and the same open/dismiss rules. Orphans
-/// stay hidden until Filter → Show orphans (satellites, no list). Hover graph cards are
-/// unchanged (title-bar button, links, inspector).
+/// stay hidden until Filter → Show orphans (satellites, no list). In the atlas, double-click
+/// a folder circle to fill the view, or double-click empty space (or Esc) to fit all;
+/// Esc still closes the overlay when the whole vault is already in view. Hover graph cards
+/// are unchanged (title-bar button, links, inspector).
 struct GraphView: View {
     @Bindable var ws: Workspace
     /// In a pane beside notes rather than as an overlay: keys stay with the editor, scroll only
@@ -78,9 +83,13 @@ struct GraphView: View {
     @State private var grouping: Atlas.Grouping = .folders
     @State private var monitors: [Any] = []
     @State private var tick = 0
+    @State private var pendingClick: DispatchWorkItem? = nil
+    @State private var camDuration = 0.55
     @FocusState private var searchFocused: Bool
 
     let duration = 0.55
+    /// Zoom/pan when a folder fills the view, or when fitting all again.
+    let atlasAnimDuration = 0.3
 
     var body: some View {
         GeometryReader { geo in
@@ -107,7 +116,11 @@ struct GraphView: View {
                 setFocus(i)
             }
         }
-        .onDisappear { monitors.forEach { NSEvent.removeMonitor($0) }; monitors = []; store.zoomReport = "no graph" }
+        .onDisappear {
+            pendingClick?.cancel(); pendingClick = nil
+            store.atlasEscapesToFit = nil
+            monitors.forEach { NSEvent.removeMonitor($0) }; monitors = []; store.zoomReport = "no graph"
+        }
         .onChange(of: store.zoomOutToken) { zoomOutToFloor() }
         .onChange(of: ws.graphAtlas) { refit(animated: true); Task { await loadAtlas() } }
         .onChange(of: hierarchyOnly) { if let f = focus { setFocus(f, record: false) } }
@@ -116,7 +129,7 @@ struct GraphView: View {
     }
 
     var animating: Bool {
-        Date().timeIntervalSince(transitionStart) < duration + 0.05 || Date().timeIntervalSince(camStart) < duration + 0.05
+        Date().timeIntervalSince(transitionStart) < duration + 0.05 || Date().timeIntervalSince(camStart) < camDuration + 0.05
     }
 
     // MARK: Data
@@ -143,6 +156,11 @@ struct GraphView: View {
 
     func start() {
         installMonitors()
+        store.atlasEscapesToFit = { [self] in
+            guard ws.graphAtlas, !isAtlasFitted() else { return false }
+            refit(animated: true, duration: atlasAnimDuration)
+            return true
+        }
         Task {
             guard let snap = ws.snapshot else { return }
             await store.ensureIndex(snap, gen: ws.snapshotGen)
@@ -207,43 +225,83 @@ struct GraphView: View {
     }
 
     func camera(_ now: Date) -> Camera {
-        let t = progress(now, camStart)
+        let t = ease(min(1, max(0, now.timeIntervalSince(camStart) / max(camDuration, 0.001))))
         if t >= 1 { return cam }
         return Camera(zoom: camFrom.zoom + (cam.zoom - camFrom.zoom) * t, pan: camFrom.pan + (cam.pan - camFrom.pan) * t)
     }
 
-    func setCamera(_ c: Camera, animated: Bool) {
+    func setCamera(_ c: Camera, animated: Bool, duration d: Double? = nil) {
         var c = c
         c.zoom = GraphZoom.clamp(c.zoom, fit: fitZoom)
         camFrom = animated ? camera(Date()) : c
         cam = c
+        camDuration = animated ? (d ?? duration) : duration
         camStart = animated ? Date() : .distantPast
         store.zoomReport = "zoom=\(String(format: "%.4f", c.zoom)) fit=\(String(format: "%.4f", fitZoom)) min=\(String(format: "%.4f", GraphZoom.minimum(fit: fitZoom))) max=\(GraphZoom.max)"
-        settleLater(animated)
+        settleLater(animated, last: camDuration)
     }
 
     /// Re-render once an animation finishes so the static canvas shows the final frame.
-    func settleLater(_ animated: Bool) {
+    func settleLater(_ animated: Bool, last: Double? = nil) {
         tick += 1
-        if animated { DispatchQueue.main.asyncAfter(deadline: .now() + duration + 0.08) { tick += 1 } }
+        if animated { DispatchQueue.main.asyncAfter(deadline: .now() + (last ?? duration) + 0.08) { tick += 1 } }
     }
 
-    func refit(animated: Bool) {
-        guard size.width > 0 else { return }
-        let avail = SIMD2(Double(size.width) - 80, Double(size.height) - 220)
+    func atlasChromePadding() -> SIMD2<Double> {
+        SIMD2(Double(size.width) - 80, Double(size.height) - 220)
+    }
+
+    /// Camera that frames every top-level cluster, the same framing `refit` uses.
+    func fitAllCamera() -> Camera? {
+        guard size.width > 0 else { return nil }
+        let avail = atlasChromePadding()
         if ws.graphAtlas, let a = store.atlas, !a.clusters.isEmpty {
             var lo = SIMD2(Double.infinity, .infinity), hi = -lo
-            for c in a.clusters where c.level == 0 { lo = simd_min(lo, c.center - c.radius); hi = simd_max(hi, c.center + c.radius) }
+            for c in a.clusters where c.level == 0 {
+                lo = simd_min(lo, c.center - c.radius)
+                hi = simd_max(hi, c.center + c.radius)
+            }
             let ext = hi - lo
-            let z = min(avail.x / ext.x, avail.y / ext.y)
-            fitZoom = GraphZoom.clamp(z, fit: z)
-            setCamera(Camera(zoom: z, pan: -(lo + hi) / 2 * z + SIMD2(0, 10)), animated: animated)
+            let z = min(avail.x / max(ext.x, 1), avail.y / max(ext.y, 1))
+            return Camera(zoom: z, pan: -(lo + hi) / 2 * z + SIMD2(0, 10))
         } else {
             let ext = (layout.map { simd_length($0.pos) }.max() ?? 100) + 90
             let z = min(1.5, max(0.3, min(avail.x, avail.y) / 2 / ext))
-            fitZoom = GraphZoom.clamp(z, fit: z)
-            setCamera(Camera(zoom: z, pan: SIMD2(0, 18)), animated: animated)
+            return Camera(zoom: z, pan: SIMD2(0, 18))
         }
+    }
+
+    /// Camera that fills the view with one cluster, leaving a little margin inside the chrome.
+    func fitClusterCamera(_ cl: AtlasCluster) -> Camera? {
+        guard size.width > 0 else { return nil }
+        let avail = atlasChromePadding() - SIMD2(48, 48)
+        let span = max(cl.radius * 2, 1)
+        let z = min(avail.x / span, avail.y / span)
+        return Camera(zoom: z, pan: -cl.center * z + SIMD2(0, 10))
+    }
+
+    func isAtlasFitted(tolerance: Double = 0.05) -> Bool {
+        guard let fitted = fitAllCamera() else { return true }
+        let c = camera(Date())
+        let zoomClose = abs(c.zoom - fitted.zoom) / max(abs(fitted.zoom), 1e-6) < tolerance
+        let panClose = simd_length(c.pan - fitted.pan) < 16
+        return zoomClose && panClose
+    }
+
+    func refit(animated: Bool, duration d: Double? = nil) {
+        guard let dest = fitAllCamera() else { return }
+        if ws.graphAtlas {
+            fitZoom = GraphZoom.clamp(dest.zoom, fit: dest.zoom)
+            setCamera(dest, animated: animated, duration: d)
+        } else {
+            fitZoom = GraphZoom.clamp(dest.zoom, fit: dest.zoom)
+            setCamera(dest, animated: animated, duration: d)
+        }
+    }
+
+    func maximizeCluster(_ cl: AtlasCluster) {
+        guard let dest = fitClusterCamera(cl) else { return }
+        setCamera(dest, animated: true, duration: atlasAnimDuration)
     }
 
     func screen(_ p: SIMD2<Double>, _ c: Camera) -> CGPoint {
@@ -291,9 +349,11 @@ struct GraphView: View {
             }
         }
         .onTapGesture(count: 2, coordinateSpace: .local) { loc in
-            if let i = hitTest(loc).0 { open(i) }
+            handleDoubleClick(loc)
         }
-        .onTapGesture(count: 1, coordinateSpace: .local) { loc in click(loc) }
+        .onTapGesture(count: 1, coordinateSpace: .local) { loc in
+            scheduleClick(loc)
+        }
     }
 
     func zoomOutToFloor() {
@@ -319,6 +379,32 @@ struct GraphView: View {
             let avail = min(Double(size.width) - 120, Double(size.height) - 240)
             let z = max(camera(Date()).zoom * 1.4, avail / (cl.radius * 2))
             setCamera(Camera(zoom: z, pan: -cl.center * z + SIMD2(0, 10)), animated: true)
+        }
+    }
+
+    func scheduleClick(_ loc: CGPoint) {
+        pendingClick?.cancel()
+        let work = DispatchWorkItem { [self] in
+            pendingClick = nil
+            click(loc)
+        }
+        pendingClick = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + NSEvent.doubleClickInterval, execute: work)
+    }
+
+    func handleDoubleClick(_ loc: CGPoint) {
+        pendingClick?.cancel()
+        pendingClick = nil
+        let (node, cluster) = hitTest(loc)
+        if let i = node {
+            open(i)
+            return
+        }
+        guard ws.graphAtlas else { return }
+        if let ci = cluster, let a = store.atlas {
+            maximizeCluster(a.clusters[ci])
+        } else {
+            refit(animated: true, duration: atlasAnimDuration)
         }
     }
 
@@ -825,8 +911,8 @@ struct GraphView: View {
         HStack(spacing: 12) {
             if ws.graphAtlas {
                 ViewThatFits(in: .horizontal) {
-                    Text("Pinch or scroll to zoom into a region · click a region to enter it · click a note to focus it").foregroundStyle(Color.faint).lineLimit(1)
-                    Text("Scroll to zoom · click to enter · ↩ opens · Esc closes").foregroundStyle(Color.faint).lineLimit(1)
+                    Text("Double-click a folder to fill the view · double-click empty or Esc to see all · click a note to focus it").foregroundStyle(Color.faint).lineLimit(1)
+                    Text("Double-click fills a folder · Esc fits all, again closes").foregroundStyle(Color.faint).lineLimit(1)
                 }
             } else {
                 ViewThatFits(in: .horizontal) {
@@ -884,6 +970,13 @@ struct GraphView: View {
             case 36 where mods.isEmpty, 76 where mods.isEmpty: if let f = hover ?? focus { open(f) }; return nil   // return / enter
             case 51 where mods.isEmpty: back(); return nil                                                        // delete
             case 3 where mods == [.command]: searchFocused = true; return nil                                     // ⌘F
+            case 53 where mods.isEmpty || mods == [.shift]:
+                // Esc fits all when a folder fills the atlas; a second Esc still closes the overlay.
+                if ws.graphAtlas, !isAtlasFitted() {
+                    refit(animated: true, duration: atlasAnimDuration)
+                    return nil
+                }
+                return e
             default: return e
             }
         }) { monitors.append(m) }

@@ -8,9 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Double-click a folder circle in the atlas to zoom and pan so that circle fills the view, with a little margin (about 0.3s ease). Double-click empty background, or press Esc, to animate back to the whole vault. Esc still closes the atlas when everything is already in view. Single-click is unchanged (click a region to enter it, click a note to focus it); a double-click does not also fire the single-click.
 - `make install` builds the universal (arm64 + x86_64) app and installs it to `/Applications/Onyx.app`. A running Onyx is asked to quit first (it saves; never force-killed), the new bundle is copied with `ditto` beside the old one and swapped in so the code signature is kept, and the installed version and architectures are printed. `INSTALL_DIR` / `DESTDIR` choose another location (quitting only happens for the real `/Applications`), `NO_QUIT=1` skips it, `RELAUNCH=1` reopens Onyx if it was running, and `make uninstall` removes the app. It replaces the old native-only `cp -R` target.
 
 ### Changed
+- Atlas folder circles keep a clear gap between their edges, so neighbors no longer overlap or sit on top of each other. Very large folders use a compressed size scale (a soft cap on radius) so they don't swallow the canvas, and small ones such as Home keep a minimum size and stay visibly separate. Cluster titles and note-count labels sit inside their own circle. The view still fits the whole atlas after layout, and the layout is deterministic from one open to the next.
 - The vault's home note is shown in semibold in the file tree. The path is the Obsidian Homepage plugin's note when that's set, otherwise `Home.md` at the vault root. If that note is a folder note, the folder row is bold, since the file itself is hidden.
 
 ### Fixed

@@ -1459,7 +1459,11 @@ final class Workspace {
         case .closeFind:
             closeFind()
             return true
-        case .dismissOverlay, .dismissUnpinnedInspector, .dismissUnpinnedSidebar, .dismissInspector, .leaveFocusMode:
+        case .dismissOverlay:
+            // In the atlas, the first Esc fits all if a folder is filling the view.
+            if overlay == .graph, graphAtlas, graphStore.atlasEscapesToFit?() == true { return true }
+            return dismissTop()
+        case .dismissUnpinnedInspector, .dismissUnpinnedSidebar, .dismissInspector, .leaveFocusMode:
             return dismissTop()
         case .cancelInlineRename:
             cancelInlineRename()
