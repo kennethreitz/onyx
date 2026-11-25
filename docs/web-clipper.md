@@ -10,7 +10,7 @@ Onyx.app carries a Safari Web Extension (and a Share menu item). Nothing to down
 
 1. Open Onyx once (any build from 0.1.18 on). macOS registers the extension when the app is launched.
 2. Safari ▸ Settings ▸ **Extensions** ▸ turn on **Clip to Onyx**. Settings ▸ Files & Links ▸ Web Clipper ▸ **Safari Extension…** in Onyx jumps there.
-3. Click the **Clip to Onyx** toolbar button (Safari asks once to let it read the page you're on), or right-click a page, a selection, or a link: **Clip Page to Onyx**, **Clip Selection to Onyx**, **Clip Link to Onyx**.
+3. Click the **Clip to Onyx** toolbar button (Safari asks once to let it read the page you're on), or right-click a page, a selection, or a link: **Clip Page to Onyx**, **Clip Selection to Onyx**, **Clip Link to Onyx**. ⌃⇧O (Control-Shift-O) does the same as the toolbar button; Safari ▸ Settings ▸ Extensions can change it.
 
 It sends the same thing as the bookmarklet: the page's URL, title, and metadata, plus your selection if there is one. The extension's native half opens `onyx://clip` itself, so there is no "allow this page to open Onyx?" prompt and no URL-length worry for selections. If that fails it falls back to opening the `onyx://` link in the tab.
 

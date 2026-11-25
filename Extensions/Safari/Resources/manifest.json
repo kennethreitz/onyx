@@ -27,5 +27,11 @@
       "64": "images/toolbar-64.png"
     }
   },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+O", "mac": "MacCtrl+Shift+O" },
+      "description": "Clip to Onyx"
+    }
+  },
   "permissions": ["activeTab", "scripting", "contextMenus", "nativeMessaging"]
 }
