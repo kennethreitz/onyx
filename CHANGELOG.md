@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Table of contents rows in a folder or selection PDF are clickable and jump to that note or folder page. In-note heading links (`[[#Heading]]` and Markdown `#heading`) do the same in a single-note export and inside a book. The PDF also gets an outline (bookmarks): the contents for a book, with each note's headings nested under it, or just the headings of a single note. External links were already kept. Heading jumps follow the laid-out positions; a heading that WebKit moved to the next page to avoid a break may land a little early or late.
+
 ## [0.1.16] - 2026-11-25
 
 ### Added

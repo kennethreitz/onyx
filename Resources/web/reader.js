@@ -1069,6 +1069,26 @@
       if (g.paper) st.textContent = `@page { size: ${g.paper[0]}pt ${g.paper[1]}pt; margin: ${g.margin.map(m => m + 'pt').join(' ')}; }`;
       layoutSidenotes();
     },
+    // Export as PDF: heading positions and heading-link boxes in document coordinates
+    // (CSS px from the top-left of the page), so Swift can add PDF jumps and an outline.
+    printAnchors() {
+      const sx = window.scrollX || 0, sy = window.scrollY || 0;
+      const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + sx, y: r.top + sy, width: r.width, height: r.height }; };
+      const visible = (el) => !el.closest('.markdown-embed') && !el.closest('.footnotes') && !el.closest('.kanban') && !el.classList.contains('fold-hidden');
+      const headings = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => visible(h) && !h.classList.contains('fallback-title'))
+        .map(h => Object.assign({ text: (h.textContent || '').replace(/\s+/g, ' ').trim(), level: +h.tagName.slice(1) }, box(h)))
+        .filter(h => h.text && h.width > 0 && h.height > 0);
+      const links = [];
+      page.querySelectorAll('a.internal-link[data-heading], a[href^="#"]').forEach(a => {
+        if (!visible(a) || a.hasAttribute('data-footnote-ref') || a.closest('.footnotes')) return;
+        let heading = a.dataset.heading || '';
+        let target = a.dataset.target || '';
+        if (!heading) { const href = a.getAttribute('href') || ''; if (href.startsWith('#')) { try { heading = decodeURIComponent(href.slice(1)); } catch { heading = href.slice(1); } } }
+        if (!heading || heading.startsWith('^')) return;
+        for (const r of a.getClientRects()) if (r.width > 0 && r.height > 0) links.push({ heading, target, x: r.left + sx, y: r.top + sy, width: r.width, height: r.height });
+      });
+      return { contentWidth: document.documentElement.clientWidth || window.innerWidth, headings, links };
+    },
     printReady() {
       const imgs = [...page.querySelectorAll('img')].every(i => i.complete);
       const mer = !page.querySelector('pre.mermaid:not([data-processed])') || !window.mermaid;

@@ -28,6 +28,7 @@ final class NoteBookPrinter: NSObject, WKNavigationDelegate, WKScriptMessageHand
     private var queue: [SectionExport.Item] = []
     private var current: SectionExport.Item?
     private var notePDFs: [String: URL] = [:]
+    private var noteAnchors: [String: PDFLinkMap.AnchorSet] = [:]
     private static var running: [NoteBookPrinter] = []
 
     static func run(_ paths: [String], ws: Workspace, to given: URL? = nil) {
@@ -108,10 +109,24 @@ final class NoteBookPrinter: NSObject, WKNavigationDelegate, WKScriptMessageHand
             guard let self else { return }
             self.polls += 1
             if (r as? Bool) == true || self.polls > 60 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
+                self.captureAnchorsThenPaginate()
             } else {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { self.waitUntilReady() }
             }
+        }
+    }
+
+    private func captureAnchorsThenPaginate() {
+        guard let webView else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
+            return
+        }
+        webView.evaluateJavaScript("Onyx.printAnchors()") { [weak self] r, _ in
+            guard let self else { return }
+            if let current = self.current, let set = PDFLinkMap.AnchorSet(json: r) {
+                self.noteAnchors[current.path] = set
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self.paginate() }
         }
     }
 
@@ -201,12 +216,14 @@ final class NoteBookPrinter: NSObject, WKNavigationDelegate, WKScriptMessageHand
         }
         var tocURL = FileManager.default.temporaryDirectory.appendingPathComponent("onyx-toc-\(UUID().uuidString).pdf")
         assign(tocPages: 1)
-        var tocPages = try PDFChrome.drawTOC(items: items, start: start, page: page, face: face, to: tocURL)
+        var toc = try PDFChrome.drawTOC(items: items, start: start, page: page, face: face, to: tocURL)
+        var tocPages = toc.pages
         assign(tocPages: tocPages)
         if tocPages != (CGPDFDocument(tocURL as CFURL)?.numberOfPages ?? tocPages) {
             try? FileManager.default.removeItem(at: tocURL)
             tocURL = FileManager.default.temporaryDirectory.appendingPathComponent("onyx-toc-\(UUID().uuidString).pdf")
-            tocPages = try PDFChrome.drawTOC(items: items, start: start, page: page, face: face, to: tocURL)
+            toc = try PDFChrome.drawTOC(items: items, start: start, page: page, face: face, to: tocURL)
+            tocPages = toc.pages
             assign(tocPages: tocPages)
         }
 
@@ -240,9 +257,61 @@ final class NoteBookPrinter: NSObject, WKNavigationDelegate, WKScriptMessageHand
             }
         }
         try PDFChrome.write(leaves: leaves, page: page, face: face, title: title, to: dst)
+        try linkBook(dst, start: start, toc: toc, noteCounts: noteCounts)
         try? FileManager.default.removeItem(at: tocURL)
         for u in partURLs.values { try? FileManager.default.removeItem(at: u) }
         for u in notePDFs.values { try? FileManager.default.removeItem(at: u) }
+    }
+
+    /// Clickable TOC rows, in-note heading links, and a PDF outline (bookmarks).
+    private func linkBook(_ dst: URL, start: [String: Int], toc: PDFChrome.TOCLayout, noteCounts: [String: Int]) throws {
+        let geo = PDFAnnotator.geometry(page)
+        let destY = page.paper.height - page.top
+        var jumps: [PDFLinkMap.Jump] = []
+        var dests: [String: [String: (page: Int, y: CGFloat)]] = [:]
+        for it in items where it.kind == .note {
+            guard let set = noteAnchors[it.path], let first = start[it.path], let count = noteCounts[it.path], count > 0 else { continue }
+            dests[it.path] = PDFLinkMap.destinations(in: set, geometry: geo, pageCount: count, pageOffset: first - 1)
+        }
+        func resolve(from path: String, heading: String, target: String) -> (page: Int, y: CGFloat)? {
+            let destPath: String
+            if target.isEmpty {
+                destPath = path
+            } else if dests[target] != nil {
+                destPath = target
+            } else if let it = items.first(where: {
+                $0.kind == .note && ($0.path == target || $0.title == target
+                    || (($0.path as NSString).deletingPathExtension as NSString).lastPathComponent == target)
+            }) {
+                destPath = it.path
+            } else { return nil }
+            return dests[destPath]?[PDFLinkMap.normalize(heading)]
+        }
+        for it in items where it.kind == .note {
+            guard let set = noteAnchors[it.path], let first = start[it.path], let count = noteCounts[it.path], count > 0 else { continue }
+            jumps.append(contentsOf: PDFLinkMap.jumps(in: set, geometry: geo, pageCount: count, pageOffset: first - 1) { heading, target in
+                resolve(from: it.path, heading: heading, target: target)
+            })
+        }
+        for link in toc.links {
+            guard let dest = start[link.path] else { continue }
+            if let it = items.first(where: { $0.path == link.path }), it.kind == .note, (noteCounts[it.path] ?? 0) == 0 { continue }
+            jumps.append(PDFLinkMap.Jump(page: link.page, rect: link.rect, destPage: dest, destY: destY))
+        }
+        var flat: [(title: String, page: Int, depth: Int, y: CGFloat?)] = []
+        for it in items {
+            guard let folio = start[it.path] else { continue }
+            if it.kind == .note, (noteCounts[it.path] ?? 0) == 0 { continue }
+            flat.append((it.title, folio, it.depth, destY))
+        }
+        var kids: [Int: [PDFLinkMap.OutlineNode]] = [:]
+        for it in items where it.kind == .note {
+            guard let set = noteAnchors[it.path], let first = start[it.path], let count = noteCounts[it.path], count > 0 else { continue }
+            let heads = PDFLinkMap.headingOutline(in: set, geometry: geo, pageCount: count, pageOffset: first - 1)
+            if !heads.isEmpty { kids[first] = heads }
+        }
+        let outline = PDFLinkMap.graft(PDFLinkMap.nestOutline(flat), children: kids)
+        try PDFAnnotator.apply(to: dst, jumps: jumps, outline: outline)
     }
 
     private func finish(_ url: URL?) {
@@ -320,8 +389,18 @@ enum PDFChrome {
         ctx.closePDF()
     }
 
-    /// Draw TOC pages; returns the number of pages written.
-    static func drawTOC(items: [SectionExport.Item], start: [String: Int], page: NotePrinter.Page, face: String, to url: URL) throws -> Int {
+    struct TOCLink {
+        var page: Int
+        var rect: CGRect
+        var path: String
+    }
+    struct TOCLayout {
+        var pages: Int
+        var links: [TOCLink]
+    }
+
+    /// Draw TOC pages; returns the page count and the clickable row rects (PDF space).
+    static func drawTOC(items: [SectionExport.Item], start: [String: Int], page: NotePrinter.Page, face: String, to url: URL) throws -> TOCLayout {
         var box = CGRect(origin: .zero, size: page.paper)
         let meta: [CFString: Any] = [kCGPDFContextTitle: "Contents", kCGPDFContextCreator: "Onyx"]
         guard let ctx = CGContext(url as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
@@ -334,6 +413,7 @@ enum PDFChrome {
         let bottomY = page.bottom + 12
         let leading: CGFloat = 18
         var pages = 0
+        var links: [TOCLink] = []
 
         func beginPage() -> CGFloat {
             var mb = box
@@ -379,11 +459,15 @@ enum PDFChrome {
             CTLineDraw(titleLine, ctx)
             ctx.textPosition = CGPoint(x: x0 + textW - fw, y: y)
             CTLineDraw(folioLine, ctx)
+            let row = PDFLinkMap.tocRowRect(x: x0 + indent, y: y, width: textW - indent)
+            if start[it.path] != nil, row.width > 0 {
+                links.append(TOCLink(page: pages, rect: row, path: it.path))
+            }
             y -= leading
         }
         ctx.endPDFPage()
         ctx.closePDF()
-        return max(pages, 1)
+        return TOCLayout(pages: max(pages, 1), links: links)
     }
 
     static func drawPart(title: String, page: NotePrinter.Page, face: String, to url: URL) throws {
