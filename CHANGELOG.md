@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-11-25
+
 ### Added
 - Right-click a folder in the file tree that has no folder note for **New Index Here**, just after New Note Here. It creates `<Folder>/<Folder>.md` (the same convention Onyx already uses to hide the folder note, underline the folder row, and merge the title path), seeds a modest template (`class: Index` or the class already used by other folder notes, a title, a short placeholder, wikilinks to the folder's current notes and subfolders, and `partOf::` to the parent folder's index when there is one), and opens it in the editor. One file creation. The item is hidden once the folder has an index.
 - Double-click a Mermaid diagram (or a wide, horizontally scrolling table) in the reader to open a full-window lightbox in the page: a dimmed, theme-aware backdrop, the figure fitted to the window (upscaling is allowed here), pinch or scroll to zoom, and drag to pan. Esc, a click on the backdrop, or the close button dismisses it with a short fade (~0.2s). Hovering shows a zoom-in cursor and a small expand icon. Double-click does not select label text. Single-click on a linked image still opens the attachment viewer.
@@ -266,7 +268,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.15...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.16...HEAD
+[0.1.16]: https://github.com/kennethreitz/onyx/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/kennethreitz/onyx/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/kennethreitz/onyx/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/kennethreitz/onyx/compare/v0.1.12...v0.1.13
