@@ -36,6 +36,9 @@ struct RootView: View {
         ZStack(alignment: .topLeading) {
             Color.paper.ignoresSafeArea()
             SettingsOpener()
+                .sheet(isPresented: $ws.showSyncOnlyConnect) {   // File ▸ Connect Obsidian Sync Vault…, welcome screen
+                    SyncOnlyConnectSheet { v in SyncOnlyVaultsMac.open(v, in: ws) }
+                }
             if ws.root == nil {
                 WelcomeView(ws: ws)
             } else {
@@ -831,8 +834,11 @@ struct WelcomeView: View {
                 if FileManager.default.fileExists(atPath: notes.path) {
                     Button("Open ~/Notes") { OnyxApp.remember(notes); ws.open(vault: notes) }
                 }
+                Button("Connect Obsidian Sync Vault…") { ws.showSyncOnlyConnect = true }
             }.controlSize(.large).padding(.top, 8)
-            Text("Any folder of Markdown files works, including an Obsidian vault.").font(.system(size: 11.5)).foregroundStyle(Color.faint)
+            Text("Any folder of Markdown files works, including an Obsidian vault. Or keep a sync-only copy of an Obsidian Sync vault inside Onyx.")
+                .font(.system(size: 11.5)).foregroundStyle(Color.faint).multilineTextAlignment(.center).frame(maxWidth: 420)
+            SyncOnlyVaultList(ws: ws, compact: true).padding(.top, 6)
         }.frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     func pick() {

@@ -75,13 +75,9 @@ final class VaultSync {
     @ObservationIgnored private var engine: SyncEngine?
     @ObservationIgnored var onLog: (SyncLogEvent, String) -> Void = { _, _ in }
 
-    static var supportDir: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("Onyx/Sync")
-    }
-    static func stateURL(for root: URL) -> URL {
-        let id = Hex.encode(Array(SHA256.hash(data: Data(root.standardizedFileURL.path.utf8))).prefix(8))
-        return supportDir.appendingPathComponent("\(id).json")
-    }
+    static var supportDir: URL { SyncStorage.defaultSupportDir }
+    /// Path-hash state for a folder you picked; remote-id state for a sync-only vault (see SyncStorage).
+    static func stateURL(for root: URL) -> URL { SyncStorage.stateURL(for: root) }
     static func isConnected(_ root: URL) -> Bool { FileManager.default.fileExists(atPath: stateURL(for: root).path) }
 
     /// Resume sync for a folder that was connected before; nil if it never was (or secrets are missing).
@@ -120,7 +116,7 @@ final class VaultSync {
             status.phase = .error(msg); record(.error, msg); return
         }
         var o = SyncEngine.Options()
-        o.backupDir = Self.supportDir.appendingPathComponent("Backups").appendingPathComponent(Self.stateURL(for: root).deletingPathExtension().lastPathComponent)
+        o.backupDir = SyncStorage.backupDir(forState: Self.stateURL(for: root))
         let e = SyncEngine(root: root, state: state, crypto: crypto, token: token, stateURL: Self.stateURL(for: root), options: o,
                            onStatus: { [weak self] s in Task { @MainActor in self?.status = s } },
                            onLog: { [weak self] msg, path in
@@ -271,7 +267,9 @@ struct ObsidianSyncSettings: View {
                 Spacer()
                 Button("Disconnect…", role: .destructive) { disconnect(s) }
             }
+            managedRow
         } else if ws.root != nil {
+            managedRow
             HStack {
                 Picker("Remote vault", selection: $selectedVault) {
                     Text("Choose…").tag("")
@@ -294,6 +292,19 @@ struct ObsidianSyncSettings: View {
     }
 
     var chosen: ObsidianAPI.RemoteVault? { account.vaults.first { $0.id == selectedVault } }
+
+    /// For a sync-only vault (a copy Onyx keeps in Application Support): where it lives, and deleting it.
+    @ViewBuilder var managedRow: some View {
+        if let root = ws.root, let mv = SyncOnlyVaultsMac.vaults.library.vault(at: root) {
+            HStack {
+                Text("Sync-only vault, stored by Onyx in Application Support/Onyx/Vaults/\(mv.folder).")
+                    .font(.system(size: 11)).foregroundStyle(Color.faint)
+                Spacer()
+                Button("Reveal in Finder") { SyncOnlyVaultsMac.reveal(mv) }
+                Button("Delete Local Copy…", role: .destructive) { SyncOnlyVaultsMac.confirmRemove(mv, in: ws) }
+            }
+        }
+    }
 
     func confirmSheet(_ p: Proposal) -> some View {
         VStack(alignment: .leading, spacing: 12) {

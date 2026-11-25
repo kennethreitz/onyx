@@ -178,6 +178,7 @@ private extension View {
 }
 
 struct GeneralSettingsPage: View {
+    @State private var connectingSyncOnly = false
     @Bindable var ws: Workspace
     @AppStorage(Prefs.appearance) private var appearance = "system"
     @AppStorage(Prefs.startFocus) private var startFocus = false
@@ -202,10 +203,20 @@ struct GeneralSettingsPage: View {
                     }
                     Spacer()
                     Button("Choose…") { chooseVault() }
+                    Button("Sync-only Vault…") { connectingSyncOnly = true }
+                        .help("Keep a local copy of an Obsidian Sync vault inside Onyx (~/Library/Application Support/Onyx/Vaults)")
                 }
                 if let snap = ws.snapshot {
                     Text("\(snap.notes.count) notes · \(snap.attachments.count) attachments · indexed in \(ws.indexMillis) ms")
                         .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+                if let root = ws.root, SyncOnlyVaultsMac.vaults.library.isManaged(root) {
+                    Text("A sync-only vault: Onyx keeps this copy in Application Support and syncs it with Obsidian Sync (Settings ▸ Sync).")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
+                if !SyncOnlyVaultsMac.vaults.library.load().isEmpty {
+                    SyncOnlyVaultList(ws: ws)
+                    Button("Show Vaults Folder in Finder") { SyncOnlyVaultsMac.revealLibrary() }.buttonStyle(.link).font(.system(size: 11))
                 }
             } header: { settingsHeader("Vault") }
 
@@ -216,6 +227,7 @@ struct GeneralSettingsPage: View {
         }
         .settingsPage()
         .onChange(of: appearance) { OnyxApp.applyAppearance(appearance) }
+        .sheet(isPresented: $connectingSyncOnly) { SyncOnlyConnectSheet { v in SyncOnlyVaultsMac.open(v, in: ws) } }
     }
 
     func chooseVault() {
