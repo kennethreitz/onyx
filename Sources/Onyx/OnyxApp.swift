@@ -289,6 +289,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("bookmarks") { ws.toggleSidebar(.bookmarks) }
             ShortcutMenus.button("tags") { ws.toggleSidebar(.tags) }
             ShortcutMenus.button("git") { ws.toggleSidebar(.git) }
+            ShortcutMenus.button("notehistory") { ws.showNoteHistory() }
             Divider()
             ShortcutMenus.button("inspector") { ws.toggleInspector() }
             ShortcutMenus.button("outline") { ws.toggleInspector(.outline) }

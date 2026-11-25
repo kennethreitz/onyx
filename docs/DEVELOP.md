@@ -159,7 +159,7 @@ The official release builds are not notarized, which is why first launch needs t
 
 `make test` runs `swift test`, then `node --test Tests/reader`.
 
-- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, Obsidian Bases (`.base` parse/filter/formula), find, git text, fuzzy matching, auto-update from GitHub Releases, split-layout encode/decode/clamp, and the optional fixture / bench tests above.
+- `Tests/OnyxCoreTests` — vault index, links, Markdown rewrite, kanban, canvas, Obsidian Bases (`.base` parse/filter/formula), find, git text, note version history, fuzzy matching, auto-update from GitHub Releases, split-layout encode/decode/clamp, and the optional fixture / bench tests above.
 - `Tests/OnyxSyncTests` — crypto, the sync engine, a mock server, and protocol vectors in `Tests/OnyxSyncTests/Resources/`.
 - `Tests/reader` — typography and sidenote layout in Node, with fixtures in `Tests/reader/fixtures/` (`typeset-specimen.md`, `named-sidenotes.md`).
 

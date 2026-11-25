@@ -108,6 +108,7 @@ public enum CommandCatalog {
         cmd("bookmarks", "Bookmarks", .view, [.command("b", shift: true)], "bookmark"),
         cmd("tags", "Tags", .view, [.command("t", shift: true)], "number"),
         cmd("git", "Source Control", .view, [.command("y", shift: true)], "arrow.triangle.branch"),
+        cmd("notehistory", "Version History", .view, [], "clock.arrow.circlepath"),
         cmd("inspector", "Inspector", .view, [.command("i", option: true)], "sidebar.right"),
         cmd("outline", "Outline", .view, [.command("1", option: true)], "list.bullet.indent"),
         cmd("backlinks", "Backlinks", .view, [.command("2", option: true)], "arrow.uturn.backward"),

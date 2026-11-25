@@ -83,7 +83,7 @@ public struct EscSituation: Equatable, Sendable {
 }
 
 /// Precedence for Esc, highest first:
-/// sheet/alert → IME → autocomplete → inline rename → find bar → overlay (switcher, palette, graph, sync log, move-to)
+/// sheet/alert → IME → autocomplete → inline rename → find bar → overlay (switcher, palette, graph, sync log, version history, move-to)
 /// → tree multi-selection → unpinned inspector → unpinned sidebar → docked inspector
 /// → focus mode → collapse selection/multi-cursor → return to reading (editor only, setting on).
 /// Esc in reading view never switches to editing.

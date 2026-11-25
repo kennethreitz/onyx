@@ -87,6 +87,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Bookmarks | <kbd>⇧⌘B</kbd> |
 | Tags | <kbd>⇧⌘T</kbd> |
 | Source Control | <kbd>⇧⌘Y</kbd> |
+| Version History | — |
 | Inspector | <kbd>⌥⌘I</kbd> |
 | Outline | <kbd>⌥⌘1</kbd> |
 | Backlinks | <kbd>⌥⌘2</kbd> |

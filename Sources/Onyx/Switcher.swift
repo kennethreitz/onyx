@@ -275,6 +275,7 @@ enum PaletteCommands {
             item("bookmark", title: "Bookmark / unbookmark this note") { ws.toggleBookmark() },
             item("tags") { ws.toggleSidebar(.tags) },
             item("git") { ws.toggleSidebar(.git) },
+            item("notehistory", title: "Version history of this note") { ws.showNoteHistory() },
             item("synclog") { DispatchQueue.main.async { ws.show(.syncLog) } },
             item("inspector", title: "Show inspector (outline, backlinks, properties)") { ws.toggleInspector() },
             item("outline") { ws.toggleInspector(.outline) },

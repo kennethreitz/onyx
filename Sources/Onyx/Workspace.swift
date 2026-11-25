@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -26,6 +26,18 @@ enum InspectorTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self { case .outline: return "list.bullet.indent"; case .backlinks: return "arrow.uturn.backward"; case .properties: return "tablecells" }
     }
+}
+enum GitPanelSection: String, CaseIterable, Identifiable {
+    case status, history
+    var id: String { rawValue }
+    var title: String { rawValue.capitalized }
+}
+/// The version chosen in the git pane, shown in the version-history overlay.
+struct NoteVersionPreview: Equatable {
+    var entry: NoteHistoryEntry
+    var notePath: String
+    var content: NoteVersionContent?
+    var currentText: String
 }
 
 /// Everything about one open vault: the index, the open note, panels, saving.
@@ -169,6 +181,9 @@ final class Workspace {
 
     /// Continuous git when the vault is a repository (see GitSync); nil otherwise.
     var git: GitSync?
+    /// Status vs. this-note history, in the git sidebar.
+    var gitPanelSection: GitPanelSection = .status
+    var versionPreview: NoteVersionPreview?
     /// Obsidian Sync, only for folders the user connected in Settings ▸ Sync (see VaultSync); nil otherwise.
     var obsidianSync: VaultSync?
     /// Recent git and Obsidian Sync activity for this vault, persisted in Application Support.
@@ -1497,6 +1512,42 @@ final class Workspace {
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
     }
+    /// Open the git sidebar on this note's version history (does not hide a sidebar that's already open).
+    func showNoteHistory() {
+        gitPanelSection = .history
+        sidebarTab = .git
+        if !sidebarVisible { toggleSidebar() }
+    }
+    func openVersionPreview(_ preview: NoteVersionPreview) {
+        versionPreview = preview
+        show(.versionHistory)
+    }
+    /// Put historical text into the editor as an unsaved edit. Never runs git checkout or reset.
+    @discardableResult
+    func restoreNoteVersion(_ content: String) -> Bool {
+        guard let path = currentPath, !path.opensInFileView else { return false }
+        if text == content { toast = "Already the current text."; return false }
+        text = content
+        renderToken += 1
+        toast = "Restored this version as an unsaved edit."
+        return true
+    }
+    func confirmRestoreNoteVersion(entry: NoteHistoryEntry, content: String) {
+        let a = NSAlert()
+        a.messageText = "Restore this version?"
+        let when = Self.versionDate.string(from: entry.date)
+        var info = "Replace the current note with the version from \(when) (“\(entry.subject)”) by \(entry.author). It lands in the editor as an unsaved edit; the git repository is not reset or checked out."
+        if isDirty { info += " Unsaved changes in the editor will be replaced." }
+        a.informativeText = info
+        a.addButton(withTitle: "Restore")
+        a.addButton(withTitle: "Cancel")
+        if a.runModal() == .alertFirstButtonReturn {
+            if restoreNoteVersion(content) { show(.none) }
+        }
+    }
+    private static let versionDate: DateFormatter = {
+        let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
+    }()
     /// ⌥⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
         withAnimation(Motion.layout) {

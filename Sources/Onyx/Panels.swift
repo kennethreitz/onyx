@@ -852,42 +852,67 @@ struct GitPanel: View {
                     Spacer()
                     Button { ws.git?.syncNow(); refresh() } label: { Image(systemName: "arrow.clockwise") }.buttonStyle(.plain).foregroundStyle(Color.muted).help("Sync now")
                 }.padding(.horizontal, 12).padding(.top, 10)
-                if let g = ws.git {
-                    Text(g.help).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(4).padding(.horizontal, 12)
-                    ForEach(g.conflictCopies, id: \.self) { c in
-                        Button { ws.openNote(c) } label: {
-                            Label((c as NSString).lastPathComponent, systemImage: "doc.on.doc").font(.system(size: 11.5)).lineLimit(1)
-                        }.buttonStyle(.plain).foregroundStyle(Color.ink).padding(.horizontal, 12)
-                        .help("Both versions were kept. Merge what you need into the original, then delete this copy.")
-                    }
+                sectionPicker
+                if ws.gitPanelSection == .history {
+                    NoteHistoryList(ws: ws, isRepo: isRepo)
                 } else {
-                    Text("Auto-sync is off (git not found).").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.horizontal, 12)
+                    statusPane
                 }
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
-                        ForEach(changes, id: \.1) { c in
-                            HStack(spacing: 8) {
-                                Text(c.0).font(.custom("IBMPlexMono", size: 10.5)).foregroundStyle(Color.muted).frame(width: 20, alignment: .leading)
-                                Text(c.1).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
-                            }.padding(.horizontal, 12).padding(.vertical, 3)
-                        }
-                    }.thinScrollers()
-                }
-                if changes.isEmpty { QuietEmpty(title: "Working tree clean.").padding(.horizontal, -2) }
-                TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)
-                HStack {
-                    Button("Commit all") { commit() }.disabled(changes.isEmpty)
-                    Spacer()
-                    Text(status).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(2)
-                }.padding(.horizontal, 10).padding(.bottom, 10)
             }
         }
         .onAppear { refresh() }
     }
+
+    var sectionPicker: some View {
+        HStack(spacing: 1) {
+            ForEach(GitPanelSection.allCases) { s in
+                Button { withAnimation(Motion.quick) { ws.gitPanelSection = s } } label: {
+                    Text(s.title)
+                        .font(.system(size: 11, weight: ws.gitPanelSection == s ? .semibold : .regular))
+                        .foregroundStyle(ws.gitPanelSection == s ? Color.ink : Color.faint)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(ws.gitPanelSection == s ? Color.ink.opacity(0.07) : .clear, in: RoundedRectangle(cornerRadius: Radius.control))
+                }.buttonStyle(.plain)
+            }
+            Spacer(minLength: 0)
+        }.padding(.horizontal, 10)
+    }
+
+    @ViewBuilder var statusPane: some View {
+        if let g = ws.git {
+            Text(g.help).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(4).padding(.horizontal, 12)
+            ForEach(g.conflictCopies, id: \.self) { c in
+                Button { ws.openNote(c) } label: {
+                    Label((c as NSString).lastPathComponent, systemImage: "doc.on.doc").font(.system(size: 11.5)).lineLimit(1)
+                }.buttonStyle(.plain).foregroundStyle(Color.ink).padding(.horizontal, 12)
+                .help("Both versions were kept. Merge what you need into the original, then delete this copy.")
+            }
+        } else {
+            Text("Auto-sync is off (git not found).").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.horizontal, 12)
+        }
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                ForEach(changes, id: \.1) { c in
+                    HStack(spacing: 8) {
+                        Text(c.0).font(.custom("IBMPlexMono", size: 10.5)).foregroundStyle(Color.muted).frame(width: 20, alignment: .leading)
+                        Text(c.1).font(.system(size: 11.5)).lineLimit(1).truncationMode(.middle)
+                    }.padding(.horizontal, 12).padding(.vertical, 3)
+                }
+            }.thinScrollers()
+        }
+        if changes.isEmpty { QuietEmpty(title: "Working tree clean.").padding(.horizontal, -2) }
+        TextField("Commit message", text: $message).textFieldStyle(.roundedBorder).font(.system(size: 12)).padding(.horizontal, 10)
+        HStack {
+            Button("Commit all") { commit() }.disabled(changes.isEmpty)
+            Spacer()
+            Text(status).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(2)
+        }.padding(.horizontal, 10).padding(.bottom, 10)
+    }
+
     func git(_ args: [String]) -> (Int32, String) {
         guard let root = ws.root else { return (1, "") }
         let p = Process()
-        p.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+        p.executableURL = URL(fileURLWithPath: NoteHistory.gitBinary() ?? "/usr/bin/git")
         p.arguments = ["-C", root.path] + args
         let pipe = Pipe(); p.standardOutput = pipe; p.standardError = pipe
         do { try p.run() } catch { return (1, error.localizedDescription) }
