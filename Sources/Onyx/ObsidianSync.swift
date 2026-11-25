@@ -10,7 +10,7 @@ import SwiftUI
 @MainActor @Observable
 final class SyncAccount {
     static let shared = SyncAccount()
-    @ObservationIgnored let store: SecretStore = KeychainStore()
+    @ObservationIgnored let store: SecretStore = ResilientSecretStore(onFallback: SyncSignIn.defaultLog)
     @ObservationIgnored let api = ObsidianAPI()
     private(set) var email = UserDefaults.standard.string(forKey: "onyx.sync.email") ?? ""
     private(set) var signedIn = false
@@ -37,18 +37,18 @@ final class SyncAccount {
 
     /// Like `ob login`: first without a code; if the account has 2FA the caller asks for it and calls again.
     func signIn(email: String, password: String, code: String?) async throws -> SignInResult {
-        do {
-            let r = try await api.signIn(email: email, password: password, mfa: code ?? "")
-            guard let t = r.token else { throw ObsidianAPI.APIError(message: "No token in the sign-in response") }
-            try store.set("token", Data(t.utf8))
+        // Idempotent (SyncSignIn): reuses a token that still works, retries "Already logged in" once, and keeps
+        // the token for this session even if the Keychain refuses it.
+        switch try await SyncSignIn(api: api, store: store).signIn(email: email, password: password, code: code, heldToken: cachedToken) {
+        case .needsCode:
+            return .needsCode
+        case .signedIn(let t, let e, _):
             cachedToken = t
             UserDefaults.standard.set(true, forKey: Self.signedInKey)
-            self.email = r.email ?? email
-            UserDefaults.standard.set(self.email, forKey: "onyx.sync.email")
+            self.email = e
+            UserDefaults.standard.set(e, forKey: "onyx.sync.email")
             signedIn = true
             return .ok
-        } catch where code == nil && ObsidianAPI.needsMFA(error) {
-            return .needsCode
         }
     }
 
@@ -334,7 +334,7 @@ struct ObsidianSyncSettings: View {
 
     func run(_ label: String, _ op: () async throws -> Void) async {
         busy = label; error = nil
-        do { try await op() } catch { self.error = "\(error)" }
+        do { try await op() } catch { self.error = SyncErrorText.describe(error) }
         busy = nil
     }
 
@@ -374,7 +374,7 @@ struct ObsidianSyncSettings: View {
                 ws?.syncLog?.append(source: .obsidian, event: event, detail: detail)
             })
         }
-        catch { self.error = "\(error)" }
+        catch { self.error = SyncErrorText.describe(error) }
     }
 
     func disconnect(_ s: VaultSync) {

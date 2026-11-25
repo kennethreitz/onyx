@@ -182,7 +182,8 @@ public actor SyncEngine {
             r.ts = options.now().addingTimeInterval(min(pow(2, Double(r.count)) * 5, 300))
             fileRetry[p] = r
         }
-        publish(.error(syncingPath.map { "\($0): \(msg)" } ?? msg))
+        let text = SyncErrorText.describe(error, log: { _ in })   // raw details are in the log above
+        publish(.error(syncingPath.map { "\($0): \(text)" } ?? text))
     }
     private func canSyncPath(_ p: String) -> Bool {
         let now = options.now()
@@ -218,9 +219,10 @@ public actor SyncEngine {
             backoff.fail()
             let msg = "\(error)"
             note("Connect failed \(msg)")
+            let text = SyncErrorText.describe(error, log: { _ in })
             if msg.contains("subscription") || msg.contains("Vault not found") || msg.contains("authFailed") {
-                publish(.error(msg))
-            } else { publish(.offline(msg)) }
+                publish(.error(text))
+            } else { publish(.offline(text)) }
             return nil
         }
     }
