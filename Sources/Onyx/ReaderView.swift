@@ -57,6 +57,8 @@ struct ReaderView: NSViewRepresentable {
     var preview = false
     /// When set (version-history overlay), the reader renders a rich insert/delete diff instead of `text` alone.
     var richDiff: [NoteDiff.RichBlock]? = nil
+    /// Called when a “Show N unchanged lines” control in a rich diff is clicked.
+    var onDiffExpand: ((Int) -> Void)? = nil
     @Environment(\.colorScheme) var scheme
     // Observed so a Settings ▸ Typesetting change re-renders at once (values are read in Typeset).
     @AppStorage(Typeset.on) private var tsOn = true
@@ -100,6 +102,7 @@ struct ReaderView: NSViewRepresentable {
         let c = context.coordinator
         c.ws = ws
         c.paneID = paneID
+        c.onDiffExpand = onDiffExpand
         c.handler?.vaultRoot = ws.root
         if source == nil && !preview { ws.liveReader = c }
         let dark = scheme == .dark
@@ -156,6 +159,7 @@ struct ReaderView: NSViewRepresentable {
         var lastLayoutWidth: CGFloat = 0
         var foldable = true
         var renderedDiff: [NoteDiff.RichBlock]?
+        var onDiffExpand: ((Int) -> Void)?
 
         /// Source lines of this note's folded headings (shared with the editor via FoldStore).
         func foldedLines(_ text: String, path: String) -> [Int] {
@@ -271,6 +275,8 @@ struct ReaderView: NSViewRepresentable {
                                occurrence: body["occurrence"] as? Int ?? 0, width: (body["width"] as? NSNumber)?.intValue)
             case "edit": ws.toggleMode()
             case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
+            case "diffExpand":
+                if let i = body["index"] as? Int { onDiffExpand?(i) }
             default: break
             }
         }

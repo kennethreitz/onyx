@@ -519,13 +519,14 @@ struct RootView: View {
             }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .versionHistory:
             dimmer
-            VStack {
-                if let preview = ws.versionPreview {
-                    NoteVersionView(ws: ws, preview: preview, dismiss: { ws.show(.none) })
-                        .padding(.top, 72)
-                }
-                Spacer()
-            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
+            if let preview = ws.versionPreview {
+                NoteVersionView(ws: ws, preview: preview, dismiss: { ws.show(.none) })
+                    .padding(.top, 48)
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(Motion.pop(0.98, anchor: .top))
+            }
         case .findReplace:
             dimmer
             VStack {

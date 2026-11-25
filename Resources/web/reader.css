@@ -639,3 +639,18 @@ del.onyx-diff-del {
 .onyx-diff-del-block > :last-child,
 .onyx-diff-chg-block > :last-child { margin-bottom: 0; }
 .onyx-diff-blank { height: 0.6em; margin: 0; }
+
+/* Version-history: collapsed unchanged stretches */
+.onyx-diff-collapse { margin: 0.4em 0; text-align: center; }
+button.onyx-diff-expand {
+  font-family: var(--font-interface);
+  font-size: 11.5px;
+  color: var(--text-faint);
+  background: var(--background-primary-alt);
+  border: 0.8px solid var(--border);
+  border-radius: 4px;
+  padding: 5px 12px;
+  width: 100%;
+  cursor: pointer;
+}
+button.onyx-diff-expand:hover { color: var(--text-normal); }

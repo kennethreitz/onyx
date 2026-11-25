@@ -146,4 +146,52 @@ final class RichDiffTests: XCTestCase {
         let blocks = NoteDiff.rich(old: "# Alpha\n", new: "A totally different paragraph.\n")
         XCTAssertEqual(Set(blocks.map(\.op)), Set([.delete, .insert]))
     }
+
+    func testNumberedLines() {
+        let rows: [NoteDiff.Line] = [.same("a"), .delete("b"), .insert("c"), .same("d")]
+        let n = NoteDiff.numbered(rows)
+        XCTAssertEqual(n.map(\.oldNumber), [1, 2, nil, 3])
+        XCTAssertEqual(n.map(\.newNumber), [1, nil, 2, 3])
+    }
+
+    func testCollapsedContextKeepsSidesAndHidesTheMiddle() {
+        var rows: [NoteDiff.Line] = (1...8).map { .same("k\($0)") }
+        rows += [.delete("old"), .insert("new")]
+        rows += (9...20).map { .same("k\($0)") }
+        let segs = NoteDiff.collapsed(rows, isChange: { $0.isChange }, context: 3, minHidden: 5)
+        let hunks = segs.compactMap { seg -> Int? in
+            if case .hunk(let c, _) = seg { return c }
+            return nil
+        }
+        XCTAssertEqual(hunks.count, 2, "leading and trailing unchanged should collapse: \(segs)")
+        XCTAssertEqual(hunks[0], 5) // 8 leading minus 3 context
+        XCTAssertEqual(hunks[1], 9) // 12 trailing minus 3 context
+        let visible = segs.compactMap { seg -> String? in
+            if case .visible(let l) = seg { return l.text }
+            return nil
+        }
+        XCTAssertTrue(visible.contains("k6") && visible.contains("k8"))
+        XCTAssertTrue(visible.contains("old") && visible.contains("new"))
+        XCTAssertTrue(visible.contains("k9") && visible.contains("k11"))
+        XCTAssertFalse(visible.contains("k1"))
+        XCTAssertFalse(visible.contains("k20"))
+    }
+
+    func testCollapsedShortRunStaysVisible() {
+        let rows: [NoteDiff.Line] = [.insert("new"), .same("a"), .same("b"), .insert("x")]
+        let segs = NoteDiff.collapsed(rows, isChange: { $0.isChange }, context: 3, minHidden: 5)
+        XCTAssertTrue(segs.allSatisfy {
+            if case .visible = $0 { return true }
+            return false
+        })
+    }
+
+    func testCollapsedRichEqualBlocks() {
+        let old = (1...20).map { "unchanged \($0)\n\n" }.joined() + "old para\n"
+        let new = (1...20).map { "unchanged \($0)\n\n" }.joined() + "new para\n"
+        let blocks = NoteDiff.rich(old: old, new: new)
+        let segs = NoteDiff.collapsed(blocks, isChange: \.isChange, context: 3, minHidden: 5)
+        XCTAssertTrue(segs.contains { if case .hunk = $0 { return true }; return false })
+        XCTAssertTrue(segs.contains { if case .visible(let b) = $0 { return b.isChange }; return false })
+    }
 }

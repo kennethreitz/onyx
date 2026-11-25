@@ -55,7 +55,7 @@ extension NoteDiff {
     }
 
     public enum BlockOp: String, Equatable, Sendable {
-        case equal, insert, delete, change
+        case equal, insert, delete, change, collapsed
     }
 
     /// One block in a rich diff: unchanged Markdown, a whole block added or removed, or an inline change.
@@ -64,11 +64,15 @@ extension NoteDiff {
         public var kind: BlockKind
         public var text: String
         public var spans: [Span]
-        public init(op: BlockOp, kind: BlockKind, text: String, spans: [Span] = []) {
+        /// For `.collapsed` placeholders: how many source lines are hidden, and the segment index to expand.
+        public var hiddenCount: Int
+        public var segmentIndex: Int
+        public init(op: BlockOp, kind: BlockKind, text: String, spans: [Span] = [], hiddenCount: Int = 0, segmentIndex: Int = 0) {
             self.op = op; self.kind = kind; self.text = text; self.spans = spans
+            self.hiddenCount = hiddenCount; self.segmentIndex = segmentIndex
         }
 
-        public var isChange: Bool { op != .equal }
+        public var isChange: Bool { op != .equal && op != .collapsed }
     }
 
     /// A rendered-friendly diff of `old` (historical) against `new` (current).
@@ -116,6 +120,10 @@ extension NoteDiff {
             if b.op == .change {
                 d["spans"] = b.spans.map { ["op": $0.op.rawValue, "text": $0.text] }
                 d["inner"] = innerMarkdown(b)
+            }
+            if b.op == .collapsed {
+                d["count"] = b.hiddenCount
+                d["index"] = b.segmentIndex
             }
             return d
         }
@@ -539,5 +547,95 @@ extension NoteDiff {
         if isBlockquote(line) { return true }
         if isHTMLStart(line) { return true }
         return false
+    }
+
+    // MARK: - Line numbers and collapsed context
+
+    /// A diff line with 1-based numbers in the old and new sides (nil on the side that has no line).
+    public struct NumberedLine: Equatable, Sendable {
+        public var line: Line
+        public var oldNumber: Int?
+        public var newNumber: Int?
+        public init(line: Line, oldNumber: Int?, newNumber: Int?) {
+            self.line = line; self.oldNumber = oldNumber; self.newNumber = newNumber
+        }
+        public var isChange: Bool { line.isChange }
+    }
+
+    public static func numbered(_ rows: [Line]) -> [NumberedLine] {
+        var o = 1, n = 1
+        return rows.map { row in
+            switch row {
+            case .same:
+                let item = NumberedLine(line: row, oldNumber: o, newNumber: n)
+                o += 1; n += 1
+                return item
+            case .delete:
+                let item = NumberedLine(line: row, oldNumber: o, newNumber: nil)
+                o += 1
+                return item
+            case .insert:
+                let item = NumberedLine(line: row, oldNumber: nil, newNumber: n)
+                n += 1
+                return item
+            }
+        }
+    }
+
+    /// A visible row, or a hidden stretch of unchanged rows that can be expanded.
+    public enum CollapsedSegment<Element: Equatable>: Equatable {
+        case visible(Element)
+        case hunk(count: Int, items: [Element])
+    }
+
+    /// Keep `context` unchanged rows beside each change and collapse a longer stretch in the middle.
+    /// A hidden run shorter than `minHidden` is left visible.
+    public static func collapsed<Element: Equatable>(
+        _ rows: [Element],
+        isChange: (Element) -> Bool,
+        context: Int = 3,
+        minHidden: Int = 5
+    ) -> [CollapsedSegment<Element>] {
+        guard !rows.isEmpty else { return [] }
+        let context = max(0, context)
+        let minHidden = max(1, minHidden)
+        var shown = Array(repeating: false, count: rows.count)
+        var anyChange = false
+        for i in rows.indices where isChange(rows[i]) {
+            anyChange = true
+            let lo = max(0, i - context)
+            let hi = min(rows.count - 1, i + context)
+            for j in lo...hi { shown[j] = true }
+        }
+        if !anyChange {
+            if rows.count >= minHidden {
+                return [.hunk(count: rows.count, items: rows)]
+            }
+            return rows.map { .visible($0) }
+        }
+        var out: [CollapsedSegment<Element>] = []
+        var i = 0
+        while i < rows.count {
+            if shown[i] {
+                out.append(.visible(rows[i]))
+                i += 1
+                continue
+            }
+            var j = i
+            while j < rows.count, !shown[j] { j += 1 }
+            let items = Array(rows[i..<j])
+            if items.count >= minHidden {
+                out.append(.hunk(count: items.count, items: items))
+            } else {
+                out.append(contentsOf: items.map { .visible($0) })
+            }
+            i = j
+        }
+        return out
+    }
+
+    /// How many source lines a rich-diff block occupies (for “Show N unchanged lines”).
+    public static func lineCount(of block: RichBlock) -> Int {
+        max(1, splitLines(block.text).count)
     }
 }

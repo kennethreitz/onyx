@@ -651,3 +651,12 @@ test('tags: nested and Unicode, links to the tag; numbers and trailing slashes a
   assert.doesNotMatch(out, /data-tag="2024"/);
   assert.match(out, /<a class="tag" data-tag="a\/b">#a\/b<\/a>\//);
 });
+
+test('rich diffs render a control for collapsed unchanged stretches', () => {
+  const out = ctx.window.Onyx._diffHTML([
+    { op: 'collapsed', kind: 'paragraph', markdown: '', count: 12, index: 3 },
+  ]);
+  assert.match(out, /onyx-diff-expand/);
+  assert.match(out, /data-index="3"/);
+  assert.match(out, /Show 12 unchanged lines/);
+});
