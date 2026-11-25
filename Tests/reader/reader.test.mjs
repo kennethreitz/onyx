@@ -684,3 +684,52 @@ test('outline heading scroll lands below the chrome inset with a gap, and spy us
   // Nothing has reached the line yet: stay on the title (line 0).
   assert.equal(O._activeOutlineLine([{top: 80, line: 10}], 66), 0);
 });
+
+test('outline heading list skips fallback titles, embeds, callouts, and blockquotes', () => {
+  const O = ctx.window.Onyx;
+  const el = (opts = {}) => {
+    const classes = new Set((opts.class || '').split(/\s+/).filter(Boolean));
+    const ancestors = new Set(opts.ancestors || []);
+    return {
+      classList: { contains: (c) => classes.has(c) },
+      closest: (sel) => ancestors.has(sel) ? {} : null,
+    };
+  };
+  assert.equal(O._isOutlineHeading(el()), true);
+  assert.equal(O._isOutlineHeading(el({ class: 'fallback-title' })), false);
+  assert.equal(O._isOutlineHeading(el({ ancestors: ['.markdown-embed'] })), false);
+  assert.equal(O._isOutlineHeading(el({ ancestors: ['.callout'] })), false);
+  assert.equal(O._isOutlineHeading(el({ ancestors: ['blockquote'] })), false);
+  assert.equal(O._isOutlineHeading(el({ ancestors: ['.footnotes'] })), false);
+  assert.equal(O._isOutlineHeading(el({ ancestors: ['.kanban'] })), false);
+});
+
+test('scroll-spy walking a long note picks the last outline heading at or above the landing offset', () => {
+  const O = ctx.window.Onyx;
+  const offset = 66;
+  // Absolute tops before any scroll: leading H1, then a run of sections.
+  const items = [
+    { top: 0, line: 0, title: 'Home' },
+    { top: 200, line: 10, title: 'The Proprietor' },
+    { top: 450, line: 24, title: 'Morning' },
+    { top: 700, line: 38, title: 'Afternoon' },
+    { top: 960, line: 52, title: 'The Library' },
+    { top: 1210, line: 66, title: 'Coda' },
+  ];
+  const at = (scroll) => items.map(it => ({ top: it.top - scroll, line: it.line }));
+  // Before the title has reached the landing line, stay on the title (line 0).
+  // Once its top is 0 it is already at/above offset+1? 0 <= 67, so line 0 — the title.
+  assert.equal(O._activeOutlineLine(at(0), offset), 0);
+  // Land The Proprietor at the outline offset: top 200 - scroll = 66 => scroll 134.
+  assert.equal(O._activeOutlineLine(at(200 - offset), offset), 10);
+  // A few pixels later, still Proprietor (next heading is still below the line).
+  assert.equal(O._activeOutlineLine(at(200 - offset + 20), offset), 10);
+  // Morning lands.
+  assert.equal(O._activeOutlineLine(at(450 - offset), offset), 24);
+  // Midway through Afternoon, still Afternoon.
+  assert.equal(O._activeOutlineLine(at(700 - offset + 80), offset), 38);
+  // The Library, then Coda, then past the last heading (Coda stays active).
+  assert.equal(O._activeOutlineLine(at(960 - offset), offset), 52);
+  assert.equal(O._activeOutlineLine(at(1210 - offset), offset), 66);
+  assert.equal(O._activeOutlineLine(at(1210 - offset + 400), offset), 66);
+});
