@@ -526,6 +526,13 @@ struct RootView: View {
                 }
                 Spacer()
             }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
+        case .findReplace:
+            dimmer
+            VStack {
+                FindReplaceView(ws: ws)
+                    .padding(.top, 56)
+                Spacer()
+            }.frame(maxWidth: .infinity).transition(Motion.pop(0.98, anchor: .top))
         case .graph:
             // Drawn on the focused pane (or the solo page), not over the window.
             EmptyView()
@@ -580,6 +587,9 @@ struct RootView: View {
             // Palette chords also toggle the overlay closed, and fire even when the palette field has focus.
             if KeyChord.matches(e, command: "palette") {
                 ws.overlay == .palette ? ws.show(.none) : ws.show(.palette); return nil
+            }
+            if KeyChord.matches(e, command: "replacevault") {
+                ws.overlay == .findReplace ? ws.show(.none) : ws.openVaultReplace(); return nil
             }
             // Close pane when split; otherwise let the event through so ⌘W (the default) can close the window.
             // Keyed to the main Onyx window, so the same chord in Settings still closes Settings.

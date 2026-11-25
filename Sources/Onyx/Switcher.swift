@@ -312,6 +312,8 @@ enum PaletteCommands {
             item("openvault") { DispatchQueue.main.async { Workspace.openVaultPanel(ws) } },
             item("find") { DispatchQueue.main.async { ws.openFind() } },
             item("findreplace") { DispatchQueue.main.async { ws.openFind(replace: true) } },
+            item("replacevault", title: "Replace in vault…") { DispatchQueue.main.async { ws.openVaultReplace() } },
+            item("undoreplace") { _ = ws.undoLastVaultReplace() },
             item("searchsel") { ws.searchSelection() },
             item("graphpane", title: ws.graphPaneIndex == nil ? "Graph in a pane" : "Close graph pane") {
                 ws.graphPaneIndex == nil ? ws.openGraphPane(atlas: ws.graphAtlas) : ws.closeGraphPane()

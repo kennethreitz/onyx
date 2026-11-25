@@ -4,7 +4,7 @@ import Observation
 import OnyxCore
 
 enum ViewMode: String { case read, edit }
-enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory }
+enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory, findReplace }
 enum SidebarTab: String, CaseIterable, Identifiable {
     case files, search, recent, bookmarks, tags, git
     var id: String { rawValue }
@@ -69,6 +69,7 @@ final class Workspace {
     private(set) var lastSaved: String = ""
     var mode: ViewMode = .read
     let finder = FindModel()
+    let replacer = FindReplaceModel()
     @ObservationIgnored weak var liveEditor: OnyxTextView?
     @ObservationIgnored weak var liveReader: ReaderView.Coordinator?
     /// Back/forward for the focused pane (each split pane keeps its own; see Pane).
@@ -1298,6 +1299,27 @@ final class Workspace {
     }
 
     static func stamp() -> String { let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd HHmm"; return f.string(from: Date()) }
+
+
+    func updateSnapshotNote(_ path: String, content: String) {
+        snapshot?.update(path: path, content: content)
+    }
+
+    /// Keep open editor buffers in sync after a vault write so autosave cannot overwrite it.
+    func syncOpenBuffers(_ path: String, content: String) {
+        saveTask?.cancel()
+        if path == currentPath {
+            suppressTextChange = true
+            text = content
+            lastSaved = content
+            suppressTextChange = false
+            renderToken += 1
+        }
+        for i in panes.indices where panes[i].path == path {
+            if path == currentPath, i == focusedPane { continue }
+            panes[i].text = content
+        }
+    }
 
     /// The only place Onyx writes files. Refuses anything outside the vault.
     @discardableResult

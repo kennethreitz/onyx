@@ -626,6 +626,15 @@ struct SearchPanel: View {
                 Image(systemName: "magnifyingglass").font(.system(size: 11)).foregroundStyle(Color.faint)
                 TextField("Search vault  ·  tag:  path:  \"phrase\"", text: $ws.searchQuery)
                     .textFieldStyle(.plain).font(.system(size: 12.5)).focused($focused)
+                Button {
+                    ws.openVaultReplace(query: ws.searchQuery)
+                } label: {
+                    Image(systemName: "arrow.left.arrow.right")
+                        .font(.system(size: 11)).foregroundStyle(Color.muted)
+                        .frame(width: 18, height: 18).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Replace in vault (⌥⇧⌘F)")
             }
             .padding(8).background(Color.paper, in: RoundedRectangle(cornerRadius: Radius.control))
             .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(focused ? Color.cursorBlue.opacity(0.55) : Color.hairline, lineWidth: focused ? 1 : 0.8))

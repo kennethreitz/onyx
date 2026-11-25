@@ -32,11 +32,15 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | --- | --- |
 | Find in Note… | <kbd>⌘F</kbd> |
 | Find and Replace… | <kbd>⌥⌘F</kbd> |
+| Replace in Vault… | <kbd>⌥⇧⌘F</kbd> |
+| Undo Last Replace | — |
 | Search Vault for Selection | — |
 | Toggle Spellcheck | — |
 | Merge Current File With Another File… | — |
 | Extract Current Selection… | — |
 | Extract This Heading… | — |
+
+Replace in Vault opens a preview of every match, grouped by note, with per-match checkboxes and before/after highlighting. You can search the whole vault, the current folder, or the current note, and choose match case, whole word, regular expressions (with `$1` capture groups in the replacement), and whether frontmatter is included. Replace Selected and Replace All ask for confirmation and show the counts; writes are atomic, open editors are updated, and Undo Last Replace restores the previous contents of those notes. The Search sidebar (⇧⌘F) has a button that opens the same panel with the current query. In-note find and replace (⌘F / ⌥⌘F in the editor) is unchanged.
 
 ## Format
 

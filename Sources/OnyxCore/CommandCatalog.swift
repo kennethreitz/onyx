@@ -59,6 +59,8 @@ public enum CommandCatalog {
         // Edit
         cmd("find", "Find in Note…", .edit, [.command("f")]),
         cmd("findreplace", "Find and Replace…", .edit, [.command("f", option: true)]),
+        cmd("replacevault", "Replace in Vault…", .edit, [.command("f", shift: true, option: true)], "arrow.left.arrow.right"),
+        cmd("undoreplace", "Undo Last Replace", .edit, [], "arrow.uturn.backward"),
         cmd("searchsel", "Search Vault for Selection", .edit, [], "text.magnifyingglass"),
         cmd("spellcheck", "Toggle Spellcheck", .edit, [], "textformat.abc.dottedunderline"),
         cmd("merge", "Merge Current File With Another File…", .edit, [], "arrow.triangle.merge"),

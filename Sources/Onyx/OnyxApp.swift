@@ -314,6 +314,8 @@ struct OnyxApp: App {
             Divider()
             ShortcutMenus.button("find") { ws.openFind() }
             ShortcutMenus.button("findreplace") { ws.openFind(replace: true) }
+            ShortcutMenus.button("replacevault") { ws.openVaultReplace() }
+            ShortcutMenus.button("undoreplace", disabled: ws.replacer.lastUndo == nil) { _ = ws.undoLastVaultReplace() }
             ShortcutMenus.button("searchsel") { ws.searchSelection() }
             ShortcutMenus.button("spellcheck", title: EditorPrefs.spellcheckOn ? "Turn Spellcheck Off" : "Turn Spellcheck On") { ws.toggleSpellcheck() }
             Button("Find Next (⌘G while finding)") { ws.findStep(1) }.disabled(!ws.finder.visible)

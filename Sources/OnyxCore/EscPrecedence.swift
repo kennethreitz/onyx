@@ -13,7 +13,7 @@ public enum EscAction: String, Equatable, Sendable {
     case cancelInlineRename
     /// The in-note find bar is open.
     case closeFind
-    /// Quick switcher, command palette, graph/atlas overlay, sync log, or move-to picker.
+    /// Quick switcher, command palette, graph/atlas overlay, sync log, find and replace, or move-to picker.
     case dismissOverlay
     /// A multi-selection in the file tree.
     case clearTreeSelection

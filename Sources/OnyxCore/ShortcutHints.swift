@@ -67,6 +67,8 @@ public enum ShortcutHints {
             var cap = "Find in note"
             let replace = store.display(for: "findreplace")
             if !replace.isEmpty { cap += " · " + replace + " replace" }
+            let vault = store.display(for: "replacevault")
+            if !vault.isEmpty { cap += " · " + vault + " replace in the vault" }
             cap += " · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"
             rows.append((findKey, cap))
         }

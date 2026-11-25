@@ -7,6 +7,7 @@
 | <kbd>⇧⌘O</kbd> | Open vault… |
 | <kbd>⌘K</kbd> | Show or hide the sidebar (always docked; opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
+| <kbd>⌥⇧⌘F</kbd> | Replace in the vault: preview matches, replace selected or all, undo the last replace |
 | <kbd>⌘I</kbd> | Toggle italic (`*…*`, or unwrap `*` / `_`). With no selection, inserts `**` with the caret in between |
 | <kbd>⌥⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline (this note, folder, linked & partOf, or whole vault) · backlinks · properties |
