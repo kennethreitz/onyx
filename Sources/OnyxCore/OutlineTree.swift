@@ -117,14 +117,16 @@ public enum OutlineTree {
 
     /// Nest a flat heading list. A later, shallower heading becomes a new root; skipped
     /// levels (a `####` under a `#`) still nest under the nearest higher heading.
-    public static func nestHeadings(_ headings: [Heading], path: String) -> [OutlineNode] {
+    /// `startIndex` is this slice's index in the note's full heading list (so a leading
+    /// H1 used as the title row does not renumber the body headings).
+    public static func nestHeadings(_ headings: [Heading], path: String, startIndex: Int = 0) -> [OutlineNode] {
         var i = 0
         func take(minLevel: Int) -> [OutlineNode] {
             var out: [OutlineNode] = []
             while i < headings.count {
                 let h = headings[i]
                 if h.level < minLevel { break }
-                let idx = i
+                let idx = startIndex + i
                 i += 1
                 let kids = take(minLevel: h.level + 1)
                 out.append(OutlineNode(
@@ -139,6 +141,12 @@ public enum OutlineTree {
         return take(minLevel: 1)
     }
 
+    /// Headings under the title row, numbered as in the full list (`activeId` and `scrollToHeading`).
+    public static func nestBody(of headings: [Heading], path: String) -> [OutlineNode] {
+        let start = headings.first?.level == 1 ? 1 : 0
+        return nestHeadings(bodyHeadings(headings), path: path, startIndex: start)
+    }
+
     public static func headings(for path: String, currentPath: String?, currentText: String?, in snap: VaultSnapshot) -> [Heading] {
         if path == currentPath, let currentText { return NoteParser.parseHeadings(currentText) }
         return snap.notes[path]?.summary.headings ?? []
@@ -149,7 +157,7 @@ public enum OutlineTree {
     public static func headingChildren(of n: OutlineNode, headings: (String) -> [Heading]) -> [OutlineNode] {
         var c = n.children
         if n.loadsHeadings, let path = n.path {
-            c = nestHeadings(bodyHeadings(headings(path)), path: path) + c
+            c = nestBody(of: headings(path), path: path) + c
         }
         return c
     }
@@ -165,7 +173,7 @@ public enum OutlineTree {
             return [OutlineNode(
                 id: noteId(path), kind: .note, title: lead.title, path: path,
                 headingIndex: lead.usedH1 ? 0 : nil, headingLine: lead.heading?.line,
-                children: nestHeadings(bodyHeadings(hs), path: path), loadsHeadings: false
+                children: nestBody(of: hs, path: path), loadsHeadings: false
             )]
         case .folder:
             return folderTree(of: currentPath, currentText: currentText, in: snapshot)

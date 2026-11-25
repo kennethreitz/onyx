@@ -251,8 +251,19 @@
     return bottom;
   }
   function outlineOffset() { return cssChromeInset() + OUTLINE_GAP + stickyHeaderHeight(); }
+  // Outline headings only: the same set NoteParser.parseHeadings walks (no embeds,
+  // callouts, blockquotes, fallback title, footnotes, or kanban). Click and spy
+  // use this list's order so headingIndex matches.
+  function isOutlineHeading(h) {
+    return !h.classList.contains('fallback-title')
+      && !h.closest('.markdown-embed')
+      && !h.closest('.callout')
+      && !h.closest('blockquote')
+      && !h.closest('.footnotes')
+      && !h.closest('.kanban');
+  }
   function headingEls() {
-    return [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
+    return [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(isOutlineHeading);
   }
   // Last heading whose border-box top is at or above offset+1 (1px hysteresis).
   // `items` is [{top, line}, ...] in document order. Returns 0 when none have reached the line (title).
@@ -1338,6 +1349,7 @@
     _activeOutlineLine: activeOutlineLine,
     _headingScrollY: headingScrollY,
     _outlineOffset: outlineOffset,
+    _isOutlineHeading: isOutlineHeading,
   };
 
   // The native graph card is shared with inspector links. Swift owns the 400 ms delay.

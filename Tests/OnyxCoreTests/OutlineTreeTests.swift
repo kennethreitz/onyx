@@ -147,7 +147,7 @@ final class OutlineTreeTests: XCTestCase {
         XCTAssertEqual(open.first { $0.id == one }?.title, "One")  // leading H1 is the note title
         // Two's headings stay unloaded
         XCTAssertFalse(open.contains { $0.title == "B" && $0.kind == .heading })
-        let body = OutlineTree.nestHeadings(OutlineTree.bodyHeadings(hs("A/One.md")), path: "A/One.md")
+        let body = OutlineTree.nestBody(of: hs("A/One.md"), path: "A/One.md")
         let folded = OutlineTree.flatten(roots, expanded: [folderA, one], headings: hs,
                                          collapsedHeadings: [body[0].id])
         XCTAssertEqual(folded.filter { $0.kind == .heading }.map(\.title), ["A"])
@@ -333,7 +333,7 @@ final class OutlineTreeTests: XCTestCase {
         let roots = OutlineTree.build(scope: .vault, currentPath: "F00/N00.md", snapshot: snap)
         let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
         let ids = OutlineTree.reveal("F00/N00.md", in: roots, headings: hs)
-        let a = OutlineTree.nestHeadings(OutlineTree.bodyHeadings(hs("F00/N00.md")), path: "F00/N00.md")[0]
+        let a = OutlineTree.nestBody(of: hs("F00/N00.md"), path: "F00/N00.md")[0]
         let followed = OutlineTree.follow(
             activeId: a.id, roots: roots, headings: hs,
             expanded: ids, heldOpen: [], entered: []
@@ -374,5 +374,86 @@ final class OutlineTreeTests: XCTestCase {
         }
         nodes.forEach(walk)
         return out
+    }
+
+    /// Scroll-spy reports a source line; the highlighted row must be the last heading
+    /// whose line is at or above that position, using the same ids as the tree (so a
+    /// leading H1 used as the title does not shift body heading indices). Selecting a
+    /// row is a pure lookup — it does not scroll the document.
+    func testScrollSpyHighlightsTheHeadingAtTheLandingLineAcrossALongNote() {
+        var parts: [String] = ["# Home", "", "Intro under the title.", ""]
+        let names = ["The Proprietor", "Morning", "Afternoon", "Evening",
+                     "The Garden", "The Library", "Guests", "Coda"]
+        for (i, name) in names.enumerated() {
+            parts.append(i == 5 ? "# \(name)" : "## \(name)")
+            parts.append("")
+            for p in 1...8 { parts.append("Paragraph \(p) under \(name).") }
+            parts.append("")
+        }
+        parts.append("Closing lines after the last heading.")
+        let text = parts.joined(separator: "\n")
+        let hs = NoteParser.parseHeadings(text)
+        XCTAssertEqual(hs.first?.text, "Home")
+        XCTAssertEqual(hs.first?.level, 1)
+        XCTAssertEqual(hs.count, 1 + names.count)
+
+        let snap = snapshot(["Home.md": text])
+        let roots = OutlineTree.build(scope: .note, currentPath: "Home.md", currentText: text, snapshot: snap)
+        let rows = OutlineTree.flatten(roots, expanded: [roots[0].id], headings: { _ in hs })
+        let byId = Dictionary(uniqueKeysWithValues: rows.map { ($0.id, $0) })
+
+        // Body rows are numbered in the full heading list, not from zero after dropping the H1.
+        XCTAssertEqual(rows[0].id, OutlineTree.noteId("Home.md"))
+        XCTAssertEqual(rows[0].headingIndex, 0)
+        let proprietor = rows.first { $0.title == "The Proprietor" }!
+        XCTAssertEqual(proprietor.headingIndex, 1)
+        XCTAssertEqual(proprietor.id, OutlineTree.headingId("Home.md", index: 1, line: proprietor.headingLine!))
+        let library = rows.first { $0.title == "The Library" }!  // later H1, still a child of the title
+        XCTAssertEqual(library.headingIndex, 6)
+        for row in rows where row.kind == .heading {
+            let i = hs.firstIndex { $0.line == row.headingLine }
+            XCTAssertEqual(row.headingIndex, i)
+            XCTAssertEqual(row.id, OutlineTree.headingId("Home.md", index: i!, line: row.headingLine!))
+        }
+
+        let lastLine = (hs.last?.line ?? 0) + 4
+        var seen: [String] = []
+        for line in 0...lastLine {
+            let id = OutlineTree.activeId(path: "Home.md", line: Double(line), headings: hs)
+            XCTAssertNotNil(id, "line \(line)")
+            XCTAssertNotNil(byId[id!], "line \(line) highlighted \(id!) which is not a visible outline row")
+            if let i = OutlineTree.headingIndex(at: Double(line), in: hs) {
+                let expected = (i == 0 && hs[0].level == 1)
+                    ? OutlineTree.noteId("Home.md")
+                    : OutlineTree.headingId("Home.md", index: i, line: hs[i].line)
+                XCTAssertEqual(id, expected, "line \(line)")
+            } else {
+                XCTAssertEqual(id, OutlineTree.noteId("Home.md"))
+            }
+            if seen.last != id { seen.append(id!) }
+        }
+        // Walking the file should light up the title, then each heading in order, never a neighbour by mistake.
+        XCTAssertEqual(seen.first, OutlineTree.noteId("Home.md"))
+        XCTAssertEqual(seen.dropFirst().map { byId[$0]!.title }, names)
+
+        // Same mapping in a wider scope (the other outline tab shares this model).
+        let vault = OutlineTree.build(scope: .vault, currentPath: "Home.md", currentText: text, snapshot: snap)
+        let noteId = OutlineTree.noteId("Home.md")
+        let vaultRows = OutlineTree.flatten(vault, expanded: [noteId], headings: { _ in hs })
+        let atGarden = Double(rows.first { $0.title == "The Garden" }!.headingLine!)
+        let active = OutlineTree.activeId(path: "Home.md", line: atGarden + 1, headings: hs)
+        XCTAssertEqual(active, vaultRows.first { $0.title == "The Garden" }?.id)
+        XCTAssertEqual(active, rows.first { $0.title == "The Garden" }?.id)
+
+        // No leading H1: the first heading keeps index 0 and is a child of the file-name row.
+        let noH1 = "## Alpha\ntext\n## Beta\nmore\n"
+        let hs2 = NoteParser.parseHeadings(noH1)
+        let snap2 = snapshot(["Y.md": noH1])
+        let roots2 = OutlineTree.build(scope: .note, currentPath: "Y.md", currentText: noH1, snapshot: snap2)
+        XCTAssertEqual(roots2[0].children[0].headingIndex, 0)
+        XCTAssertEqual(OutlineTree.activeId(path: "Y.md", line: 0, headings: hs2),
+                       OutlineTree.headingId("Y.md", index: 0, line: 0))
+        XCTAssertEqual(OutlineTree.activeId(path: "Y.md", line: 2, headings: hs2),
+                       roots2[0].children[1].id)
     }
 }
