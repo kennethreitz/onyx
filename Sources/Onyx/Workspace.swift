@@ -78,6 +78,10 @@ final class Workspace {
     var sidebarPinned = true
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
+    /// Temporary shortcut sheet from holding ⌘; not persisted, unlike `showHints`.
+    var holdHints = false
+    @ObservationIgnored var commandHold = CommandHold()
+    @ObservationIgnored private var commandHoldTimer: DispatchWorkItem?
     var sidebarTab: SidebarTab = .files
     // Split panes. Empty = one pane. The focused pane's note lives in currentPath/text/mode;
     // the others keep their own path, text and mode until focused (swap model).
@@ -1454,6 +1458,19 @@ final class Workspace {
     func handleEscape(eventWindow: NSWindow?) -> Bool {
         let action = EscPrecedence.action(escapeSituation(eventWindow: eventWindow))
         switch action {
+        case .passToSheet, .passToIME, .dismissSuggestions:
+            return false
+        default:
+            break
+        }
+        // Holding ⌘ may still be pending: cancel the timer, but only consume Esc
+        // if the hint sheet is actually visible.
+        if holdHints || commandHold.phase == .showing {
+            applyCommandHold(.escape)
+            return true
+        }
+        if commandHold.phase == .pending { applyCommandHold(.cancel) }
+        switch action {
         case .passToSheet, .passToIME, .dismissSuggestions, .none:
             return false
         case .closeFind:
@@ -1552,6 +1569,62 @@ final class Workspace {
     }
 
     func dismissHints() { withAnimation(.easeOut(duration: 0.2)) { showHints = false }; UserDefaults.standard.set(true, forKey: "onyx.hintsDismissed") }
+    /// Close the hint sheet without necessarily marking first-run hints as seen.
+    func dismissHintSheet() {
+        if showHints { dismissHints() }
+        if holdHints || commandHold.phase != .idle { applyCommandHold(.escape) }
+    }
+
+    /// Whether holding ⌘ should be allowed to start (or finish) showing the hint sheet.
+    func isCommandHoldEligible(eventWindow: NSWindow? = nil) -> Bool {
+        guard Prefs.commandHoldHintsEnabled else { return false }
+        if NSApp.modalWindow != nil { return false }
+        if MainWindow.current?.attachedSheet != nil { return false }
+        if let w = eventWindow, !MainWindow.isVaultWindow(w) { return false }
+        guard let key = NSApp.keyWindow, MainWindow.isVaultWindow(key) else { return false }
+        if let tv = key.firstResponder as? NSTextView, tv.hasMarkedText() { return false }
+        return true
+    }
+
+    func handleCommandHoldFlags(_ event: NSEvent) {
+        let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        let ev = CommandHold.flagsEvent(
+            command: mods.contains(.command),
+            shift: mods.contains(.shift),
+            option: mods.contains(.option),
+            control: mods.contains(.control)
+        )
+        if ev == .commandAlone, !isCommandHoldEligible(eventWindow: event.window) { return }
+        applyCommandHold(ev)
+    }
+
+    func applyCommandHold(_ event: CommandHold.Event) {
+        switch commandHold.handle(event) {
+        case .none:
+            break
+        case .startTimer:
+            commandHoldTimer?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                self?.applyCommandHold(.timerFired)
+            }
+            commandHoldTimer = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + CommandHold.duration, execute: work)
+        case .stopTimer:
+            commandHoldTimer?.cancel()
+            commandHoldTimer = nil
+        case .show:
+            commandHoldTimer = nil
+            if !isCommandHoldEligible() {
+                applyCommandHold(.cancel)
+                return
+            }
+            withAnimation(.easeIn(duration: 0.2)) { holdHints = true }
+        case .hide:
+            commandHoldTimer?.cancel()
+            commandHoldTimer = nil
+            withAnimation(.easeOut(duration: 0.2)) { holdHints = false }
+        }
+    }
     func toggleWorkspaceLayout() {
         withAnimation(Motion.layout) {
             let on = !(sidebarVisible && inspectorPinned && inspectorVisible)

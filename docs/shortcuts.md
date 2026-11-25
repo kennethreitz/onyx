@@ -43,7 +43,7 @@ Open Random Note is in the command palette and the Go menu; it has no default sh
 
 Read Aloud, Pause/Resume Reading, and Stop Reading are in the command palette and the Note menu; they have no default shortcut. Voice and Rate are in Settings ▸ Reading. Record Audio (Stop Recording while recording) is there too, also without a default shortcut.
 
-Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back.
+Every command is also in the menu bar with its shortcut; the full list is in [Commands](commands.md). The first-run hint sheet lists the everyday ones; Note ▸ Show Shortcut Hints brings it back. Holding ⌘ by itself for two seconds shows the same sheet (the keys follow your current Settings ▸ Shortcuts bindings); releasing ⌘ fades it away. A click, another key, or Esc dismisses it, or cancels the hold if the sheet has not appeared yet. It does not fire during IME composition or while a modal or sheet is up. Turn this off in Settings ▸ Shortcuts.
 
 Customize any of these in Settings ▸ Shortcuts. Click a shortcut to record a new combination, or use Clear and Reset on that row. Reset All restores the defaults. If the combination is already used, or is reserved by the system (⌘Q for Quit, for example), Onyx warns you before it assigns it. The menu bar and the command palette follow the live bindings. Standard editing keys such as ⌘C, ⌘V, ⌘Z, ⌘⌫ (delete to the start of the line), and ⌥⌫ (delete the previous word) stay with the editor and are not rebound here.
 

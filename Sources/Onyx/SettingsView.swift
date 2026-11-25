@@ -11,9 +11,11 @@ enum Prefs {
     static let startFocus = "onyx.startFocus"
     static let sidenotes = "onyx.sidenotes"
     static let escToReading = "onyx.escToReading"  // Esc in the editor returns to reading; default on
+    static let commandHoldHints = "onyx.commandHoldHints"  // hold ⌘ to show the hint sheet; default on
 
     static var editorPoints: CGFloat { CGFloat(UserDefaults.standard.object(forKey: editorSize) as? Double ?? 14) }
     static var escReturnsToReading: Bool { UserDefaults.standard.object(forKey: escToReading) as? Bool ?? true }
+    static var commandHoldHintsEnabled: Bool { UserDefaults.standard.object(forKey: commandHoldHints) as? Bool ?? true }
     static var measureRem: CGFloat { CGFloat(UserDefaults.standard.object(forKey: measure) as? Double ?? 41) }
     /// The editor's 760px measure corresponds to the reader's 41rem; keep them in proportion.
     static var editorMeasure: CGFloat { (measureRem / 41 * 760).rounded() }

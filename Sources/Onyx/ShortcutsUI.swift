@@ -89,6 +89,7 @@ enum ShortcutMenus {
 // MARK: Settings ▸ Shortcuts
 
 struct ShortcutsSettingsPage: View {
+    @AppStorage(Prefs.commandHoldHints) private var commandHoldHints = true
     @State private var revision = 0
     @State private var recording: String?
     @State private var monitor: Any?
@@ -112,6 +113,11 @@ struct ShortcutsSettingsPage: View {
     var body: some View {
         VStack(spacing: 0) {
             Form {
+                Section {
+                    Toggle("Hold ⌘ to show shortcut hints", isOn: $commandHoldHints)
+                    Text("Hold the Command key alone for two seconds to see the same hint sheet as the first launch. Releasing ⌘ hides it.")
+                        .font(.system(size: 11)).foregroundStyle(Color.faint)
+                }
                 Section {
                     Text("Click a shortcut to change it. Clear removes it; Reset restores the default. Standard editing keys such as ⌘C stay with the editor.")
                         .font(.system(size: 11)).foregroundStyle(Color.faint)

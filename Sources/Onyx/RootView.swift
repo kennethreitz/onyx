@@ -16,6 +16,7 @@ struct RootView: View {
     @State private var footerHover = false
     @State private var showLights = false
     @State private var keyMonitor: Any?
+    @State private var flagsMonitor: Any?
     @State private var moveMonitor: Any?
     @State private var clickMonitor: Any?
     @State private var navMonitor: Any?
@@ -54,7 +55,7 @@ struct RootView: View {
                     toastLayer
                 }
                 panels
-                if ws.showHints && !ws.focusMode && ws.overlay == .none { hints.padding(.trailing, rightInset) }
+                if ws.overlay == .none && ((ws.showHints && !ws.focusMode) || ws.holdHints) { hints.padding(.trailing, rightInset) }
                 overlays
             }
         }
@@ -68,10 +69,11 @@ struct RootView: View {
         }
         .background(WindowConfigurator(showLights: !ws.focusMode || showLights || ws.anyChrome || ws.root == nil))
         .onAppear(perform: installMonitors)
-        .onDisappear { [keyMonitor, moveMonitor, clickMonitor, navMonitor] in
+        .onDisappear { [keyMonitor, flagsMonitor, moveMonitor, clickMonitor, navMonitor] in
             if let navMonitor { NSEvent.removeMonitor(navMonitor) }
             if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
             if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+            if let flagsMonitor { NSEvent.removeMonitor(flagsMonitor) }
             if let moveMonitor { NSEvent.removeMonitor(moveMonitor) }
         }
     }
@@ -231,12 +233,12 @@ struct RootView: View {
                     HStack {
                         Text("Onyx, in a few keys").font(Theme.serif(15, bold: true)).foregroundStyle(Color.ink)
                         Spacer()
-                        Button { ws.dismissHints() } label: { Image(systemName: "xmark").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Color.faint) }.buttonStyle(.plain)
+                        Button { ws.dismissHintSheet() } label: { Image(systemName: "xmark").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Color.faint) }.buttonStyle(.plain)
                     }
-                    ForEach(ShortcutHints.all, id: \.0) { k, v in
+                    ForEach(Array(ShortcutHints.all().enumerated()), id: \.offset) { item in
                         HStack(alignment: .firstTextBaseline, spacing: 10) {
-                            Keycaps(keys: k).frame(width: 84, alignment: .trailing)
-                            Text(v).font(.system(size: TypeScale.small)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
+                            Keycaps(keys: item.element.0).frame(width: 84, alignment: .trailing)
+                            Text(item.element.1).font(.system(size: TypeScale.small)).foregroundStyle(Color.muted).fixedSize(horizontal: false, vertical: true)
                         }
                     }
                     Text("Every command is in the menu bar, too.").font(.system(size: 10.5)).foregroundStyle(Color.faint).padding(.top, 2)
@@ -246,7 +248,7 @@ struct RootView: View {
                 .padding(.trailing, 16).padding(.bottom, 42)
             }
         }
-        .transition(Motion.slide(.bottom))
+        .transition(.asymmetric(insertion: Motion.slide(.bottom), removal: .opacity))
     }
 
     // MARK: Page
@@ -259,10 +261,10 @@ struct RootView: View {
                     Text(ws.isIndexing ? "Reading your vault…" : "Nothing open.").font(Theme.serif(19, italic: true)).foregroundStyle(Color.muted)
                     if !ws.isIndexing {
                         VStack(alignment: .leading, spacing: 6) {
-                            ForEach(ShortcutHints.all, id: \.0) { k, v in
+                            ForEach(Array(ShortcutHints.all().enumerated()), id: \.offset) { item in
                                 HStack(alignment: .firstTextBaseline, spacing: 12) {
-                                    Keycaps(keys: k, size: 11).frame(width: 92, alignment: .trailing)
-                                    Text(v).font(.system(size: 12)).foregroundStyle(Color.muted)
+                                    Keycaps(keys: item.element.0, size: 11).frame(width: 92, alignment: .trailing)
+                                    Text(item.element.1).font(.system(size: 12)).foregroundStyle(Color.muted)
                                 }
                             }
                         }
@@ -537,7 +539,12 @@ struct RootView: View {
     }
 
     func installMonitors() {
+        flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { e in
+            ws.handleCommandHoldFlags(e)
+            return e
+        }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { e in
+            if e.keyCode != 53 { ws.applyCommandHold(.cancel) }
             if ProcessInfo.processInfo.environment["ONYX_DEBUG_KEYS"] != nil {
                 let key = e.charactersIgnoringModifiers ?? "?"
                 let fr = String(describing: type(of: NSApp.keyWindow?.firstResponder ?? NSObject()))
@@ -621,6 +628,7 @@ struct RootView: View {
         // Back/forward: mouse buttons 4/5, three-finger swipe ("swipe between pages"), and a
         // two-finger horizontal swipe when the system setting allows it.
         navMonitor = NSEvent.addLocalMonitorForEvents(matching: [.otherMouseDown, .swipe, .scrollWheel]) { e in
+            if e.type == .otherMouseDown { ws.applyCommandHold(.cancel) }
             guard e.window != nil, e.window === MainWindow.current else { return e }
             switch e.type {
             case .otherMouseDown:
@@ -648,6 +656,7 @@ struct RootView: View {
             return e
         }
         clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { e in
+            ws.applyCommandHold(.cancel)
             // any click clears "tree focus"; a tree row's own tap sets it again right after
             if e.type == .leftMouseDown { ws.treeFocused = false }
             // a click in an unfocused pane focuses it first, then the click lands as usual
@@ -687,14 +696,6 @@ struct FooterButton: View {
         }
         .buttonStyle(.plain).help(help).onHover { hover = $0 }
     }
-}
-
-enum ShortcutHints {
-    static let all: [(String, String)] = [
-        ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
-        ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌥⌘I", "Inspector: outline, backlinks, properties"), ("⌘B  ⌘I", "Bold · italic"),
-        ("⌘G", "Focus graph overlay · click or ⌘G again to close · ⇧⌘G atlas · double-click a folder to fill the view · Esc fits all, then closes · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete to the start of the line · in the sidebar, delete the selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
-    ]
 }
 
 /// The window hosting the workspace (not Settings, not a panel), for window-scoped shortcuts.
