@@ -499,16 +499,26 @@
     if (!nodes.length || !window.mermaid) return;
     const cs = getComputedStyle(document.body);
     const bg = cs.getPropertyValue('--background-primary').trim(), ink = cs.getPropertyValue('--text-normal').trim();
+    // useMaxWidth: false keeps the SVG at its natural size so a wide diagram
+    // can use the pane bleed and scroll, instead of shrinking to the measure.
     mermaid.initialize({
-      startOnLoad: false, theme: 'base', securityLevel: 'strict',
+      startOnLoad: false, theme: 'base', securityLevel: 'strict', useMaxWidth: false,
       fontFamily: 'Latin Modern Roman, Georgia, serif',
-      htmlLabels: false, markdownAutoWrap: false, flowchart: { curve: 'linear', htmlLabels: false, padding: 12, wrappingWidth: 600 },
+      htmlLabels: false, markdownAutoWrap: false, flowchart: { curve: 'linear', htmlLabels: false, padding: 12, wrappingWidth: 600, useMaxWidth: false },
       themeVariables: { background: bg, primaryColor: bg, primaryTextColor: ink, primaryBorderColor: ink, lineColor: ink,
         secondaryColor: bg, tertiaryColor: bg, mainBkg: bg, nodeBorder: ink, clusterBkg: bg, clusterBorder: ink, edgeLabelBackground: bg,
         fontFamily: 'Latin Modern Roman, Georgia, serif', fontSize: '15px' }
     });
     try { await document.fonts.load('15px "Latin Modern Roman"'); await document.fonts.ready; } catch (e) { }
     try { await mermaid.run({ nodes, suppressErrors: true }); } catch (e) { }
+    nodes.forEach(n => {
+      const svg = n.querySelector && n.querySelector('svg');
+      if (!svg) return;
+      if (svg.getAttribute('width') === '100%') {
+        const m = (svg.getAttribute('style') || '').match(/max-width:\s*([\d.]+)px/);
+        if (m) { svg.setAttribute('width', m[1]); svg.style.maxWidth = ''; }
+      }
+    });
     scheduleNotes();
   }
 

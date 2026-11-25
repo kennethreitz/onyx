@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Wide tables in the reader no longer crush a column to a single character or wrap dates at the hyphen. Each wrapping column keeps a minimum of 8em and wraps on words (including long wikilink titles); dates, numbers, and other short unbreakable cells stay on one line. When a table still cannot fit the measure, it may use a little of the pane on either side and scrolls horizontally inside its own container rather than overflowing or clipping. Booktabs rules and Latin Modern are unchanged. The editor is source Markdown, so this is the reader (and hover previews that use it).
+- Mermaid diagrams get the same extra room: a figure wider than the measure may use up to 8rem of the pane on each side (with a 1.2rem gutter at the edge), stays at its natural size (small ones are not upscaled or centered-and-stretched), and scrolls horizontally if it still cannot fit, instead of shrinking until the labels are tiny.
 
 ## [0.1.15] - 2026-11-25
 
