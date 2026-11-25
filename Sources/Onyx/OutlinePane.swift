@@ -60,7 +60,7 @@ struct OutlinePane: View {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(rows) { row in
-                            OutlineRowView(row: row, active: row.id == activeId, hovering: hover == row.id,
+                            OutlineRowView(ws: ws, row: row, active: row.id == activeId, hovering: hover == row.id,
                                            expanded: row.kind == .heading ? !ws.outlineCollapsed.contains(row.id) : ws.outlineExpanded.contains(row.id),
                                            onHover: { hover = $0 ? row.id : (hover == row.id ? nil : hover) },
                                            onToggle: { toggle(row) },
@@ -148,6 +148,7 @@ struct OutlinePane: View {
 }
 
 private struct OutlineRowView: View {
+    var ws: Workspace
     let row: OutlineRow
     var active: Bool
     var hovering: Bool
@@ -206,6 +207,19 @@ private struct OutlineRowView: View {
         .contentShape(Rectangle())
         .onTapGesture(perform: onOpen)
         .onHover(perform: onHover)
+        .contextMenu { bookmarkMenu }
         .help(row.kind == .heading ? "Jump to this heading" : (row.path != nil ? "Open this note" : "Expand"))
+    }
+
+    @ViewBuilder var bookmarkMenu: some View {
+        if row.kind == .heading, let path = row.path {
+            Button(ws.isBookmarked(path, subpath: row.title) ? "Remove Bookmark" : "Bookmark this heading") {
+                ws.toggleBookmark(path: path, isFolder: false, subpath: row.title)
+            }
+        } else if row.kind == .note, let path = row.path {
+            Button(ws.isBookmarked(path) ? "Remove Bookmark" : "Bookmark") {
+                ws.toggleBookmark(path: path, isFolder: false)
+            }
+        }
     }
 }

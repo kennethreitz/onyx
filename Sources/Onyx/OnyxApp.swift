@@ -333,7 +333,7 @@ struct OnyxApp: App {
             }
         }
         CommandMenu("Note") {
-            ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.bookmarks.contains($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
+            ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.isBookmarked($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
             ShortcutMenus.button("copy") { ws.copyWikilink() }
             ShortcutMenus.button("finder") { ws.revealInFinder() }
             ShortcutMenus.button("obsidian") { ws.openInObsidian() }

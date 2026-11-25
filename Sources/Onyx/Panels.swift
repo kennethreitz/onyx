@@ -273,6 +273,7 @@ struct FileTreeView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0) {
+                    BookmarksSection(ws: ws)
                     if let tree = ws.snapshot?.tree {
                         ForEach(ws.treeChildren(tree)) { node in TreeNodeView(ws: ws, node: node, depth: 0) }
                     } else {
@@ -515,6 +516,9 @@ struct FileMenu: View {
             Button("Open") { ws.openNote(note) }
             Button("Open in Split") { ws.split(.vertical); ws.openNote(note) }
         }
+        Button(ws.isBookmarked(path, isFolder: isFolder) ? "Remove Bookmark" : "Bookmark") {
+            ws.toggleBookmark(path: path, isFolder: isFolder)
+        }
         if isFolder {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
             if folderNote == nil, FolderIndex.notePath(forFolder: path) != nil {
@@ -543,6 +547,10 @@ struct SelectionMenu: View {
     var paths: [String]
     var body: some View {
         Button("Open") {}.disabled(true)
+        Button(selectionAllBookmarked(paths) ? "Remove Bookmarks" : "Bookmark \(paths.count) Items") {
+            let pinned = !selectionAllBookmarked(paths)
+            ws.setBookmarked(paths.map { ($0, ws.snapshot?.folders.contains($0) == true) }, pinned: pinned)
+        }
         Button("Export Selection as PDF…") { NoteBookPrinter.run(paths, ws: ws) }
         Divider()
         Button("Rename…") {}.disabled(true)
@@ -554,6 +562,10 @@ struct SelectionMenu: View {
         Button("Open in Obsidian") {}.disabled(true)
         Divider()
         Button("Delete \(paths.count) Items…", role: .destructive) { DispatchQueue.main.async { ws.confirmTrash(paths) } }
+    }
+
+    func selectionAllBookmarked(_ paths: [String]) -> Bool {
+        paths.allSatisfy { ws.isBookmarked($0, isFolder: ws.snapshot?.folders.contains($0) == true) }
     }
 }
 
@@ -677,11 +689,18 @@ struct BookmarksPanel: View {
     @Bindable var ws: Workspace
     var body: some View {
         VStack(spacing: 0) {
-            PathList(ws: ws, paths: ws.bookmarks, empty: "No bookmarks yet.", hint: "Bookmark a note from the button below or the command palette.")
+            if ws.bookmarkStore.items.isEmpty {
+                QuietEmpty(title: "No bookmarks yet.", hint: "Bookmark a note from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+            } else {
+                ScrollView {
+                    BookmarksList(ws: ws, items: ws.bookmarkStore.items, parent: nil, depth: 0)
+                    BookmarksAppendTarget(ws: ws, parent: nil)
+                }.padding(.vertical, 6).thinScrollers()
+            }
             if let p = ws.currentPath {
                 Divider().overlay(Color.hairline)
                 Button { ws.toggleBookmark() } label: {
-                    Label(ws.bookmarks.contains(p) ? "Remove bookmark" : "Bookmark this note", systemImage: ws.bookmarks.contains(p) ? "bookmark.slash" : "bookmark")
+                    Label(ws.isBookmarked(p) ? "Remove bookmark" : "Bookmark this note", systemImage: ws.isBookmarked(p) ? "bookmark.slash" : "bookmark")
                         .font(.system(size: 11.5)).frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(.plain).foregroundStyle(Color.muted).padding(10)
             }

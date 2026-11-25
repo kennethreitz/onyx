@@ -223,8 +223,8 @@ horizontal swipe when the system setting allows it (outside overlays). The title
 ## Deleting and the file menu
 
 Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
-New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
-Delete…. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
+Bookmark / Remove Bookmark, New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
+Delete…. Bookmarks are also a section at the top of the file sidebar, stored in `.obsidian/bookmarks.json` and shared with Obsidian; drag to reorder. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
 always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. A new Untitled
 note is named from its first heading (or first line) when you save or leave it. Afterwards the
 note leaves every pane's history (with collapsed neighbours, so A ✕ A doesn't leave a double step),

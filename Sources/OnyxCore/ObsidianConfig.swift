@@ -1,7 +1,7 @@
 import Foundation
 
 /// Reading and writing Obsidian's per-vault config files (`.obsidian/app.json`, `daily-notes.json`,
-/// `templates.json`) without disturbing what Obsidian or Obsidian Sync put there: unknown keys keep
+/// `templates.json`, `bookmarks.json`) without disturbing what Obsidian or Obsidian Sync put there: unknown keys keep
 /// their place and their exact text, unchanged values are copied byte for byte, and new keys go at the
 /// end, in Obsidian's own `JSON.stringify(…, null, 2)` shape.
 public enum ObsidianConfig {
@@ -11,7 +11,7 @@ public enum ObsidianConfig {
     }
 
     /// The config files Onyx reads and edits, watched for outside changes (Obsidian, Sync).
-    public static let watchedFiles: Set<String> = ["app.json", "daily-notes.json", "templates.json"]
+    public static let watchedFiles: Set<String> = ["app.json", "daily-notes.json", "templates.json", "bookmarks.json"]
 
     public static func parse(_ data: Data?) -> [String: Any]? {
         guard let data, let o = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }

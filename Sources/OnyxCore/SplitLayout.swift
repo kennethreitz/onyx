@@ -1,7 +1,7 @@
 import Foundation
 
 /// Saved split for one vault: axis, ratios, and the note (or docked graph) in each pane.
-/// Stored beside the other per-vault keys (`recent`, `treeSort`, `bookmarks`).
+/// Stored beside the other per-vault keys (`recent`, `treeSort`).
 public struct SplitLayout: Codable, Equatable, Sendable {
     public enum Axis: String, Codable, Sendable { case vertical, horizontal }
 

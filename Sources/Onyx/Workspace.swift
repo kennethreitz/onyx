@@ -79,7 +79,11 @@ final class Workspace {
     private(set) var scrollRequest: ScrollRequest? = nil
     @ObservationIgnored private var navigating = false
     var recent: [String] = []
-    var bookmarks: [String] = []
+    var bookmarkStore = BookmarkStore()
+    /// Whether the Bookmarks section at the top of the file tree is expanded.
+    var bookmarksExpanded = true
+    /// Last bytes we wrote or loaded, so our own save doesn't stomp in-memory IDs.
+    @ObservationIgnored private var bookmarksFingerprint: Data?
     /// The open note was typed in since it was opened or last linted (lint on save).
     @ObservationIgnored var editedSinceLint = false
     var conflict: String? = nil          // disk content that differs from both buffer and last save
@@ -225,7 +229,8 @@ final class Workspace {
         loadObsidianSettings()
         recent = UserDefaults.standard.stringArray(forKey: key("recent")) ?? obsidianRecent()
         loadTreeOrder()
-        bookmarks = UserDefaults.standard.stringArray(forKey: key("bookmarks")) ?? obsidianBookmarks()
+        loadBookmarks(migrateDefaults: true)
+        bookmarksExpanded = UserDefaults.standard.object(forKey: key("bookmarksExpanded")) as? Bool ?? true
         isIndexing = true
         let root = self.root!
         let ignore = obsidianIgnore()
@@ -310,7 +315,66 @@ final class Workspace {
     /// Obsidian (or Sync) changed a config file under `.obsidian`: pick up the new values.
     func obsidianConfigChanged(_ files: [String]) {
         if files.contains("daily-notes.json") { loadDailySettings() }
+        if files.contains("bookmarks.json") { loadBookmarks() }
         obsidianConfigRevision += 1
+    }
+
+    private func bookmarksURL() -> URL? {
+        root?.appendingPathComponent(".obsidian/bookmarks.json")
+    }
+
+    /// Read `.obsidian/bookmarks.json`. When `migrateDefaults` is set, paths previously
+    /// stored only in UserDefaults are appended (once) and that key is cleared.
+    func loadBookmarks(migrateDefaults: Bool = false) {
+        let url = bookmarksURL()
+        let data = url.flatMap { try? Data(contentsOf: $0) }
+        if let data, data == bookmarksFingerprint { return }
+        guard let parsed = BookmarkStore.parse(data: data) else {
+            toast = "Couldn’t read .obsidian/bookmarks.json: it isn’t valid JSON, so Onyx left it alone."
+            return
+        }
+        var store = parsed
+        if migrateDefaults {
+            let k = key("bookmarks")
+            if let paths = UserDefaults.standard.stringArray(forKey: k) {
+                if BookmarkStore.migrate(paths: paths, into: &store, now: bookmarkNow()) {
+                    bookmarkStore = store
+                    persistBookmarks()
+                } else {
+                    bookmarkStore = store
+                    bookmarksFingerprint = data
+                }
+                UserDefaults.standard.removeObject(forKey: k)
+                return
+            }
+        }
+        bookmarkStore = store
+        bookmarksFingerprint = data
+    }
+
+    func persistBookmarks() {
+        guard let url = bookmarksURL() else { return }
+        do {
+            _ = try ObsidianConfig.update(url, changes: ["items": bookmarkStore.itemsJSON])
+        } catch {
+            toast = "Couldn’t save .obsidian/bookmarks.json: it isn’t valid JSON, so Onyx left it alone."
+            return
+        }
+        bookmarksFingerprint = try? Data(contentsOf: url)
+        obsidianConfigRevision += 1
+        git?.edited()
+        obsidianSync?.edited()
+    }
+
+    private func bookmarkNow() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+
+    func isBookmarked(_ path: String, isFolder: Bool = false, subpath: String? = nil) -> Bool {
+        isFolder ? bookmarkStore.containsFolder(path: path) : bookmarkStore.containsFile(path: path, subpath: subpath)
+    }
+
+    func setBookmarksExpanded(_ on: Bool) {
+        bookmarksExpanded = on
+        UserDefaults.standard.set(on, forKey: key("bookmarksExpanded"))
     }
 
     /// Folder a new note goes in, honoring app.json's "Default location for new notes". With no
@@ -346,10 +410,6 @@ final class Workspace {
     }
     private func obsidianIgnore() -> [String] {
         ((obsidianJSON("app.json") as? [String: Any])?["userIgnoreFilters"] as? [String]) ?? []
-    }
-    private func obsidianBookmarks() -> [String] {
-        guard let b = obsidianJSON("bookmarks.json") as? [String: Any], let items = b["items"] as? [[String: Any]] else { return [] }
-        return items.compactMap { $0["type"] as? String == "file" ? $0["path"] as? String : nil }
     }
     private func obsidianRecent() -> [String] {
         guard let r = obsidianJSON("plugins/recent-files-obsidian/data.json") as? [String: Any], let f = r["recentFiles"] as? [[String: Any]] else { return [] }
@@ -1193,7 +1253,7 @@ final class Workspace {
             for (k, v) in treeOrder.overrides where k == from || k.hasPrefix(from + "/") { o[k] = nil; o[dest + String(k.dropFirst(from.count))] = v }
             treeOrder.overrides = o
         }
-        bookmarks = bookmarks.map(remap); UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        if bookmarkStore.remapPaths(plan.fileMoves) { persistBookmarks() }
         foldStore?.remapPaths(map)   // folds follow the note
         var parent = (dest as NSString).deletingLastPathComponent
         while !parent.isEmpty { expanded.insert(parent); parent = (parent as NSString).deletingLastPathComponent }
@@ -1811,8 +1871,86 @@ final class Workspace {
     }
     func toggleBookmark() {
         guard let p = currentPath else { return }
-        if bookmarks.contains(p) { bookmarks.removeAll { $0 == p } } else { bookmarks.append(p) }
-        UserDefaults.standard.set(bookmarks, forKey: key("bookmarks"))
+        toggleBookmark(path: p, isFolder: false)
+    }
+
+    func toggleBookmark(path: String, isFolder: Bool, subpath: String? = nil) {
+        setBookmarked([(path, isFolder, subpath)], pinned: nil)
+    }
+
+    /// `pinned` nil toggles each target; otherwise set that state (skipping ones already there).
+    func setBookmarked(_ targets: [(path: String, isFolder: Bool, subpath: String?)], pinned: Bool?) {
+        var store = bookmarkStore
+        let now = bookmarkNow()
+        var changed = false
+        for t in targets {
+            let already = t.isFolder ? store.containsFolder(path: t.path) : store.containsFile(path: t.path, subpath: t.subpath)
+            if let pinned, already == pinned { continue }
+            if t.isFolder {
+                _ = store.toggleFolder(path: t.path, now: now)
+            } else {
+                _ = store.toggleFile(path: t.path, subpath: t.subpath, now: now)
+            }
+            changed = true
+        }
+        guard changed else { return }
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func setBookmarked(_ targets: [(String, Bool)], pinned: Bool) {
+        setBookmarked(targets.map { ($0.0, $0.1, nil) }, pinned: pinned)
+    }
+
+    func removeBookmark(id: UUID) {
+        var store = bookmarkStore
+        guard store.remove(id: id) != nil else { return }
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func moveBookmark(id: UUID, parent: UUID?, before beforeID: UUID?) {
+        var store = bookmarkStore
+        store.move(id: id, parent: parent, before: beforeID)
+        bookmarkStore = store
+        persistBookmarks()
+    }
+
+    func openBookmark(_ item: BookmarkItem) {
+        switch item.type {
+        case "file":
+            guard let path = item.path else { return }
+            if let heading = BookmarkSubpath.headingName(item.subpath) {
+                openNote(path, heading: heading)
+            } else if let line = item.subpath.flatMap({ sub in
+                snapshot?.notes[path].map { BookmarkSubpath.line(subpath: sub, text: $0.content, headings: $0.summary.headings) } ?? nil
+            }) {
+                openNote(path, line: line + 1)
+            } else {
+                openNote(path)
+            }
+        case "folder":
+            guard let path = item.path else { return }
+            selectedFolder = path
+            for parent in TreeReveal.ancestors(of: path) { expanded.insert(parent) }
+            expanded.insert(path)
+            revealToken += 1
+            if sidebarTab != .files { sidebarTab = .files }
+            if let fn = FolderIndex.notePath(forFolder: path), snapshot?.notes[fn] != nil {
+                openNote(fn, revealInTree: false)
+            }
+        case "search":
+            searchQuery = item.query ?? ""
+            toggleSidebar(.search)
+            focusSearch += 1
+        case "url":
+            if let raw = item.url, let url = URL(string: raw) { NSWorkspace.shared.open(url) }
+        case "graph":
+            graphAtlas = true
+            if overlay != .graph { show(.graph) }
+        default:
+            break
+        }
     }
 
     // MARK: Read aloud
