@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.15] - 2026-11-25
+
 ### Changed
 - ⌘I in the editor (and from the Format menu / command palette) toggles italic: a selection is wrapped in `*…*`, or unwrapped if it is already wrapped in `*` or `_`. With no selection, it inserts `**` with the caret in between; a second press inside an empty pair removes it. ⌘B already toggled bold the same way (`**` / `__`) and still does; both are one undo step and are not intercepted during IME composition. The inspector moved to ⌥⌘I (the macOS Inspector convention), which still works while the editor has focus.
 
@@ -246,7 +248,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.14...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.15...HEAD
+[0.1.15]: https://github.com/kennethreitz/onyx/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/kennethreitz/onyx/compare/v0.1.13...v0.1.14
 [0.1.13]: https://github.com/kennethreitz/onyx/compare/v0.1.12...v0.1.13
 [0.1.12]: https://github.com/kennethreitz/onyx/compare/v0.1.11...v0.1.12
