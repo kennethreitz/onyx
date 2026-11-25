@@ -5,8 +5,8 @@ import OnyxCore
 /// Web clipper: File ▸ Clip Web Page… (a URL), the `onyx://clip` URL scheme (the bookmarklet,
 /// Shortcuts, scripts). A bare URL is loaded in an offscreen, cookie-less web view and reduced to
 /// its article with Mozilla's Readability.js; a selection sent by the bookmarklet is used as is.
-/// Either way the HTML becomes Markdown (HTMLToMarkdown), images are downloaded into the
-/// attachment folder, and the note lands in the Clippings folder. See docs/web-clipper.md.
+/// Either way the HTML becomes Markdown (HTMLToMarkdown) with images hotlinked to the web
+/// (nothing is downloaded), and the note lands in the Clippings folder. See docs/web-clipper.md.
 @MainActor final class WebClipper {
     static let shared = WebClipper()
     weak var ws: Workspace?
@@ -89,57 +89,6 @@ import OnyxCore
         await ws.saveClip(page, markdown: text, folder: r.folder)
     }
 
-    // MARK: Images
-
-    /// Download images (6 at a time) into a temp folder; results keep the input order, failures dropped.
-    nonisolated static func download(_ srcs: [String], referer: String, into dir: URL) async -> [(String, URL)] {
-        let cfg = URLSessionConfiguration.ephemeral
-        cfg.timeoutIntervalForRequest = 20
-        cfg.httpAdditionalHeaders = ["User-Agent": PageExtractor.userAgent, "Accept": "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5"]
-        let session = URLSession(configuration: cfg)
-        defer { session.finishTasksAndInvalidate() }
-        var results = [(String, URL)?](repeating: nil, count: srcs.count)
-        await withTaskGroup(of: (Int, URL?).self) { group in
-            var next = 0
-            func add() {
-                guard next < srcs.count else { return }
-                let i = next, src = srcs[i]
-                next += 1
-                group.addTask {
-                    guard let u = URL(string: src), ["http", "https"].contains(u.scheme?.lowercased() ?? "") else { return (i, nil) }
-                    // Plain-http images: try https first (App Transport Security blocks http downloads).
-                    var tries = [u]
-                    if u.scheme?.lowercased() == "http", var c = URLComponents(url: u, resolvingAgainstBaseURL: false) {
-                        c.scheme = "https"
-                        if let s = c.url { tries.insert(s, at: 0) }
-                    }
-                    var got: (Data, HTTPURLResponse)? = nil
-                    for t in tries {
-                        var req = URLRequest(url: t)
-                        req.setValue(referer, forHTTPHeaderField: "Referer")
-                        if let (data, resp) = try? await session.data(for: req), let http = resp as? HTTPURLResponse,
-                           (200..<300).contains(http.statusCode), !data.isEmpty, data.count <= 25_000_000 {
-                            got = (data, http); break
-                        }
-                    }
-                    guard let (data, http) = got else { return (i, nil) }
-                    let mime = http.mimeType
-                    if let mime, !mime.hasPrefix("image/"), mime != "application/octet-stream" { return (i, nil) }
-                    let sub = dir.appendingPathComponent("\(i)")
-                    try? FileManager.default.createDirectory(at: sub, withIntermediateDirectories: true)
-                    let file = sub.appendingPathComponent(WebClip.imageName(url: src, mimeType: mime, index: i))
-                    guard (try? data.write(to: file)) != nil else { return (i, nil) }
-                    return (i, file)
-                }
-            }
-            for _ in 0..<6 { add() }
-            for await (i, file) in group {
-                if let file { results[i] = (srcs[i], file) }
-                add()
-            }
-        }
-        return results.compactMap { $0 }
-    }
 }
 
 // MARK: - Fetching and extraction
@@ -232,7 +181,7 @@ extension Workspace {
         let a = NSAlert()
         let settings = WebClip.Settings(defaults: .standard)
         a.messageText = "Clip Web Page"
-        a.informativeText = "Onyx saves a readable copy of the page, with its images, to \(settings.folder.isEmpty ? "the vault root" : settings.folder + "/")."
+        a.informativeText = "Onyx saves a readable copy of the page (images stay linked to the web) to \(settings.folder.isEmpty ? "the vault root" : settings.folder + "/")."
         var prefill = ""
         if let s = NSPasteboard.general.string(forType: .string)?.trimmingCharacters(in: .whitespacesAndNewlines),
            !s.contains("\n"), WebClip.Request(url: s).webURL != nil { prefill = s }
@@ -265,8 +214,7 @@ extension Workspace {
         return notes.compactMap { try? String(contentsOf: $0, encoding: .utf8) }.map(Frontmatter.parse)
     }
 
-    /// Write a clipping: download its images into the attachment folder, convert to Markdown,
-    /// fill the template, save it in the Clippings folder, and open it.
+    /// Write a clipping: convert to Markdown (images hotlinked), fill the template, save it in the Clippings folder, and open it.
     func saveClip(_ page: WebClip.Page, markdown text: String? = nil, folder override: String? = nil) async {
         guard let root else { return }
         let settings = WebClip.Settings(defaults: .standard)
@@ -287,26 +235,7 @@ extension Workspace {
             snapshot?.notes[p] != nil || fm.fileExists(atPath: root.appendingPathComponent(p).path)
         }
 
-        // Images → attachments, mapped from their remote URL to the link Obsidian would write.
-        let base = URL(string: page.url)
-        var links: [String: String] = [:]
-        var imageCount = 0
-        if text == nil, settings.downloadImages {
-            let srcs = Array(HTMLToMarkdown.imageSources(in: page.html, baseURL: base).prefix(60))
-            if !srcs.isEmpty {
-                toast = "Clipping “\(page.title)”: \(srcs.count) image\(srcs.count == 1 ? "" : "s")…"
-                let tmp = fm.temporaryDirectory.appendingPathComponent("onyx-clip/" + UUID().uuidString)
-                let files = await WebClipper.download(srcs, referer: page.url, into: tmp)
-                for (src, file) in files {
-                    if let link = attachmentLinks([.file(file)], note: path)?.first { links[src] = link; imageCount += 1 }
-                }
-                try? fm.removeItem(at: tmp)
-            }
-        }
-        let converter = HTMLToMarkdown(baseURL: base) { src, alt in
-            guard let link = links[src] else { return nil }
-            return link.hasPrefix("![](") && !alt.isEmpty ? "![\(alt)](" + link.dropFirst(4) : link
-        }
+        let converter = HTMLToMarkdown(baseURL: URL(string: page.url))
         let markdown = text ?? converter.convert(page.html)
 
         var template: String? = nil
@@ -325,7 +254,7 @@ extension Workspace {
         openNote(path)
         MainWindow.reveal()
         NSApp.activate(ignoringOtherApps: true)
-        WebClipper.selfTestReport("saved \(path) images=\(imageCount)")
-        toast = "Clipped “\(page.title)”" + (imageCount > 0 ? " with \(imageCount) image\(imageCount == 1 ? "" : "s")" : "")
+        WebClipper.selfTestReport("saved \(path)")
+        toast = "Clipped “\(page.title)”"
     }
 }

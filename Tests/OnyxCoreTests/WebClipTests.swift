@@ -19,13 +19,34 @@ final class HTMLToMarkdownTests: XCTestCase {
                        "See [the page](https://example.com/about%20me) and 1.")
     }
 
-    func testImagesUseHookAndSrcset() {
-        var seen: [String] = []
-        let c = HTMLToMarkdown(baseURL: base) { src, alt in seen.append(src); return src.hasSuffix("big.jpg") ? "![[big.jpg]]" : nil }
-        let out = c.convert(#"<p><img src="data:image/gif;base64,AAAA" srcset="small.jpg 320w, big.jpg 1200w" alt="A [cat]"/><img src="/x.png" alt="x"/><img src="data:image/png;base64,AA"/></p>"#)
-        XCTAssertEqual(seen, ["https://example.com/blog/big.jpg", "https://example.com/x.png"])
-        XCTAssertEqual(out, "![[big.jpg]]![x](https://example.com/x.png)")
-        XCTAssertEqual(HTMLToMarkdown.imageSources(in: #"<p><img src="a.png"/><img src="a.png"/></p>"#, baseURL: base), ["https://example.com/blog/a.png"])
+    func testImagesAreHotlinkedFromTheLargestSrcset() {
+        let out = md(#"<p><img src="data:image/gif;base64,AAAA" srcset="small.jpg 320w, big.jpg 1200w, mid.jpg 800w" alt="A [cat]"/><img src="/x.png" alt="x"/><img src="data:image/png;base64,AA"/></p>"#)
+        XCTAssertEqual(out, "![A cat](https://example.com/blog/big.jpg)![x](https://example.com/x.png)")
+        // srcset wins over a smaller src; density descriptors too.
+        XCTAssertEqual(md(#"<img src="https://cdn.e.com/a-400.jpg" srcset="https://cdn.e.com/a-400.jpg 1x, //cdn.e.com/a-800.jpg 2x"/>"#),
+                       "![](https://cdn.e.com/a-800.jpg)")
+    }
+
+    func testLazyImagesResolveToAbsoluteURLs() {
+        XCTAssertEqual(md(#"<img src="data:image/svg+xml,%3Csvg/%3E" data-src="../img/lazy one.jpg" alt="Lazy"/>"#),
+                       "![Lazy](https://example.com/img/lazy%20one.jpg)")
+        XCTAssertEqual(md(#"<img data-srcset="/s.webp 300w, /l.webp 1600w"/>"#), "![](https://example.com/l.webp)")
+        XCTAssertEqual(md(#"<img data-original="//images.e.com/o.png"/>"#), "![](https://images.e.com/o.png)")
+    }
+
+    func testPictureSourcesCompete() {
+        let html = #"<picture><source type="image/avif" srcset="/p-2000.avif 2000w, /p-800.avif 800w"/><img src="/p-640.jpg" alt="P"/></picture>"#
+        XCTAssertEqual(md(html), "![P](https://example.com/p-2000.avif)")
+    }
+
+    func testDataURIsAndTrackingPixelsAreDropped() {
+        XCTAssertEqual(md(#"<p>a<img src="data:image/png;base64,AA"/>b</p>"#), "ab")
+        XCTAssertEqual(md(#"<p>a<img src="https://e.com/beacon.gif?id=1" width="1" height="1"/>b</p>"#), "ab")
+        XCTAssertEqual(md(#"<p>a<img src="https://www.facebook.com/tr?id=1&amp;ev=PageView"/>b</p>"#), "ab")
+        XCTAssertEqual(md(#"<p>a<img src="https://pixel.wp.com/g.gif?v=1"/>b</p>"#), "ab")
+        XCTAssertEqual(md(#"<p>a<img src="blob:https://e.com/1234"/>b</p>"#), "ab")
+        // A small but real image stays.
+        XCTAssertEqual(md(#"<img src="https://e.com/icon.png" width="16" height="16" alt="i"/>"#), "![i](https://e.com/icon.png)")
     }
 
     func testLinkedImageKeepsImage() {
@@ -135,12 +156,6 @@ final class WebClipTests: XCTestCase {
         XCTAssertEqual(WebClip.fileName(title: "Swift: a tour?", url: nil, date: d), "Swift - a tour.md")
         XCTAssertEqual(WebClip.fileName(title: "", url: "https://www.ex.com/x", date: d, timeZone: TimeZone(identifier: "UTC")!), "ex.com 1970-01-01 0000.md")
         XCTAssertLessThanOrEqual(WebClip.fileName(title: String(repeating: "word ", count: 60), url: nil, date: d).count, 124)
-    }
-
-    func testImageNames() {
-        XCTAssertEqual(WebClip.imageName(url: "https://e.com/img/My%20Cat.jpeg?w=2", mimeType: "image/jpeg", index: 0), "My Cat.jpeg")
-        XCTAssertEqual(WebClip.imageName(url: "https://e.com/render?id=1", mimeType: "image/webp", index: 2), "render.webp")
-        XCTAssertEqual(WebClip.imageName(url: "https://e.com/", mimeType: "image/png", index: 4), "Clipped image 5.png")
     }
 
     func testConventions() {

@@ -5,15 +5,14 @@ import Foundation
 /// nested lists and task lists, block quotes, fenced code with its language, GFM tables,
 /// highlights, strikethrough, and YouTube embeds. Scripts, forms and chrome are dropped.
 ///
-/// Images go through `image(src, alt)` so the web clipper can swap a remote URL for the
-/// downloaded attachment's link; returning nil keeps `![alt](src)`.
+/// Images are hotlinked, never downloaded: `![alt](https://…)` with the absolute URL of the
+/// largest `srcset` candidate (or a lazy-load attribute, or `src`). `data:` URIs, non-web
+/// schemes, and tracking pixels are dropped.
 public struct HTMLToMarkdown {
     public var baseURL: URL?
-    public var image: (_ src: String, _ alt: String) -> String?
 
-    public init(baseURL: URL? = nil, image: @escaping (_ src: String, _ alt: String) -> String? = { _, _ in nil }) {
+    public init(baseURL: URL? = nil) {
         self.baseURL = baseURL
-        self.image = image
     }
 
     // MARK: Entry points
@@ -22,17 +21,6 @@ public struct HTMLToMarkdown {
         guard let root = Self.parse(html) else { return Self.plainText(html) }
         let r = Renderer(owner: self)
         return r.finish(r.render(root))
-    }
-
-    /// Absolute URLs of the images `convert` would emit, in document order, without duplicates.
-    public static func imageSources(in html: String, baseURL: URL? = nil) -> [String] {
-        var seen = Set<String>(), out: [String] = []
-        let c = HTMLToMarkdown(baseURL: baseURL) { src, _ in
-            if seen.insert(src).inserted { out.append(src) }
-            return nil
-        }
-        _ = c.convert(html)
-        return out
     }
 
     /// Parse well-formed XHTML first (what XMLSerializer produces), then fall back to
@@ -89,12 +77,13 @@ public struct HTMLToMarkdown {
         return out
     }
 
-    /// The largest candidate in a `srcset` ("a.jpg 480w, b.jpg 1080w" → "b.jpg").
+    /// The largest candidate in a `srcset` ("a.jpg 480w, b.jpg 1080w" → "b.jpg"); `data:`
+    /// candidates are skipped.
     public static func bestFromSrcset(_ srcset: String) -> String? {
         var best: (String, Double)? = nil
         for part in srcset.split(separator: ",") {
-            let bits = part.trimmingCharacters(in: .whitespaces).split(separator: " ", omittingEmptySubsequences: true)
-            guard let u = bits.first else { continue }
+            let bits = part.trimmingCharacters(in: .whitespacesAndNewlines).split(whereSeparator: { $0 == " " || $0 == "\n" || $0 == "\t" })
+            guard let u = bits.first, !u.lowercased().hasPrefix("data:") else { continue }
             var w = 1.0
             if bits.count > 1 {
                 let d = bits[1]
@@ -104,6 +93,21 @@ public struct HTMLToMarkdown {
             if best == nil || w > best!.1 { best = (String(u), w) }
         }
         return best?.0
+    }
+
+    /// Hosts and paths of well-known analytics beacons that pages embed as 1×1 images.
+    static let trackerPatterns = ["google-analytics.com/", "googletagmanager.com/", "doubleclick.net/", "facebook.com/tr",
+                                  "scorecardresearch.com/", "quantserve.com/", "pixel.wp.com/", "pixel.quantserve", "/b/ss/",
+                                  "bat.bing.com/", "analytics.twitter.com/", "t.co/i/adsct", "ct.pinterest.com/", "px.ads.linkedin.com/",
+                                  "/pixel.gif", "/pixel.png", "/spacer.gif", "/blank.gif", "/1x1.gif", "/1x1.png", "/transparent.gif"]
+
+    /// A tracking pixel: 1–2px in either declared dimension, or a known beacon URL.
+    static func isTrackingPixel(src: String, width: String?, height: String?) -> Bool {
+        func px(_ v: String?) -> Double? { v.flatMap { Double($0.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: "px", with: "")) } }
+        if let w = px(width), w <= 2 { return true }
+        if let h = px(height), h <= 2 { return true }
+        let l = src.lowercased()
+        return trackerPatterns.contains { l.contains($0) }
     }
 
     func absolute(_ s: String) -> String {
@@ -273,8 +277,10 @@ private final class Renderer {
         case "img":
             return img(n)
         case "picture":
-            if let i = descendants(n, ["img"]).first { return img(i) }
-            return ""
+            guard let i = descendants(n, ["img"]).first else { return "" }
+            // <source srcset> candidates (often the large or modern-format ones) compete with the img's.
+            let sets = descendants(n, ["source"]).compactMap { attr($0, "srcset") ?? attr($0, "data-srcset") }
+            return img(i, extraSrcsets: sets)
         case "iframe", "video":
             let src = owner.absolute(attr(n, "src") ?? attr(n, "data-src") ?? "")
             if let id = HTMLToMarkdown.youTubeID(src) { return "\n\n![](https://www.youtube.com/watch?v=\(id))\n\n" }
@@ -371,18 +377,19 @@ private final class Renderer {
         return lead + "[" + text + "](" + HTMLToMarkdown.destination(href) + ")" + trail
     }
 
-    func img(_ n: XMLNode) -> String {
-        var src = attr(n, "src") ?? ""
-        for lazy in ["data-src", "data-original", "data-lazy-src", "data-url"] {
-            if let l = attr(n, lazy), src.isEmpty || src.hasPrefix("data:") { src = l }
+    /// An image as a hotlink to the web: the largest srcset candidate, else a lazy-load
+    /// attribute, else `src`, made absolute. Nothing is downloaded.
+    func img(_ n: XMLNode, extraSrcsets: [String] = []) -> String {
+        let sets = [attr(n, "srcset"), attr(n, "data-srcset"), attr(n, "data-lazy-srcset")].compactMap { $0 } + extraSrcsets
+        var src = HTMLToMarkdown.bestFromSrcset(sets.joined(separator: ", ")) ?? ""
+        for lazy in ["data-src", "data-original", "data-lazy-src", "data-url", "data-hi-res-src", "src"] where src.isEmpty {
+            if let l = attr(n, lazy)?.trimmingCharacters(in: .whitespacesAndNewlines), !l.isEmpty, !l.lowercased().hasPrefix("data:") { src = l }
         }
-        if let set = attr(n, "srcset") ?? attr(n, "data-srcset"), let best = HTMLToMarkdown.bestFromSrcset(set),
-           src.isEmpty || src.hasPrefix("data:") { src = best }
         src = owner.absolute(src)
-        guard !src.isEmpty, !src.hasPrefix("data:") else { return "" }
+        guard let scheme = URL(string: src)?.scheme?.lowercased(), scheme == "https" || scheme == "http" else { return "" }
+        if HTMLToMarkdown.isTrackingPixel(src: src, width: attr(n, "width"), height: attr(n, "height")) { return "" }
         let alt = oneLine(collapse(attr(n, "alt") ?? "")).replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: "")
-        let md = owner.image(src, alt) ?? "![\(alt)](\(HTMLToMarkdown.destination(src)))"
-        return md
+        return "![\(alt)](\(HTMLToMarkdown.destination(src)))"
     }
 
     func table(_ n: XMLNode) -> String {
