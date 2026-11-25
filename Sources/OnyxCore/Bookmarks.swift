@@ -99,6 +99,41 @@ public struct BookmarkStore {
         }
     }
 
+    /// Insert a file or folder bookmark at `parent` (nil = top level), before
+    /// `beforeID` (nil = append). If an equivalent bookmark already exists
+    /// anywhere in the tree, it is moved to that position instead of adding a
+    /// second copy. A heading bookmark of the same file does not count as a
+    /// duplicate of the whole-file pin. Returns whether the store changed.
+    @discardableResult
+    public mutating func insert(path: String, isFolder: Bool, subpath: String? = nil, parent: UUID?, before beforeID: UUID?, now: Int64) -> Bool {
+        let sub = isFolder ? nil : BookmarkSubpath.normalize(subpath)
+        if let existing = find({
+            isFolder ? $0.isFolder(path: path) : $0.isFile(path: path, subpath: sub)
+        }) {
+            let beforeIDs = idOrder
+            move(id: existing.id, parent: parent, before: beforeID)
+            return idOrder != beforeIDs
+        }
+        let item = isFolder
+            ? BookmarkItem.folder(path: path, ctime: now)
+            : BookmarkItem.file(path: path, subpath: sub, ctime: now)
+        if parent == nil, beforeID == nil {
+            items.append(item)
+            return true
+        }
+        items.append(item)
+        move(id: item.id, parent: parent, before: beforeID)
+        return true
+    }
+
+    /// Depth-first ids, used to detect a no-op move.
+    var idOrder: [UUID] {
+        func walk(_ items: [BookmarkItem]) -> [UUID] {
+            items.flatMap { [$0.id] + walk($0.items ?? []) }
+        }
+        return walk(items)
+    }
+
     /// Rewrite file and folder paths after a rename or move. Prefix matches follow a
     /// folder that moved. Returns whether anything changed.
     @discardableResult
@@ -404,5 +439,56 @@ public enum BookmarkSubpath {
             i += 1
         }
         return line
+    }
+}
+
+
+/// Resolve a dropped file URL to a vault-relative path. The vault root itself
+/// and anything outside the vault are rejected.
+public enum VaultFileDrop {
+    public static func relativePath(of url: URL, vaultRoot root: URL) -> String? {
+        if let rel = relative(url.standardizedFileURL, root: root.standardizedFileURL) {
+            return rel
+        }
+        return relative(
+            url.standardizedFileURL.resolvingSymlinksInPath(),
+            root: root.standardizedFileURL.resolvingSymlinksInPath()
+        )
+    }
+
+    /// Vault-relative paths from an in-app path list and/or file URLs, skipping
+    /// anything outside the vault and de-duplicating.
+    public static func items(treePaths: String?, urls: [URL], vaultRoot root: URL?, isFolder: (String, URL?) -> Bool) -> [(path: String, isFolder: Bool)] {
+        var result: [(path: String, isFolder: Bool)] = []
+        var seen = Set<String>()
+        func add(_ path: String, url: URL?) {
+            guard !path.isEmpty, !seen.contains(path) else { return }
+            seen.insert(path)
+            result.append((path, isFolder(path, url)))
+        }
+        if let treePaths {
+            for raw in treePaths.split(whereSeparator: \.isNewline) {
+                add(String(raw), url: nil)
+            }
+        }
+        if let root {
+            for url in urls {
+                if let rel = relativePath(of: url, vaultRoot: root) {
+                    add(rel, url: url)
+                }
+            }
+        }
+        return result
+    }
+
+    private static func relative(_ url: URL, root: URL) -> String? {
+        let urlParts = url.pathComponents
+        let rootParts = root.pathComponents
+        guard urlParts.count > rootParts.count else { return nil }
+        let matched = zip(rootParts, urlParts).allSatisfy {
+            $0.caseInsensitiveCompare($1) == .orderedSame
+        }
+        guard matched else { return nil }
+        return urlParts.dropFirst(rootParts.count).joined(separator: "/")
     }
 }

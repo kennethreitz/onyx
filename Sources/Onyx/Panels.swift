@@ -115,6 +115,8 @@ struct TreeClickCatcher: NSViewRepresentable {
     var onChevron: (() -> Void)? = nil
     var onClick: (NSEvent.ModifierFlags) -> Void
     var onCommandDrag: ((String) -> [String])? = nil
+    var onMoveDrag: (([String]) -> Void)? = nil
+    var urlForPath: ((String) -> URL?)? = nil
     var isFolderPath: ((String) -> Bool)? = nil
     var onDragHover: ((String, Bool) -> Bool)? = nil
     var onDrop: ((String, Bool) -> Void)? = nil
@@ -139,6 +141,8 @@ struct TreeClickCatcher: NSViewRepresentable {
         var onChevron: (() -> Void)?
         var chevronWidth: CGFloat = 0
         var onCommandDrag: ((String) -> [String])?
+        var onMoveDrag: (([String]) -> Void)?
+        var urlForPath: ((String) -> URL?)?
         var isFolderPath: ((String) -> Bool)?
         var onDragHover: ((String, Bool) -> Bool)?
         var onDrop: ((String, Bool) -> Void)?
@@ -146,6 +150,7 @@ struct TreeClickCatcher: NSViewRepresentable {
         private var pendingClick: NSEvent?
         private var pendingPoint: NSPoint = .zero
         private var startedDrag = false
+        private var dragIsMove = false
 
         func apply(_ s: TreeClickCatcher) {
             path = s.path
@@ -155,6 +160,8 @@ struct TreeClickCatcher: NSViewRepresentable {
             onChevron = s.onChevron
             chevronWidth = s.chevronWidth
             onCommandDrag = s.onCommandDrag
+            onMoveDrag = s.onMoveDrag
+            urlForPath = s.urlForPath
             isFolderPath = s.isFolderPath
             onDragHover = s.onDragHover
             onDrop = s.onDrop
@@ -192,18 +199,26 @@ struct TreeClickCatcher: NSViewRepresentable {
                 return
             }
             onClick?(event.modifierFlags)
+            // A follow-through drag (without ⌘) pins the row to Bookmarks or
+            // can be dropped in Finder; the click already opened the note.
+            if onCommandDrag != nil {
+                pendingClick = event
+                pendingPoint = loc
+                startedDrag = false
+            }
         }
         override func mouseDragged(with event: NSEvent) {
             guard let start = pendingClick, !startedDrag, let onCommandDrag else { return }
             let loc = convert(event.locationInWindow, from: nil)
             let dx = loc.x - pendingPoint.x, dy = loc.y - pendingPoint.y
             guard (dx * dx + dy * dy) >= 16 else { return }
-            guard start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command) else { return }
             let paths = onCommandDrag(path)
             guard !paths.isEmpty else { return }
             startedDrag = true
             pendingClick = nil
-            beginMoveDrag(paths: paths, event: event)
+            let isMove = start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command)
+            if isMove { onMoveDrag?(paths) }
+            beginDrag(paths: paths, event: event, isMove: isMove)
         }
         override func mouseUp(with event: NSEvent) {
             if let start = pendingClick, !startedDrag {
@@ -215,27 +230,44 @@ struct TreeClickCatcher: NSViewRepresentable {
         }
         override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
 
-        private func beginMoveDrag(paths: [String], event: NSEvent) {
-            let pb = NSPasteboardItem()
-            pb.setString(paths.joined(separator: "\n"), forType: .onyxTreePaths)
-            let item = NSDraggingItem(pasteboardWriter: pb)
+        private func beginDrag(paths: [String], event: NSEvent, isMove: Bool) {
+            dragIsMove = isMove
             let img = TreeDragPreview.image(paths: paths, isFolder: isFolderPath ?? { _ in false })
             let size = img.size
             let loc = convert(event.locationInWindow, from: nil)
-            // Frame must match the image size. A wider row-sized frame stretches a
-            // short image and leaves a black slab around the name.
-            item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
-            item.imageComponentsProvider = {
-                let c = NSDraggingImageComponent(key: .icon)
-                c.contents = img
-                c.frame = NSRect(origin: .zero, size: size)
-                return [c]
+            var items: [NSDraggingItem] = []
+            for (i, p) in paths.enumerated() {
+                let pb = NSPasteboardItem()
+                if i == 0 {
+                    // ⌘-drag keeps the tree-move type so folders still accept it.
+                    // A plain drag uses a vault-path type Bookmarks can pin, which
+                    // the tree itself ignores, so dropping on a folder won't move the file.
+                    pb.setString(paths.joined(separator: "\n"), forType: isMove ? .onyxTreePaths : .onyxVaultPaths)
+                }
+                if let url = urlForPath?(p) {
+                    pb.setString(url.absoluteString, forType: .fileURL)
+                }
+                let item = NSDraggingItem(pasteboardWriter: pb)
+                if i == 0 {
+                    // Frame must match the image size. A wider row-sized frame stretches a
+                    // short image and leaves a black slab around the name.
+                    item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: size.width, height: size.height)
+                    item.imageComponentsProvider = {
+                        let c = NSDraggingImageComponent(key: .icon)
+                        c.contents = img
+                        c.frame = NSRect(origin: .zero, size: size)
+                        return [c]
+                    }
+                } else {
+                    item.draggingFrame = NSRect(x: loc.x - 16, y: loc.y - size.height / 2, width: 1, height: 1)
+                }
+                items.append(item)
             }
-            Self.moving = true
-            beginDraggingSession(with: [item], event: event, source: self)
+            if isMove { Self.moving = true }
+            beginDraggingSession(with: items, event: event, source: self)
         }
 
-        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { .move }
+        func draggingSession(_ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext) -> NSDragOperation { dragIsMove ? .move : .copy }
         func draggingSession(_ session: NSDraggingSession, endedAt screenPoint: NSPoint, operation: NSDragOperation) {
             Self.moving = false
             onDragEnded?()
@@ -418,10 +450,10 @@ struct TreeNodeView: View {
                         },
                         onCommandDrag: { path in
                             guard ws.renamingPath == nil else { return [] }
-                            let paths = ws.pathsForTreeDrag(from: path)
-                            ws.beginTreeDrag(paths)
-                            return paths
+                            return ws.pathsForTreeDrag(from: path)
                         },
+                        onMoveDrag: { ws.beginTreeDrag($0) },
+                        urlForPath: { ws.root?.appendingPathComponent($0) },
                         isFolderPath: { ws.snapshot?.folders.contains($0) == true },
                         onDragHover: { path, isFolder in ws.treeDragHover(on: path, isFolder: isFolder) },
                         onDrop: { path, isFolder in ws.performTreeDrop(on: path, isFolder: isFolder) },
@@ -625,6 +657,20 @@ struct NoteRow: View {
             GraphPreviewController.shared.close()
             if let line { ws.openNote(path, line: line + 1) } else { ws.openNote(path) }
         }
+        .modifier(VaultPathDraggable(url: ws.root?.appendingPathComponent(path)))
+    }
+}
+
+/// Makes a sidebar or inspector row draggable as a vault file URL so it can be
+/// pinned to Bookmarks (search, recent, backlinks) or dropped in Finder.
+private struct VaultPathDraggable: ViewModifier {
+    var url: URL?
+    func body(content: Content) -> some View {
+        if let url {
+            content.draggable(url)
+        } else {
+            content
+        }
     }
 }
 
@@ -689,10 +735,24 @@ struct SearchPanel: View {
 
 struct BookmarksPanel: View {
     @Bindable var ws: Workspace
+    @State private var emptyArmed = false
     var body: some View {
         VStack(spacing: 0) {
             if ws.bookmarkStore.items.isEmpty {
-                QuietEmpty(title: "No bookmarks yet.", hint: "Bookmark a note from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+                VStack(spacing: 0) {
+                    QuietEmpty(title: "No bookmarks yet.", hint: "Drag a note here, or pin one from the context menu, the button below, or ⌥⌘D.").padding(.top, Space.xs)
+                    BookmarksEmptyDrop(ws: ws, parent: nil)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .background(
+                    RoundedRectangle(cornerRadius: Radius.control)
+                        .fill(emptyArmed ? Color.cursorBlue.opacity(0.08) : Color.clear)
+                        .padding(6)
+                )
+                .overlay {
+                    BookmarksDropCatcher(ws: ws, parent: nil, before: nil) { emptyArmed = $0 }
+                }
             } else {
                 ScrollView {
                     BookmarksList(ws: ws, items: ws.bookmarkStore.items, parent: nil, depth: 0)

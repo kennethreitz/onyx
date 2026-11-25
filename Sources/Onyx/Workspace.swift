@@ -1916,6 +1916,24 @@ final class Workspace {
         persistBookmarks()
     }
 
+    /// Pin dropped vault files or folders at `parent`/`before`. An item that's
+    /// already bookmarked is moved to the drop position instead of being added twice.
+    func bookmarkDropped(paths: [(path: String, isFolder: Bool)], parent: UUID?, before beforeID: UUID?) {
+        guard !paths.isEmpty else { return }
+        var store = bookmarkStore
+        let now = bookmarkNow()
+        var changed = false
+        for t in paths {
+            if store.insert(path: t.path, isFolder: t.isFolder, parent: parent, before: beforeID, now: now) {
+                changed = true
+            }
+        }
+        guard changed else { return }
+        bookmarkStore = store
+        persistBookmarks()
+        if !bookmarksExpanded { setBookmarksExpanded(true) }
+    }
+
     func openBookmark(_ item: BookmarkItem) {
         switch item.type {
         case "file":
