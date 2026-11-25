@@ -68,7 +68,7 @@ dev:
 
 test:
 	swift test
-	node --test Tests/reader
+	node --test Tests/reader Tests/extension
 
 icon:
 	@test -f Resources/AppIcon.icns || { echo "missing Resources/AppIcon.icns"; exit 1; }

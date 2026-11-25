@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 import AppKit
 import OnyxCore
 
@@ -303,8 +304,16 @@ struct ClipperSettingsSection: View {
                     copied = true
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copied = false }
                 }
+                Button("Safari Extension…") {
+                    SFSafariApplication.showPreferencesForExtension(withIdentifier: "org.kennethreitz.onyx.SafariExtension") { error in
+                        if error != nil {
+                            DispatchQueue.main.async { ws.toast = "Safari doesn’t list Clip to Onyx yet; see docs/web-clipper.md" }
+                        }
+                    }
+                }
                 Spacer()
             }
+            caption("Safari: turn on Clip to Onyx in Safari ▸ Settings ▸ Extensions for a toolbar button and a Clip to Onyx context menu; Onyx also appears in the Share menu.")
             caption("Make a bookmark in Safari, Chrome or Firefox and paste this as its address. Clicking it clips the page, or just the selection when text is selected. File ▸ Clip Web Page… (⇧⌘K) clips a URL from inside Onyx.")
         } header: { settingsHeader("Web Clipper") }
     }

@@ -76,6 +76,10 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
+# App extensions (Safari "Clip to Onyx", Share menu) → Contents/PlugIns. SKIP_EXTENSIONS=1 skips them.
+if [ "${SKIP_EXTENSIONS:-0}" != 1 ]; then
+  UNIVERSAL="$UNIVERSAL" ARCH="$ARCH" "$ROOT/scripts/build-extensions.sh" "$APP" "$CONFIG"
+fi
 # A stable signature keeps Keychain "Always Allow" valid across rebuilds. Prefer a real Apple identity,
 # then the self-signed "Onyx Local Signing" (scripts/make-signing-cert.sh), else ad-hoc (prompts again
 # after each rebuild). SIGN_IDENTITY / SIGN_KEYCHAIN override.
@@ -85,12 +89,27 @@ if [ -z "$ID" ]; then
   ID=$(security find-identity -v -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p;s/.*"\(Apple Development:[^"]*\)".*/\1/p' | head -1)
 fi
 if [ -z "$ID" ] && security find-identity -p codesigning ${SIGN_KEYCHAIN:+"$SIGN_KEYCHAIN"} 2>/dev/null | grep -q '"Onyx Local Signing"'; then ID="Onyx Local Signing"; fi
-if [ -n "$ID" ] && codesign --force --deep ${KC_ARGS[@]+"${KC_ARGS[@]}"} --sign "$ID" "$APP" >/dev/null 2>&1; then
+# Extensions are signed first, each with the App Sandbox entitlement extensions require, then
+# the app (not --deep, which would re-sign the extensions without their entitlements).
+sign_all() {
+  local id="$1"; shift
+  local x
+  for x in "$APP"/Contents/PlugIns/*.appex; do
+    [ -d "$x" ] || continue
+    codesign --force --timestamp=none "$@" --entitlements "$ROOT/Extensions/sandbox.entitlements" --sign "$id" "$x" >/dev/null 2>&1 || return 1
+  done
+  codesign --force --timestamp=none "$@" --sign "$id" "$APP" >/dev/null 2>&1
+}
+if [ -n "$ID" ] && sign_all "$ID" ${KC_ARGS[@]+"${KC_ARGS[@]}"}; then
   echo "Signed with \"$ID\""
 else
-  codesign --force --deep --sign - "$APP" >/dev/null 2>&1 || true
+  sign_all - || true
   echo "Signed ad hoc (run scripts/make-signing-cert.sh once for a stable signature)"
 fi
+case "$ID" in
+  "Apple Development:"*|"Developer ID Application:"*) ;;
+  *) [ -d "$APP/Contents/PlugIns/OnyxSafari.appex" ] && echo "Note: Safari lists \"Clip to Onyx\" only with Allow Unsigned Extensions on until Onyx is signed by an Apple Development or Developer ID certificate (see docs/web-clipper.md)." ;;
+esac
 echo "Built $APP"
 echo "Binary: $(lipo -info "$APP/Contents/MacOS/Onyx")"
 file "$APP/Contents/MacOS/Onyx"

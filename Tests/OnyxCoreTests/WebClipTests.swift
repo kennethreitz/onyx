@@ -210,3 +210,24 @@ final class WebClipTests: XCTestCase {
         XCTAssertTrue(text.contains(WebClip.bookmarklet), "update the bookmarklet in docs/web-clipper.md")
     }
 }
+
+final class ClipURLTests: XCTestCase {
+    func testRoundTripsThroughRequestParsing() {
+        let fields: [String: Any] = ["url": "https://ex.com/a?b=1&c=2#x", "title": "A + B & C = D", "selection": "<p>x &amp; y</p>",
+                                     "author": "", "site": "  Ex  ", "ignored": "z", "published": 3]
+        let url = ClipURL.make(fields)!
+        XCTAssertFalse(url.absoluteString.contains("ignored"))
+        XCTAssertFalse(url.absoluteString.contains("author="))
+        let r = WebClip.request(from: url)
+        XCTAssertEqual(r?.url, "https://ex.com/a?b=1&c=2#x")
+        XCTAssertEqual(r?.title, "A + B & C = D")
+        XCTAssertEqual(r?.selection, "<p>x &amp; y</p>")
+        XCTAssertEqual(r?.site, "Ex")
+        XCTAssertNil(r?.published)
+    }
+
+    func testNothingToClip() {
+        XCTAssertNil(ClipURL.make(["title": "Only a title"]))
+        XCTAssertNotNil(ClipURL.make(["text": "Some text"]))
+    }
+}
