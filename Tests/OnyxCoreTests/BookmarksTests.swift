@@ -302,3 +302,65 @@ final class BookmarksTests: XCTestCase {
         XCTAssertEqual(items.map(\.isFolder), [false, false, false])
     }
 }
+
+
+final class BookmarkActivationTests: XCTestCase {
+    func testPlainClickOpensEachKindAndTogglesAGroup() {
+        XCTAssertEqual(BookmarkActivation.action(type: "file", command: false), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "folder", command: false), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "search", command: false), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "url", command: false), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "graph", command: false), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "group", command: false), .toggleGroup)
+    }
+
+    func testCommandClickOpensAFileOrFolderInANewPane() {
+        XCTAssertEqual(BookmarkActivation.action(type: "file", command: true), .openInNewPane)
+        XCTAssertEqual(BookmarkActivation.action(type: "folder", command: true), .openInNewPane)
+        XCTAssertEqual(BookmarkActivation.action(type: "search", command: true), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "url", command: true), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "graph", command: true), .open)
+        XCTAssertEqual(BookmarkActivation.action(type: "group", command: true), .toggleGroup)
+    }
+}
+
+final class BookmarkPointerHitTests: XCTestCase {
+    func testARowClickIsClaimedAndAControlClickIsNot() {
+        XCTAssertTrue(BookmarkPointerHit.claimsHit(
+            isRow: true, isLeftMouseDown: true, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: true, eventIsDrag: false, pasteboardHasDrop: false
+        ))
+        XCTAssertFalse(BookmarkPointerHit.claimsHit(
+            isRow: true, isLeftMouseDown: true, isLeftMouseUp: false, isControlClick: true,
+            mouseButtonHeld: true, eventIsDrag: false, pasteboardHasDrop: false
+        ))
+    }
+
+    func testLeftoverPasteboardTypesDoNotStealAClick() {
+        XCTAssertFalse(BookmarkPointerHit.claimsHit(
+            isRow: false, isLeftMouseDown: true, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: true, eventIsDrag: false, pasteboardHasDrop: true
+        ))
+        XCTAssertFalse(BookmarkPointerHit.claimsHit(
+            isRow: false, isLeftMouseDown: false, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: false, eventIsDrag: false, pasteboardHasDrop: true
+        ))
+        // A row still gets its own click even if a previous drag left types around.
+        XCTAssertTrue(BookmarkPointerHit.claimsHit(
+            isRow: true, isLeftMouseDown: true, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: true, eventIsDrag: false, pasteboardHasDrop: true
+        ))
+    }
+
+    func testALiveDropIsClaimed() {
+        XCTAssertTrue(BookmarkPointerHit.claimsHit(
+            isRow: false, isLeftMouseDown: false, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: true, eventIsDrag: true, pasteboardHasDrop: true
+        ))
+        XCTAssertTrue(BookmarkPointerHit.claimsHit(
+            isRow: true, isLeftMouseDown: false, isLeftMouseUp: false, isControlClick: false,
+            mouseButtonHeld: true, eventIsDrag: false, pasteboardHasDrop: true
+        ))
+    }
+}
+

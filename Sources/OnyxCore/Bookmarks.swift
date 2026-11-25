@@ -492,3 +492,38 @@ public enum VaultFileDrop {
         return urlParts.dropFirst(rootParts.count).joined(separator: "/")
     }
 }
+
+
+/// What a click on a Bookmarks row should do.
+public enum BookmarkActivation: Equatable, Sendable {
+    case toggleGroup
+    case open
+    /// ⌘-click a file or folder bookmark: open it in a new split pane.
+    case openInNewPane
+
+    public static func action(type: String, command: Bool) -> BookmarkActivation {
+        if type == "group" { return .toggleGroup }
+        if command, type == "file" || type == "folder" { return .openInNewPane }
+        return .open
+    }
+}
+
+/// Whether a Bookmarks overlay should claim the pointer. Leftover pasteboard
+/// types after a finished drag must not steal clicks.
+public enum BookmarkPointerHit {
+    public static func claimsHit(
+        isRow: Bool,
+        isLeftMouseDown: Bool,
+        isLeftMouseUp: Bool,
+        isControlClick: Bool,
+        mouseButtonHeld: Bool,
+        eventIsDrag: Bool,
+        pasteboardHasDrop: Bool
+    ) -> Bool {
+        let liveDrop = pasteboardHasDrop && (eventIsDrag || (mouseButtonHeld && !isLeftMouseDown && !isLeftMouseUp))
+        if liveDrop { return true }
+        if isRow && isLeftMouseDown && !isControlClick { return true }
+        return false
+    }
+}
+
