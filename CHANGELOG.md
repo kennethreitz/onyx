@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- ⌘I in the editor (and from the Format menu / command palette) toggles italic: a selection is wrapped in `*…*`, or unwrapped if it is already wrapped in `*` or `_`. With no selection, it inserts `**` with the caret in between; a second press inside an empty pair removes it. ⌘B already toggled bold the same way (`**` / `__`) and still does; both are one undo step and are not intercepted during IME composition. The inspector moved to ⌥⌘I (the macOS Inspector convention), which still works while the editor has focus.
+
 ## [0.1.14] - 2026-11-23
 
 ### Added

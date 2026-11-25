@@ -20,6 +20,46 @@ final class EditCommandsTests: XCTestCase {
         XCTAssertEqual(EditCommands.toggleWrap("hi", r(0, 2), open: "%%").applied(to: "hi"), "%%hi%%")
     }
 
+    func testToggleItalic() {
+        let t = "say hello now"
+        let e = EditCommands.toggleItalic(t, r(4, 5))
+        XCTAssertEqual(e.applied(to: t), "say *hello* now")
+        XCTAssertEqual(e.selection, r(5, 5))
+        let starred = e.applied(to: t)
+        XCTAssertEqual(EditCommands.toggleItalic(starred, e.selection).applied(to: starred), t)   // * outside
+        XCTAssertEqual(EditCommands.toggleItalic(starred, r(4, 7)).applied(to: starred), t)       // * inside
+        let underscored = "say _hello_ now"
+        XCTAssertEqual(EditCommands.toggleItalic(underscored, r(5, 5)).applied(to: underscored), t)
+        XCTAssertEqual(EditCommands.toggleItalic(underscored, r(4, 7)).applied(to: underscored), t)
+        // no selection: *|* , and a second press removes the empty pair
+        let empty = EditCommands.toggleItalic("ab", r(1))
+        XCTAssertEqual(empty.applied(to: "ab"), "a**b")
+        XCTAssertEqual(empty.selection, r(2))
+        XCTAssertEqual(EditCommands.toggleItalic("a**b", r(2)).applied(to: "a**b"), "ab")
+        XCTAssertEqual(EditCommands.toggleItalic("a__b", r(2)).applied(to: "a__b"), "ab")
+        // * / _ don't strip half of a bold pair
+        XCTAssertEqual(EditCommands.toggleItalic("**x**", r(2, 1)).applied(to: "**x**"), "***x***")
+        XCTAssertEqual(EditCommands.toggleItalic("__x__", r(2, 1)).applied(to: "__x__"), "__*x*__")
+    }
+
+    func testToggleBold() {
+        let t = "say hello now"
+        let e = EditCommands.toggleBold(t, r(4, 5))
+        XCTAssertEqual(e.applied(to: t), "say **hello** now")
+        XCTAssertEqual(e.selection, r(6, 5))
+        let wrapped = e.applied(to: t)
+        XCTAssertEqual(EditCommands.toggleBold(wrapped, e.selection).applied(to: wrapped), t)
+        XCTAssertEqual(EditCommands.toggleBold(wrapped, r(4, 9)).applied(to: wrapped), t)
+        let underscored = "say __hello__ now"
+        XCTAssertEqual(EditCommands.toggleBold(underscored, r(6, 5)).applied(to: underscored), t)
+        XCTAssertEqual(EditCommands.toggleBold(underscored, r(4, 9)).applied(to: underscored), t)
+        let empty = EditCommands.toggleBold("ab", r(1))
+        XCTAssertEqual(empty.applied(to: "ab"), "a****b")
+        XCTAssertEqual(empty.selection, r(3))
+        XCTAssertEqual(EditCommands.toggleBold("a****b", r(3)).applied(to: "a****b"), "ab")
+        XCTAssertEqual(EditCommands.toggleBold("a____b", r(3)).applied(to: "a____b"), "ab")
+    }
+
     func testLinks() {
         XCTAssertEqual(EditCommands.insertWikilink("a b", r(2, 1)).applied(to: "a b"), "a [[b]]")
         let m = EditCommands.insertMarkdownLink("go", r(0, 2))

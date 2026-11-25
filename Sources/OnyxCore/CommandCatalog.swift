@@ -65,9 +65,9 @@ public enum CommandCatalog {
         cmd("extract", "Extract Current Selection…", .edit, [], "text.badge.plus"),
         cmd("extractheading", "Extract This Heading…", .edit, [], "text.justify.left"),
 
-        // Format (Obsidian's editor commands; ⌘I and ⌘K stay with the inspector and sidebar)
+        // Format (Obsidian's editor commands; ⌘K stays with the sidebar, inspector is ⌥⌘I)
         cmd("bold", "Toggle Bold", .format, [.command("b")], "bold"),
-        cmd("italic", "Toggle Italic", .format, [], "italic"),
+        cmd("italic", "Toggle Italic", .format, [.command("i")], "italic"),
         cmd("strike", "Toggle Strikethrough", .format, [], "strikethrough"),
         cmd("highlight", "Toggle Highlight", .format, [], "highlighter"),
         cmd("inlinecode", "Toggle Inline Code", .format, [], "chevron.left.forwardslash.chevron.right"),
@@ -108,7 +108,7 @@ public enum CommandCatalog {
         cmd("bookmarks", "Bookmarks", .view, [.command("b", shift: true)], "bookmark"),
         cmd("tags", "Tags", .view, [.command("t", shift: true)], "number"),
         cmd("git", "Source Control", .view, [.command("y", shift: true)], "arrow.triangle.branch"),
-        cmd("inspector", "Inspector", .view, [.command("i")], "sidebar.right"),
+        cmd("inspector", "Inspector", .view, [.command("i", option: true)], "sidebar.right"),
         cmd("outline", "Outline", .view, [.command("1", option: true)], "list.bullet.indent"),
         cmd("backlinks", "Backlinks", .view, [.command("2", option: true)], "arrow.uturn.backward"),
         cmd("props", "Properties", .view, [.command("3", option: true)], "tablecells"),

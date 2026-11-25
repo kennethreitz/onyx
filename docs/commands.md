@@ -1,6 +1,6 @@
 # Commands
 
-Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar, and can be rebound in Settings ▸ Shortcuts. Defaults follow Obsidian where they don’t clash with Onyx’s own keys (⌘I is the inspector and ⌘K the sidebar, so Italic and Insert Markdown Link start unbound).
+Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar, and can be rebound in Settings ▸ Shortcuts. Defaults follow Obsidian where they don’t clash with Onyx’s own keys (⌘K is the sidebar, so Insert Markdown Link starts unbound; italic is ⌘I and the inspector is ⌥⌘I).
 
 ## File
 
@@ -43,7 +43,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Command | Default |
 | --- | --- |
 | Toggle Bold | <kbd>⌘B</kbd> |
-| Toggle Italic | — |
+| Toggle Italic | <kbd>⌘I</kbd> |
 | Toggle Strikethrough | — |
 | Toggle Highlight | — |
 | Toggle Inline Code | — |
@@ -87,7 +87,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Bookmarks | <kbd>⇧⌘B</kbd> |
 | Tags | <kbd>⇧⌘T</kbd> |
 | Source Control | <kbd>⇧⌘Y</kbd> |
-| Inspector | <kbd>⌘I</kbd> |
+| Inspector | <kbd>⌥⌘I</kbd> |
 | Outline | <kbd>⌥⌘1</kbd> |
 | Backlinks | <kbd>⌥⌘2</kbd> |
 | Properties | <kbd>⌥⌘3</kbd> |
@@ -154,7 +154,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 ## Notes
 
 - Format commands work on the editor. From the reader, they switch to editing first. Each one is a single undo step.
-- Toggles are reversible: running Toggle Bold on `**bold**` (selected with or without its markers) removes the markers. List, checklist, and quote toggles apply to every selected line, and remove the prefix when every line already has it. A heading command on a line at that level turns it back into text.
+- Toggles are reversible: running Toggle Bold on `**bold**` or `__bold__` (selected with or without its markers) removes the markers, and Toggle Italic does the same for `*italic*` or `_italic_`. With no selection, each inserts an empty pair and a second press removes it. List, checklist, and quote toggles apply to every selected line, and remove the prefix when every line already has it. A heading command on a line at that level turns it back into text.
 - Return in a list continues it: the same `-`, `*`, or `+` bullet, the next number (`1.` or `1)`), or a new unchecked checkbox. A Return in the middle of an item splits the text onto the new item. Return on an empty item ends the list, or outdents one level if the item is nested. Following numbered items in that contiguous list are then renumbered, keeping the list's starting number and delimiter; nested lists are numbered independently. A blank line or a non-list line ends the list, so two numbered lists separated by a blank stay independent. Shift-Return is a plain newline. Tab and Shift-Tab indent and outdent list items (the Indent and Outdent commands do the same, and have no default shortcut), and both the level left and the level joined are renumbered (a newly nested item starts at 1). Delete Line, Backspace, Delete, and cut also renumber when they leave a list out of sequence. This is off when `smartIndentList` is `false` in the vault’s `app.json`; Settings ▸ Editor has the toggle. Return does not continue a list inside a fenced code block or frontmatter, or while an IME is composing, and those regions are not renumbered.
 - Smart pairs (Obsidian’s Auto pair brackets and Auto pair Markdown syntax) insert a closer when you type `(`, `[`, `{`, `"`, `'`, or `` ` ``, with the caret in between — so `[[` becomes `[[|]]`, and wikilink autocomplete still steps past or writes the existing `]]`. Quotes do not pair mid-word (`don't`). With a selection, those markers and `*` `_` `~` `=` wrap the text and keep it selected, so typing `*` twice wraps `**bold**`. Typing the closer when it is already next steps over it; Backspace in an empty pair deletes both. `*` `_` `~` `=` are not paired without a selection, and are left alone in fenced code. Off when `autoPairBrackets` or `autoPairMarkdown` is `false` in `app.json`; Settings ▸ Editor has the toggles.
 - Cycle Checkbox (<kbd>⌘L</kbd>) turns a line into `- [ ] `, then toggles it between `[ ]` and `[x]`.

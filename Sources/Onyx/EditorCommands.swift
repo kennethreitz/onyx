@@ -47,8 +47,8 @@ extension Workspace {
     @discardableResult
     func runEditCommand(_ id: String) -> Bool {
         switch id {
-        case "bold": wrap("**")
-        case "italic": wrap("*")
+        case "bold": applyEdit { EditCommands.toggleBold($0, $1) }
+        case "italic": applyEdit { EditCommands.toggleItalic($0, $1) }
         case "strike": wrap("~~")
         case "highlight": wrap("==")
         case "inlinecode": wrap("`")

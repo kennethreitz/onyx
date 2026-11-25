@@ -7,7 +7,8 @@
 | <kbd>⇧⌘O</kbd> | Open vault… |
 | <kbd>⌘K</kbd> | Show or hide the sidebar (always docked; opens on Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
-| <kbd>⌘I</kbd> | Inspector: outline, backlinks, properties |
+| <kbd>⌘I</kbd> | Toggle italic (`*…*`, or unwrap `*` / `_`). With no selection, inserts `**` with the caret in between |
+| <kbd>⌥⌘I</kbd> | Inspector: outline, backlinks, properties |
 | <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline · backlinks · properties |
 | <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph overlay · atlas overlay · graph in a pane. <kbd>⌘G</kbd> or the title-bar button again closes the overlay; <kbd>⇧⌘G</kbd> closes the atlas if it is already showing. <kbd>Esc</kbd> also closes the overlay |
 | <kbd>⌘F</kbd> · <kbd>⌥⌘F</kbd> | Find in the note (editor or reader) · find and replace (editor). While the bar is open, <kbd>⌘G</kbd>/<kbd>⇧⌘G</kbd> or <kbd>↩</kbd>/<kbd>⇧↩</kbd> go to the next/previous match, and <kbd>Esc</kbd> closes it |
@@ -32,7 +33,7 @@
 | <kbd>⌥⇧⌘←</kbd> · <kbd>⌥⇧⌘→</kbd> | Fold all headings and lists / unfold all |
 | <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
 | <kbd>⌘,</kbd> | Settings |
-| <kbd>⌘B</kbd> · <kbd>⌘/</kbd> · <kbd>⌘L</kbd> | Toggle bold · toggle `%%comment%%` · cycle checkbox (`- [ ]` → `- [x]`). The rest of the Format menu (italic, headings, lists, move line, …) is unbound by default; see [Commands](commands.md) |
+| <kbd>⌘B</kbd> · <kbd>⌘I</kbd> · <kbd>⌘/</kbd> · <kbd>⌘L</kbd> | Toggle bold · toggle italic · toggle `%%comment%%` · cycle checkbox (`- [ ]` → `- [x]`). The rest of the Format menu (headings, lists, move line, …) is unbound by default; see [Commands](commands.md) |
 | <kbd>⌘=</kbd> · <kbd>⌘-</kbd> · <kbd>⌘0</kbd> | Zoom text in · out · actual size (editor and reader together) |
 | <kbd>Esc</kbd> | Put away whatever’s on top. In the editor, when nothing else would consume it, also saves and returns to reading view (Settings ▸ Editor; on by default). Never the other way |
 

@@ -4,7 +4,7 @@ import OnyxCore
 
 /// Calm by default: the typeset page, a quiet title line, a footer that dims
 /// itself, and a docked file list you can put away. Everything else is
-/// summoned (⌘O ⌘P ⌘K ⌘I ⌘G); ⌃⌘F is pure text.
+/// summoned (⌘O ⌘P ⌘K ⌥⌘I ⌘G); ⌃⌘F is pure text.
 struct RootView: View {
     @Bindable var ws: Workspace
     var appearance: (String) -> Void
@@ -163,7 +163,7 @@ struct RootView: View {
                     .font(.system(size: 11).monospacedDigit())
                     .padding(.trailing, 8)
                 }
-                FooterButton(symbol: "sidebar.right", help: "Inspector (⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
+                FooterButton(symbol: "sidebar.right", help: "Inspector (⌥⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
                     .opacity(footerHover ? 1 : 0.55)
                     .animation(.easeOut(duration: 0.2), value: footerHover)
             }
@@ -571,11 +571,18 @@ struct RootView: View {
                e.window != nil, e.window === MainWindow.current, ws.overlay == .none {
                 ws.closePane(); return nil
             }
-            // Inspector, even while the editor has focus (NSTextView otherwise swallows the
-            // default ⌘I before the menu sees it, so a docked inspector couldn't be put away).
+            // Inspector, even while the editor has focus (NSTextView would otherwise
+            // swallow keys like ⌘I before the menu sees them).
             if KeyChord.matches(e, command: "inspector"),
                e.window != nil, e.window === MainWindow.current {
                 ws.toggleInspector(); return nil
+            }
+            // Markdown bold / italic: NSTextView otherwise applies font traits for ⌘B / ⌘I
+            // instead of wrapping `**` / `*`. Skip during IME composition.
+            if e.window != nil, e.window === MainWindow.current, ws.overlay == .none,
+               let tv = e.window?.firstResponder as? OnyxTextView, !tv.hasMarkedText() {
+                if KeyChord.matches(e, command: "italic") { ws.runEditCommand("italic"); return nil }
+                if KeyChord.matches(e, command: "bold") { ws.runEditCommand("bold"); return nil }
             }
             // Back / forward, here as well as in the Go menu so the web view and the text view
             // can never claim them first; not while a palette or sheet is up.
@@ -685,7 +692,7 @@ struct FooterButton: View {
 enum ShortcutHints {
     static let all: [(String, String)] = [
         ("⌘O", "Find or create a note"), ("⌘P", "Every command (also ⇧⌘P)"), ("⌘K", "Show or hide the sidebar"), ("⇧⌘F", "Search the vault"),
-        ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌘I", "Outline, backlinks, properties"),
+        ("⌘↩", "Read ⇄ edit, saving (also ⌘E)"), ("⌘T", "Today’s daily note (also ⌘\\)"), ("⌥⌘I", "Inspector: outline, backlinks, properties"), ("⌘B  ⌘I", "Bold · italic"),
         ("⌘G", "Focus graph overlay · click or ⌘G again to close · ⇧⌘G atlas · Esc also closes it · ⌥⌘G graph in a pane (title-bar button: ⇧-click for the atlas)"), ("⌘[  ⌘]", "Back · forward (mouse buttons, swipe)"), ("⌘⌫", "Delete to the start of the line · in the sidebar, delete the selection"), ("⇧⌘M", "Move note to… (links follow)"), ("⌘D", "Split · ⇧⌘D stacked · ⌘W close"), ("⌘F", "Find in note · ⌥⌘F replace · ⌘G/⇧⌘G or ↩/⇧↩ next/previous while finding"), ("⌃⌘F", "Focus: just the text"), ("Esc", "Put things away · in the editor, return to reading"),
     ]
 }

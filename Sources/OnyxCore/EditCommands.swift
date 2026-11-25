@@ -32,31 +32,55 @@ public enum EditCommands {
     /// Toggle `open…close` around the selection (`**` bold, `*` italic, `~~`, `==`, `` ` ``, `%%`).
     /// A selection that already has the markers inside or just outside loses them; an empty
     /// selection between an empty pair removes the pair, otherwise inserts one with the caret inside.
-    public static func toggleWrap(_ text: String, _ sel: NSRange, open: String, close: String? = nil) -> TextEdit {
-        let ns = text as NSString
+    /// `also` are alternate markers that unwrap the same way (`_` for italic, `__` for bold);
+    /// a new wrap always uses `open`.
+    public static func toggleWrap(_ text: String, _ sel: NSRange, open: String, close: String? = nil, also: [String] = []) -> TextEdit {
         let close = close ?? open
+        if let e = unwrap(text, sel, open: open, close: close) { return e }
+        for alt in also {
+            if let e = unwrap(text, sel, open: alt, close: alt) { return e }
+        }
+        let ns = text as NSString
+        let sel = clamp(sel, ns.length)
+        let s = ns.substring(with: sel)
+        let o = (open as NSString).length
+        return TextEdit(range: sel, replacement: open + s + close, selection: NSRange(location: sel.location + o, length: sel.length))
+    }
+
+    /// Wrap or unwrap with `*`, and unwrap `_…_` too. A second press inside an empty
+    /// `*|*` or `_|_` pair removes it (the caret stays put).
+    public static func toggleItalic(_ text: String, _ sel: NSRange) -> TextEdit {
+        toggleWrap(text, sel, open: "*", also: ["_"])
+    }
+
+    /// Wrap or unwrap with `**`, and unwrap `__…__` too.
+    public static func toggleBold(_ text: String, _ sel: NSRange) -> TextEdit {
+        toggleWrap(text, sel, open: "**", also: ["__"])
+    }
+
+    static func unwrap(_ text: String, _ sel: NSRange, open: String, close: String) -> TextEdit? {
+        let ns = text as NSString
         let o = (open as NSString).length, c = (close as NSString).length
         let sel = clamp(sel, ns.length)
         let s = ns.substring(with: sel)
-        // markers inside the selection
         if sel.length >= o + c, s.hasPrefix(open), s.hasSuffix(close) {
             let inner = (s as NSString).substring(with: NSRange(location: o, length: sel.length - o - c))
             return TextEdit(range: sel, replacement: inner, selection: NSRange(location: sel.location, length: (inner as NSString).length))
         }
-        // markers just outside it
         if sel.location >= o, NSMaxRange(sel) + c <= ns.length,
            ns.substring(with: NSRange(location: sel.location - o, length: o)) == open,
            ns.substring(with: NSRange(location: NSMaxRange(sel), length: c)) == close,
-           !(open == "*" && isDoubled(ns, sel, "*")) {
+           !isHalfOfDouble(ns, sel, open) {
             let outer = NSRange(location: sel.location - o, length: sel.length + o + c)
             return TextEdit(range: outer, replacement: s, selection: NSRange(location: outer.location, length: sel.length))
         }
-        return TextEdit(range: sel, replacement: open + s + close, selection: NSRange(location: sel.location + o, length: sel.length))
+        return nil
     }
 
-    /// `**x**` around a selection is bold, not italic: don't let `*` strip half of it.
-    private static func isDoubled(_ ns: NSString, _ sel: NSRange, _ m: String) -> Bool {
-        sel.location >= 2 && NSMaxRange(sel) + 2 <= ns.length
+    /// `**x**` around a selection is bold, not italic: don't let `*` (or `_`) strip half of it.
+    private static func isHalfOfDouble(_ ns: NSString, _ sel: NSRange, _ m: String) -> Bool {
+        (m as NSString).length == 1
+            && sel.location >= 2 && NSMaxRange(sel) + 2 <= ns.length
             && ns.substring(with: NSRange(location: sel.location - 2, length: 2)) == m + m
             && ns.substring(with: NSRange(location: NSMaxRange(sel), length: 2)) == m + m
     }

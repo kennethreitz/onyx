@@ -1417,7 +1417,7 @@ final class Workspace {
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
     }
-    /// ⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
+    /// ⌥⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
     func toggleInspector(_ tab: InspectorTab? = nil) {
         withAnimation(Motion.layout) {
             if let tab, inspectorVisible, inspectorTab != tab { inspectorTab = tab; return }

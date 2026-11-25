@@ -12,6 +12,6 @@ The *focus graph* (<kbd>⌘G</kbd>) opens as an overlay on the current pane, ove
   <img src="focus-graph.png" alt="Focus graph centered on a note" width="85%">
 </p>
 
-The inspector (<kbd>⌘I</kbd>) holds the outline, backlinks, and properties. Backlinks also appear at the bottom of the reader, and in the footer when you hover it.
+The inspector (<kbd>⌥⌘I</kbd>) holds the outline, backlinks, and properties. Backlinks also appear at the bottom of the reader, and in the footer when you hover it.
 
 See also [keyboard shortcuts](shortcuts.md).

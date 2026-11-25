@@ -400,7 +400,7 @@ enum KeySelfTest {
         ("⇧⌘N", 45, "n", [.command, .shift]), ("⌘N", 45, "n", .command),
         ("⌘K", 40, "k", .command), ("⇧⌘F", 3, "f", [.command, .shift]), ("⌘↩", 36, "\r", .command),
         ("⌘E", 14, "e", .command), ("⌘T", 17, "t", .command), ("⌘\\", 42, "\\", .command),
-        ("⌘I", 34, "i", .command), ("⌘G", 5, "g", .command), ("⇧⌘G", 5, "g", [.command, .shift]),
+        ("⌘I", 34, "i", .command), ("⌘B", 11, "b", .command), ("⌥⌘I", 34, "i", [.command, .option]), ("⌘G", 5, "g", .command), ("⇧⌘G", 5, "g", [.command, .shift]),
         ("⌘D", 2, "d", .command), ("⇧⌘D", 2, "d", [.command, .shift]), ("⌘W", 13, "w", .command),
         ("⌃⌘F", 3, "f", [.command, .control]), ("Esc", 53, "\u{1b}", []),
     ]
