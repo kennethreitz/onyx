@@ -228,6 +228,7 @@ struct OnyxApp: App {
             ShortcutMenus.button("new") { ws.newNote() }
             ShortcutMenus.button("newfolder") { ws.newFolder() }
             ShortcutMenus.button("openvault", needsWindow: false) { openVault() }
+            Button("Connect Obsidian Sync Vault…") { ws.showSyncOnlyConnect = true; MainWindow.revealIfNeeded() }
             Divider()
             ShortcutMenus.button("switcher") { ws.show(.switcher) }
             ShortcutMenus.button("palette") { ws.show(.palette) }

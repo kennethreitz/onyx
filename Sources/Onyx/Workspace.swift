@@ -111,6 +111,8 @@ final class Workspace {
     var sidebarPinned = true
     var focusMode = false
     var showHints = !UserDefaults.standard.bool(forKey: "onyx.hintsDismissed")
+    /// The "Connect Obsidian Sync Vault…" sheet (sync-only vaults; see SyncOnlyVaultsUI).
+    var showSyncOnlyConnect = false
     /// Temporary shortcut sheet from holding ⌘; not persisted, unlike `showHints`.
     var holdHints = false
     @ObservationIgnored var commandHold = CommandHold()
@@ -219,6 +221,25 @@ final class Workspace {
     var obsidianSync: VaultSync?
     /// Recent git and Obsidian Sync activity for this vault, persisted in Application Support.
     var syncLog: SyncLogStore?
+
+    /// Close the vault and show the welcome screen (used before deleting a sync-only vault's local copy).
+    func closeVault() {
+        guard root != nil else { return }
+        flushSave()
+        persistSplitLayout()
+        speech.stop()
+        git?.stop(); git = nil
+        obsidianSync?.stop(); obsidianSync = nil
+        overlay = .none
+        currentPath = nil
+        text = ""; lastSaved = ""
+        history = []; historyIndex = -1
+        panes = []; focusedPane = 0; paneRatios = []; paneFrames = [:]; paneTop = [:]
+        snapshot = nil
+        syncLog = nil
+        if let r = root, UserDefaults.standard.string(forKey: "onyx.vault") == r.path { UserDefaults.standard.removeObject(forKey: "onyx.vault") }
+        root = nil
+    }
 
     func open(vault url: URL, initialNote: String? = nil, restoreSplits: Bool = true) {
         let next = url.standardizedFileURL

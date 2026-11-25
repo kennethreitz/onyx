@@ -21,6 +21,17 @@ Safety rails: the first sync never deletes on either side, and differing files a
 
 This is unofficial and still new. Try it on a throwaway vault before pointing it at the real one. If you’d rather not use it, Obsidian’s official [`obsidian-headless`](https://www.npmjs.com/package/obsidian-headless) CLI (`npx obsidian-headless`) can keep a folder in sync while Onyx simply edits the files. Protocol notes are in [obsidian-sync-protocol.md](obsidian-sync-protocol.md). To leave Sync alone for a session, see [DEVELOP.md](DEVELOP.md) (`ONYX_NO_SYNC`).
 
+### Sync-only vaults
+
+You don’t need a folder of your own to sync. **Connect Obsidian Sync Vault…** (on the welcome screen, in the File menu, and as **Sync-only Vault…** next to Settings ▸ General ▸ Vault ▸ Choose…) signs in, lists your remote vaults, asks for the vault’s end-to-end password when it has one, and creates a local copy that Onyx owns: `~/Library/Application Support/Onyx/Vaults/<vault name>` on the Mac, the app’s own container on iPhone and iPad. Onyx then downloads everything and keeps the copy synced while it’s open; the footer badge shows the status.
+
+- Each sync-only vault is listed under Settings ▸ General ▸ Vault (and on the welcome screen) with Open, Reveal in Finder, and Delete Local Copy…. **Show Vaults Folder in Finder** opens the folder that holds them.
+- **Disconnect…** (Settings ▸ Sync) stops syncing but keeps the local copy, still listed, so you can reconnect later. Connecting the same remote vault again reuses that copy and runs a careful first sync again: nothing is deleted on either side, and differing files are kept twice.
+- **Delete Local Copy…** asks first, closes the vault if it’s open, and then deletes only this device’s copy, its sync state, its backups, and its key. The vault in Obsidian Sync and your other devices keep everything. Onyx refuses to delete anything that isn’t a sync-only folder it created inside the Vaults folder.
+- Sync state for a sync-only vault is keyed by the remote vault id (`Application Support/Onyx/Sync/vault-<id>.json`), so an iOS container path changing after an update doesn’t lose it. Folders you picked yourself are keyed by path as before.
+
+The library and its safety checks live in OnyxCore (`SyncVaultLibrary`), and the connect, disconnect, and delete flow in OnyxSync (`SyncOnlyVaults`). Both are tested against the in-process fake Obsidian Sync server.
+
 The Sync Log also records Obsidian Sync: connected and disconnected, files downloaded or uploaded, conflicts, and errors. Settings ▸ Sync has a Show Log button in both the Git and Obsidian Sync sections; it closes Settings so the panel is visible.
 
 See also [compatibility and privacy](compatibility.md).

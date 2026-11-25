@@ -583,7 +583,20 @@ public actor SyncEngine {
         let url = try checkedURL(k)
         if FileManager.default.fileExists(atPath: url.path) {
             switch options.deleteMode {
-            case .trash: try FileManager.default.trashItem(at: url, resultingItemURL: nil)
+            case .trash:
+                #if os(macOS)
+                do { try FileManager.default.trashItem(at: url, resultingItemURL: nil); break } catch {}
+                #endif
+                // No user-visible Trash (iOS, or a volume without one): keep the file among the backups instead.
+                if let dir = options.backupDir {
+                    let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd'T'HHmmss"
+                    let dest = dir.appendingPathComponent("Deleted").appendingPathComponent(f.string(from: options.now())).appendingPathComponent(k)
+                    try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    if FileManager.default.fileExists(atPath: dest.path) { try FileManager.default.removeItem(at: dest) }
+                    try FileManager.default.moveItem(at: url, to: dest)
+                } else {
+                    try FileManager.default.removeItem(at: url)
+                }
             case .remove: try FileManager.default.removeItem(at: url)
             }
         }
@@ -615,9 +628,18 @@ public actor SyncEngine {
     /// "Note (Conflicted copy <device> <yyyyMMddHHmm>).md", made unique like Obsidian's getAvailablePath.
     func conflictCopyPath(_ k: String) -> String {
         let f = DateFormatter(); f.locale = Locale(identifier: "sv_SE"); f.dateFormat = "yyyyMMddHHmm"
-        let dev = SyncPath.sanitize(state.binding.deviceName.isEmpty ? Host.current().localizedName ?? "Onyx" : state.binding.deviceName)
+        let dev = SyncPath.sanitize(state.binding.deviceName.isEmpty ? Self.defaultDeviceName : state.binding.deviceName)
         let ext = SyncPath.ext(SyncPath.basename(k))
         return availablePath(SyncPath.stripExt(k) + " (Conflicted copy \(dev) \(f.string(from: options.now())))" + (ext.isEmpty ? "" : "." + ext))
+    }
+
+    /// "<computer name>" on the Mac; on iOS the binding always carries a device name, so this is a fallback.
+    public static var defaultDeviceName: String {
+        #if os(macOS)
+        return Host.current().localizedName ?? "Onyx"
+        #else
+        return "Onyx"
+        #endif
     }
 
     func availablePath(_ p: String) -> String {
