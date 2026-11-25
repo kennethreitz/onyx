@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-11-25
+
 ### Added
 - Hierarchical tags, Obsidian-compatible. The Tags sidebar is a tree: `#parent/child/grandchild` nests under disclosure triangles (⌥-click opens a whole branch), expansion is remembered per vault, and each node counts the notes with that tag or any nested one, with the notes tagged exactly there shown faintly beside it when they differ. Sort by name or count, and filter tags by any part of their path. Clicking a tag lists its notes under the tree, including nested tags like Obsidian's `tag:#parent`, with an Exact option for only that tag. Right-click ▸ Rename… renames or moves a tag and its whole subtree across the vault, inline and in frontmatter `tags:` (inline lists, block lists, and plain values), skipping code. A sheet previews every changed line before writing and warns when two tags will merge. Undo Rename is in the sort menu. Drag a tag onto another to nest it there, or below the tree to make it top-level. Typing `#` in the editor (or a value in a frontmatter `tags:` list) completes tags by path segment: `#projects/` offers the children of `#projects`. Tags in the reader, ⌘-clicked tags in the editor, and the new tag chips in the inspector open the Tags pane on that tag. Tags compare case-insensitively, the tree uses the spelling seen most, and Unicode tags work (`#café`, `#📚`). The logic lives in OnyxCore with tests, and it stays fast on large vaults: the tree builds in about 3 ms for 2,600 notes, and rename previews run off the main thread ([docs](docs/tags.md)).
 - The inspector Outline pane (<kbd>⌥⌘1</kbd>) can widen past the open note: a scope control at the top chooses This note, Folder, Linked & partOf, or Whole vault. Notes become top-level rows with their heading trees nested and collapsible; folders and `partOf` parents give the structure. Click a heading to open that note and jump there. The current section highlights while you scroll (reader or editor). Whole-vault mode walks the folder tree lazily — only expanded branches (and a note's headings once that note is opened) are built into the list — so it stays fast on a large vault. The path to the open note is expanded for you.
@@ -300,7 +302,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.17...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.18...HEAD
+[0.1.18]: https://github.com/kennethreitz/onyx/compare/v0.1.17...v0.1.18
 [0.1.17]: https://github.com/kennethreitz/onyx/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/kennethreitz/onyx/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/kennethreitz/onyx/compare/v0.1.14...v0.1.15
