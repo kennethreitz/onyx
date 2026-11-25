@@ -34,4 +34,17 @@ final class TreeSortTests: XCTestCase {
         let back = try JSONDecoder().decode(TreeOrder.self, from: JSONEncoder().encode(o))
         XCTAssertEqual(back, o); XCTAssertEqual(back.sort(for: "Box").ascending, false); XCTAssertEqual(back.sort(for: "Zed"), o.base)
     }
+
+    func testVisibleRowsIncludeDepth() {
+        let snap = snapshot(), dates = TreeDates(snap)
+        let children: (FileNode) -> [FileNode] = { dates.ordered($0.children ?? [], by: .standard) }
+        let collapsed = snap.tree.visibleRows(expanded: [], children: children)
+        XCTAssertEqual(collapsed.map { $0.node.path }, ["Box", "Zed", "alpha.md", "Note 2.md", "Note 10.md"])
+        XCTAssertTrue(collapsed.allSatisfy { $0.depth == 0 })
+        let open = snap.tree.visibleRows(expanded: ["Zed"], children: children)
+        XCTAssertEqual(open.map { "\($0.depth):\($0.node.path)" }, [
+            "0:Box", "0:Zed", "1:Zed/inner.md", "0:alpha.md", "0:Note 2.md", "0:Note 10.md"
+        ])
+        XCTAssertEqual(open.map(\.node.path), snap.tree.visiblePaths(expanded: ["Zed"], children: children))
+    }
 }

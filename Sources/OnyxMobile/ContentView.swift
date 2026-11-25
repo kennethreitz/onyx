@@ -74,6 +74,7 @@ struct ContentView: View {
         } message: {
             Text(vault.error ?? "")
         }
+        .modifier(FileTreePrompts())
         .sheet(isPresented: $connectingSync) {
             NavigationStack { SyncConnectScreen().environmentObject(vault) }
         }
@@ -135,7 +136,12 @@ struct ContentView: View {
                     }
                 } else {
                     switch vault.libraryTab {
-                    case .notes: notesList
+                    case .notes:
+                        if vault.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, vault.folderFilter == nil {
+                            FileTreeScreen()
+                        } else {
+                            notesList
+                        }
                     case .bookmarks: BookmarksScreen()
                     case .tags: TagsScreen()
                     case .outline: OutlineScreen()
@@ -219,6 +225,16 @@ struct ContentView: View {
                 Label("Vault", systemImage: "folder")
             }
         }
+        if vault.root != nil, vault.canWrite, vault.libraryTab == .notes {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button("New Note", systemImage: "square.and.pencil") { vault.beginNewNote() }
+                    Button("New Folder", systemImage: "folder.badge.plus") { vault.beginNewFolder() }
+                } label: {
+                    Label("Add", systemImage: "plus")
+                }
+            }
+        }
         if let name = vault.root?.lastPathComponent {
             ToolbarItem(placement: .principal) {
                 HStack(spacing: 6) {
@@ -266,6 +282,107 @@ private struct NotesSearch: ViewModifier {
             content.searchable(text: $text, prompt: "Search notes")
         } else {
             content
+        }
+    }
+}
+
+
+/// Rename, create, delete, and “update links?” prompts for the Files tree.
+private struct FileTreePrompts: ViewModifier {
+    @EnvironmentObject private var vault: MobileVault
+
+    func body(content: Content) -> some View {
+        content
+            .alert(promptTitle, isPresented: nameAlertPresented) {
+                if showsDraftField {
+                    TextField(draftPlaceholder, text: $vault.fileTreeDraft)
+                }
+                if case .updateLinks = vault.fileTreePrompt {
+                    Button("Don’t Update") { vault.finishRelocate(updateLinks: false) }
+                }
+                Button(promptConfirm, role: promptIsDestructive ? .destructive : nil) { confirm() }
+                Button("Cancel", role: .cancel) { vault.fileTreePrompt = nil; vault.pendingRelocate = nil }
+            } message: {
+                if !promptMessage.isEmpty { Text(promptMessage) }
+            }
+    }
+
+    private var nameAlertPresented: Binding<Bool> {
+        Binding(
+            get: { vault.fileTreePrompt != nil },
+            set: { if !$0 { vault.fileTreePrompt = nil; vault.pendingRelocate = nil } }
+        )
+    }
+
+    private var showsDraftField: Bool {
+        switch vault.fileTreePrompt {
+        case .newNote, .newFolder, .rename: true
+        default: false
+        }
+    }
+
+    private var promptIsDestructive: Bool {
+        if case .delete = vault.fileTreePrompt { return true }
+        return false
+    }
+
+    private var promptTitle: String {
+        switch vault.fileTreePrompt {
+        case .newNote: "New Note"
+        case .newFolder: "New Folder"
+        case .rename: "Rename"
+        case .delete(let path): vault.deleteConfirmationTitle(path)
+        case .updateLinks(_, _, _, let n, let m):
+            "Update \(n) link\(n == 1 ? "" : "s") in \(m) file\(m == 1 ? "" : "s")?"
+        case .none: ""
+        }
+    }
+
+    private var promptMessage: String {
+        switch vault.fileTreePrompt {
+        case .delete(let path): vault.deleteConfirmationMessage(path)
+        case .updateLinks: "Wikilinks and markdown links that pointed at the old path can follow this change."
+        default: ""
+        }
+    }
+
+    private var draftPlaceholder: String {
+        switch vault.fileTreePrompt {
+        case .newNote: "Note name"
+        case .newFolder: "Folder name"
+        case .rename: "Name"
+        default: ""
+        }
+    }
+
+    private var promptConfirm: String {
+        switch vault.fileTreePrompt {
+        case .newNote, .newFolder: "Create"
+        case .rename: "Rename"
+        case .delete: "Delete"
+        case .updateLinks: "Update"
+        case .none: "OK"
+        }
+    }
+
+    private func confirm() {
+        switch vault.fileTreePrompt {
+        case .newNote(let folder):
+            let name = vault.fileTreeDraft
+            vault.fileTreePrompt = nil
+            _ = vault.createNote(named: name, folder: folder)
+        case .newFolder(let folder):
+            let name = vault.fileTreeDraft
+            vault.fileTreePrompt = nil
+            _ = vault.createFolder(named: name, in: folder)
+        case .rename:
+            vault.commitRename()
+        case .delete:
+            vault.confirmDelete()
+        case .updateLinks:
+            vault.finishRelocate(updateLinks: true)
+        case .none:
+            break
         }
     }
 }

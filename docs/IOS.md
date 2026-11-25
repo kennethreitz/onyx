@@ -136,15 +136,16 @@ Requires Xcode with the iOS Simulator SDK (17+) and [XcodeGen](https://github.co
 
 The iOS shell now surfaces the features that landed on master the same day, reusing OnyxCore:
 
+- **Files** — the primary sidebar tab is a hierarchical folder and note tree from the same `VaultSnapshot.tree` the Mac sidebar uses (`TreeSort`, folders first by default). Folders expand and collapse with a disclosure control; the expanded set is stored per vault. Tapping a note opens it, and the open note is highlighted with its ancestor folders revealed. The context menu (and a + button) can create a note or folder, rename (updating links when OnyxCore's `LinkUpdater` finds any, after a confirmation), or delete with confirmation. Pull-to-refresh rescans. Typing in the search field still shows the flat note list. It works for a picked folder and for a sync-only vault.
 - **Bookmarks** — a sidebar tab. The list is `.obsidian/bookmarks.json` (Obsidian's format, including groups). Swipe a note or use the note menu to pin or unpin; swipe a bookmark to remove it. File, folder, search, and URL bookmarks open; graph bookmarks explain that the graph isn't in the iOS app yet.
 - **Outline** — This note, Folder, Linked & partOf, or Whole vault, flattened lazily the same way as the Mac inspector. Tapping a heading opens that note at the line.
 - **Backlinks** — from the note menu, or under the note in the reader. Linked mentions open at the line. Unlinked mentions follow the same rules as the Mac app. **Link** / **Link all** write the wikilink through the security-scoped vault folder (`NSFileCoordinator`, atomic write, then the snapshot is updated).
-- **Find** — a sidebar tab: match case, whole word, regular expression, a preview grouped by file with checkboxes. **Replace selected** writes the same way as Link, or rolls the whole pass back if one file fails. (The usual vault search operators stay on the Notes search field.)
+- **Find** — a sidebar tab: match case, whole word, regular expression, a preview grouped by file with checkboxes. **Replace selected** writes the same way as Link, or rolls the whole pass back if one file fails. (The usual vault search operators stay on the Files search field.)
 - **Reading** — Latin Modern, ET Book, and OpenDyslexic, plus the typeset toggles, stored in the same UserDefaults keys as Mac Settings ▸ Reading. The setting is local to Onyx, not the vault. The bundled fonts already ship in the iOS target.
 - **Version History** — a short “not available on iPhone” screen. History on the Mac uses git; the iOS app does not ship git, and we don't pretend otherwise.
 - **Web clipper** — not on iOS. Article HTML is converted with `HTMLToMarkdown`, which needs macOS `XMLDocument`.
 
-Limited writing is intentional: only bookmarks, linking a mention, and vault replace, all inside the folder the user picked. Creating notes, a full editor, and git are still later milestones.
+Writing is limited to the vault folder the user picked (or the sync-only copy in the app container): bookmarks, linking a mention, vault replace, and from the Files tree, new notes, new folders, rename (with optional link updates), and delete. A full editor and git are still later milestones.
 
 ## What’s in this first cut
 

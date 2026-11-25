@@ -93,12 +93,14 @@ final class MobileVault: ObservableObject {
         do { try storeBookmark(url) } catch {
             self.error = "Could not remember this folder: \(error.localizedDescription)"
         }
+        loadTreeExpanded()
         scan()
         if selectedPath == nil, let today = dailyPath, snapshot?.notes[today] != nil {
             selectedPath = today
         } else if selectedPath == nil {
             selectedPath = snapshot?.sortedNotePaths.first
         }
+        if let p = selectedPath { revealInTree(p) }
     }
 
     func scan() {
@@ -145,6 +147,10 @@ final class MobileVault: ObservableObject {
         selectedPath = nil
         query = ""
         folderFilter = nil
+        persistTreeExpanded = false
+        treeExpanded = []
+        fileTreePrompt = nil
+        persistTreeExpanded = true
         bookmarkStore = BookmarkStore()
         bookmarksLocked = false
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
@@ -195,6 +201,18 @@ final class MobileVault: ObservableObject {
     var tagCache: (gen: Int, sort: TagTree.Sort, tree: TagTree)?
     /// Bumped whenever `snapshot` is replaced, so derived caches know.
     var snapshotGeneration = 0
+
+    // Files tree
+    @Published var treeExpanded: Set<String> = [] {
+        didSet { if treeExpanded != oldValue { saveTreeExpanded() } }
+    }
+    @Published var treeOrder = TreeOrder()
+    @Published var treeRevealToken = 0
+    @Published var fileTreePrompt: FileTreePrompt?
+    @Published var fileTreeDraft = ""
+    var persistTreeExpanded = true
+    var treeDatesCache: (gen: Int, dates: TreeDates)?
+    var pendingRelocate: (from: String, dest: String, reason: String)?
 }
 
 extension MobileVault {
@@ -229,7 +247,15 @@ extension MobileVault {
             error = coordError.localizedDescription
             return false
         }
-        if ok { snapshot?.update(path: rel, content: content); syncEdited() }
+        if ok {
+            if var snap = snapshot {
+                snap.update(path: rel, content: content)
+                snapshot = snap
+            } else {
+                scan()
+            }
+            syncEdited()
+        }
         return ok
     }
 
@@ -241,10 +267,14 @@ extension MobileVault {
         return url
     }
 
-    func openNote(_ path: String, line: Int? = nil) {
+    func openNote(_ path: String, line: Int? = nil, revealInTree: Bool = true) {
+        let already = selectedPath == path
         selectedPath = path
         jumpLine = line
         jumpToken += 1
+        if TreeReveal.shouldExpandAncestors(alreadyOpen: already, reveal: revealInTree) {
+            self.revealInTree(path)
+        }
         if libraryTab == .find || libraryTab == .bookmarks { libraryTab = .notes }   // the Tags tab stays put, so back returns to the tag
     }
 
@@ -255,7 +285,7 @@ extension MobileVault {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .notes: "Notes"
+            case .notes: "Files"
             case .bookmarks: "Bookmarks"
             case .tags: "Tags"
             case .outline: "Outline"
@@ -264,7 +294,7 @@ extension MobileVault {
         }
         var symbol: String {
             switch self {
-            case .notes: "doc.text"
+            case .notes: "folder"
             case .bookmarks: "bookmark"
             case .tags: "number"
             case .outline: "list.bullet.indent"
@@ -345,9 +375,10 @@ extension MobileVault {
             }
             openNote(path, line: line)
         case "folder":
-            folderFilter = item.path
-            libraryTab = .notes
+            folderFilter = nil
             query = ""
+            libraryTab = .notes
+            if let path = item.path { revealInTree(path, includingSelf: true) }
         case "search":
             query = item.query ?? ""
             folderFilter = nil

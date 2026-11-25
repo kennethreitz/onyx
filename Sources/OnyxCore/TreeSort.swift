@@ -73,17 +73,30 @@ public struct TreeDates: Sendable {
     }
 }
 
+/// A visible file-tree row: the node and its indent depth (0 at the vault root).
+public struct FileTreeRow: Equatable, Identifiable, Sendable {
+    public var node: FileNode
+    public var depth: Int
+    public var id: String { node.id }
+    public init(node: FileNode, depth: Int) { self.node = node; self.depth = depth }
+}
+
 public extension FileNode {
-    /// Visible rows in the order the sidebar draws them, for ⇧-click ranges.
-    func visiblePaths(expanded: Set<String>, children: (FileNode) -> [FileNode]) -> [String] {
-        var out: [String] = []
-        func walk(_ n: FileNode) {
+    /// Visible rows in the order the sidebar draws them, with indent depth.
+    func visibleRows(expanded: Set<String>, children: (FileNode) -> [FileNode]) -> [FileTreeRow] {
+        var out: [FileTreeRow] = []
+        func walk(_ n: FileNode, depth: Int) {
             for c in children(n) {
-                out.append(c.path)
-                if c.isFolder, expanded.contains(c.path) { walk(c) }
+                out.append(FileTreeRow(node: c, depth: depth))
+                if c.isFolder, expanded.contains(c.path) { walk(c, depth: depth + 1) }
             }
         }
-        walk(self)
+        walk(self, depth: 0)
         return out
+    }
+
+    /// Visible rows in the order the sidebar draws them, for ⇧-click ranges.
+    func visiblePaths(expanded: Set<String>, children: (FileNode) -> [FileNode]) -> [String] {
+        visibleRows(expanded: expanded, children: children).map(\.node.path)
     }
 }

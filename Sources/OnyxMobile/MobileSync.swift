@@ -107,8 +107,10 @@ extension MobileVault {
         UserDefaults.standard.set(v.id, forKey: Self.managedKey)
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
         selectedPath = nil
+        loadTreeExpanded()
         scan()
         if let today = dailyPath, snapshot?.notes[today] != nil { selectedPath = today }
+        if let p = selectedPath { revealInTree(p) }
         startSync()
     }
 
