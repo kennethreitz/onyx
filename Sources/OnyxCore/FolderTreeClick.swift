@@ -50,3 +50,58 @@ public enum TreeReveal {
         reveal && !alreadyOpen
     }
 }
+
+
+/// Tracks a file-tree pointer press so a click fires once and a drag can still
+/// start after the movement threshold. A regular click fires on mouse-down
+/// (the folder expands immediately) and must not fire again on mouse-up — that
+/// second toggle was a regression that made a folder snap back when you let go.
+/// A ⌘-click is deferred until mouse-up so a ⌘-drag can move files without
+/// toggling selection first.
+public struct TreePointerSession: Equatable, Sendable {
+    public enum Down: Equatable, Sendable { case clickNow, deferClick }
+    public enum Drag: Equatable, Sendable { case startDrag, none }
+    public enum Up: Equatable, Sendable { case clickNow, none }
+
+    /// Squared distance, in view points, that counts as a drag (4pt).
+    public static let dragThresholdSquared: Double = 16
+
+    private var armed = false
+    private var clickFired = false
+    private var dragging = false
+
+    public init() {}
+
+    public mutating func mouseDown(command: Bool, canDrag: Bool) -> Down {
+        dragging = false
+        if command, canDrag {
+            armed = true
+            clickFired = false
+            return .deferClick
+        }
+        clickFired = true
+        armed = canDrag
+        return .clickNow
+    }
+
+    public mutating func mouseDragged(distanceSquared: Double) -> Drag {
+        guard armed, !dragging, distanceSquared >= Self.dragThresholdSquared else { return .none }
+        dragging = true
+        armed = false
+        return .startDrag
+    }
+
+    public mutating func mouseUp() -> Up {
+        let fire = armed && !dragging && !clickFired
+        reset()
+        return fire ? .clickNow : .none
+    }
+
+    public mutating func cancel() { reset() }
+
+    private mutating func reset() {
+        armed = false
+        clickFired = false
+        dragging = false
+    }
+}

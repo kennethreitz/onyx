@@ -149,7 +149,7 @@ struct TreeClickCatcher: NSViewRepresentable {
         var onDragEnded: (() -> Void)?
         private var pendingClick: NSEvent?
         private var pendingPoint: NSPoint = .zero
-        private var startedDrag = false
+        private var pointer = TreePointerSession()
         private var dragIsMove = false
 
         func apply(_ s: TreeClickCatcher) {
@@ -184,49 +184,56 @@ struct TreeClickCatcher: NSViewRepresentable {
         }
         override func mouseDown(with event: NSEvent) {
             if dropOnly { return }
-            if event.modifierFlags.contains(.control) { nextResponder?.mouseDown(with: event); return }
+            if event.modifierFlags.contains(.control) {
+                pointer.cancel()
+                pendingClick = nil
+                nextResponder?.mouseDown(with: event)
+                return
+            }
             let loc = convert(event.locationInWindow, from: nil)
             if chevronWidth > 0 && loc.x < chevronWidth {
+                pointer.cancel()
+                pendingClick = nil
                 onChevron?()
                 return
             }
-            // ⌘-click vs ⌘-drag: wait to see whether this is a drag before toggling selection,
-            // so we don't deselect a row the user is about to move.
-            if event.modifierFlags.contains(.command), onCommandDrag != nil {
+            // Chevron clicks toggle immediately and are not a drag source.
+            // A regular click fires now so a folder stays expanded when you let go;
+            // the press stays armed so a follow-through drag can still pin the row.
+            // A ⌘-click is deferred until mouse-up so a ⌘-drag can move files
+            // without toggling selection first.
+            switch pointer.mouseDown(command: event.modifierFlags.contains(.command), canDrag: onCommandDrag != nil) {
+            case .clickNow:
+                onClick?(event.modifierFlags)
+                if onCommandDrag != nil {
+                    pendingClick = event
+                    pendingPoint = loc
+                } else {
+                    pendingClick = nil
+                }
+            case .deferClick:
                 pendingClick = event
                 pendingPoint = loc
-                startedDrag = false
-                return
-            }
-            onClick?(event.modifierFlags)
-            // A follow-through drag (without ⌘) pins the row to Bookmarks or
-            // can be dropped in Finder; the click already opened the note.
-            if onCommandDrag != nil {
-                pendingClick = event
-                pendingPoint = loc
-                startedDrag = false
             }
         }
         override func mouseDragged(with event: NSEvent) {
-            guard let start = pendingClick, !startedDrag, let onCommandDrag else { return }
+            guard let start = pendingClick, let onCommandDrag else { return }
             let loc = convert(event.locationInWindow, from: nil)
             let dx = loc.x - pendingPoint.x, dy = loc.y - pendingPoint.y
-            guard (dx * dx + dy * dy) >= 16 else { return }
+            guard pointer.mouseDragged(distanceSquared: Double(dx * dx + dy * dy)) == .startDrag else { return }
             let paths = onCommandDrag(path)
             guard !paths.isEmpty else { return }
-            startedDrag = true
             pendingClick = nil
             let isMove = start.modifierFlags.contains(.command) || event.modifierFlags.contains(.command)
             if isMove { onMoveDrag?(paths) }
             beginDrag(paths: paths, event: event, isMove: isMove)
         }
         override func mouseUp(with event: NSEvent) {
-            if let start = pendingClick, !startedDrag {
-                pendingClick = nil
+            let fire = pointer.mouseUp() == .clickNow
+            if fire, let start = pendingClick {
                 onClick?(start.modifierFlags)
             }
             pendingClick = nil
-            startedDrag = false
         }
         override func rightMouseDown(with event: NSEvent) { nextResponder?.rightMouseDown(with: event) }
 
