@@ -223,12 +223,24 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
         var box = doc.page(at: 1)!.getBoxRect(.mediaBox)
         let meta: [CFString: Any] = [kCGPDFContextTitle: title, kCGPDFContextCreator: "Onyx", kCGPDFContextAuthor: NSFullUserName()]
         guard let ctx = CGContext(dst as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
-        let et = face == "et"
+        let et = face == "et", od = face == "od"
         // The head: the title in letterspaced small caps. LM Roman Caps sets lowercase as small
-        // caps; ET Book has real c2sc/smcp. The folio: old-style figures.
-        let head = et ? font("ETBookOT-Roman", size: 9, features: ["c2sc", "smcp", "kern"]) : font("LMRomanCaps10-Regular", size: 9, features: ["kern"])
-        let folioFont = et ? font("ETBookOT-Roman", size: 10, features: ["onum", "kern"]) : font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
-        let headText = et ? title : title.lowercased()
+        // caps; ET Book has real c2sc/smcp. OpenDyslexic uses the real face, natural case, no tracking.
+        // The folio: old-style figures (LM/ET) or lining (OpenDyslexic).
+        let head: CTFont
+        let folioFont: CTFont
+        if od {
+            head = font("OpenDyslexic-Regular", size: 9 * 0.88, features: [])
+            folioFont = font("OpenDyslexic-Regular", size: 10 * 0.88, features: [])
+        } else if et {
+            head = font("ETBookOT-Roman", size: 9, features: ["c2sc", "smcp", "kern"])
+            folioFont = font("ETBookOT-Roman", size: 10, features: ["onum", "kern"])
+        } else {
+            head = font("LMRomanCaps10-Regular", size: 9, features: ["kern"])
+            folioFont = font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
+        }
+        let headText = et || od ? title : title.lowercased()
+        let headKern: CGFloat = od ? 0 : 0.9
         for i in 1...doc.numberOfPages {
             guard let pg = doc.page(at: i) else { continue }
             var mb = pg.getBoxRect(.mediaBox)
@@ -237,7 +249,7 @@ final class NotePrinter: NSObject, WKNavigationDelegate, WKScriptMessageHandler 
             // Centered over the text block, not the whole page (the margin column is for notes).
             let x0 = mb.minX + page.left, w = page.textWidth
             if i > 1 {
-                let l = line(headText, head, kern: 0.9)
+                let l = line(headText, head, kern: headKern)
                 let lw = CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
                 ctx.textPosition = CGPoint(x: x0 + (w - min(lw, w)) / 2, y: mb.maxY - page.top + 26)
                 CTLineDraw(l, ctx)

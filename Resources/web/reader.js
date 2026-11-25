@@ -694,9 +694,10 @@
   function typesetClasses(t) {
     if (!t) return '';
     const print = t.print ? ' print' : '';
-    const dys = t.dyslexic ? ' face-dyslexic' : '';
-    if (!t.on) return dys + print;
-    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.justify ? ' just' : '') + (t.face === 'et' ? ' face-et' : '') + dys + print;
+    if (!t.on) return print;
+    // OpenDyslexic is its own typeset face: no old-style figures, hyphenation, or justification.
+    if (t.face === 'od' || t.dyslexic) return ' typeset face-od' + print;
+    return ' typeset' + (t.onum !== false ? ' onum' : '') + (t.hyphens !== false ? ' hyph' : '') + (t.justify ? ' just' : '') + (t.face === 'et' ? ' face-et' : '') + print;
   }
 
   // Heading folds (Settings ▸ Editor ▸ Fold headings). Display only: the markdown is never
@@ -1050,6 +1051,7 @@
       }
     },
     layoutWide() { relayoutWide(); },
+    typesetClasses,
     setType(size, measure) {
       document.documentElement.style.setProperty('--font-text-size', size + 'px');
       document.documentElement.style.setProperty('--file-line-width', measure + 'rem');

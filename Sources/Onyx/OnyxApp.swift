@@ -109,6 +109,7 @@ struct OnyxApp: App {
     private let options = LaunchOptions.parse()
 
     init() {
+        Typeset.migrateOpenDyslexicIfNeeded()
         AppResources.registerFonts()
         WindowConfigurator.idFile = options.windowIDFile
         if let ap = options.appearance { UserDefaults.standard.set(ap, forKey: "onyx.appearance") }

@@ -17,7 +17,7 @@ struct MarkdownHighlighter {
     static let url = try! NSRegularExpression(pattern: #"https?://[^\s)>\]]+"#)
     static let footnote = try! NSRegularExpression(pattern: #"\[\^[^\]]+\]"#)
 
-    var lineHeight: CGFloat { (Theme.editorSize * Theme.editorLineHeight).rounded() }
+    var lineHeight: CGFloat { (Theme.editorBodySize * Theme.editorLineHeight).rounded() }
 
     func baseParagraph(indent: CGFloat = 0) -> NSMutableParagraphStyle {
         let p = NSMutableParagraphStyle()
@@ -29,7 +29,7 @@ struct MarkdownHighlighter {
 
     var baseAttributes: [NSAttributedString.Key: Any] {
         [.font: Theme.editorFont(), .foregroundColor: Theme.ink, .paragraphStyle: baseParagraph(),
-         .kern: Theme.editorKern, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorSize * 1.3) / 2]
+         .kern: Theme.editorKern, .ligature: 0, .baselineOffset: (lineHeight - Theme.editorBodySize * 1.3) / 2]
     }
 
     /// What `InlineFields` leaves out (inline code, %% and <!-- --> comments, scanned together,
@@ -114,7 +114,7 @@ struct MarkdownHighlighter {
                 for ch in line { if ch == "#" { level += 1 } else { break } }
                 if level <= 6, line.dropFirst(level).hasPrefix(" ") {
                     let scale: [CGFloat] = [1.44, 1.2, 1.1, 1, 1, 1]
-                    let size = (Theme.editorSize * scale[level - 1]).rounded()
+                    let size = (Theme.editorBodySize * scale[level - 1]).rounded()
                     let p = baseParagraph(); p.minimumLineHeight = max(lineHeight, size * 1.6); p.maximumLineHeight = p.minimumLineHeight
                     if level <= 2 { p.paragraphSpacingBefore = lineHeight * 0.35 }
                     ts.addAttributes([.font: Theme.editorFont(size, bold: true), .paragraphStyle: p], range: lr)
@@ -204,7 +204,7 @@ struct MarkdownHighlighter {
     }
 
     private func currentSize(_ ts: NSTextStorage, _ loc: Int) -> CGFloat {
-        (ts.attribute(.font, at: loc, effectiveRange: nil) as? NSFont)?.pointSize ?? Theme.editorSize
+        (ts.attribute(.font, at: loc, effectiveRange: nil) as? NSFont)?.pointSize ?? Theme.editorBodySize
     }
 }
 

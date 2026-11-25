@@ -346,26 +346,30 @@ enum PDFChrome {
     }
 
     static func headFont(face: String, size: CGFloat = 9) -> CTFont {
-        face == "et" ? font("ETBookOT-Roman", size: size, features: ["c2sc", "smcp", "kern"])
-                     : font("LMRomanCaps10-Regular", size: size, features: ["kern"])
+        if face == "od" { return font("OpenDyslexic-Regular", size: size * 0.88, features: []) }
+        return face == "et" ? font("ETBookOT-Roman", size: size, features: ["c2sc", "smcp", "kern"])
+                            : font("LMRomanCaps10-Regular", size: size, features: ["kern"])
     }
     static func bodyFont(face: String, size: CGFloat = 10.5) -> CTFont {
-        face == "et" ? font("ETBookOT-Roman", size: size, features: ["kern", "onum"])
-                     : font("LMRoman10-Regular", size: size, features: ["kern", "onum"])
+        if face == "od" { return font("OpenDyslexic-Regular", size: size * 0.88, features: []) }
+        return face == "et" ? font("ETBookOT-Roman", size: size, features: ["kern", "onum"])
+                            : font("LMRoman10-Regular", size: size, features: ["kern", "onum"])
     }
     static func folioFont(face: String) -> CTFont {
-        face == "et" ? font("ETBookOT-Roman", size: 10, features: ["onum", "kern"])
-                     : font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
+        if face == "od" { return font("OpenDyslexic-Regular", size: 10 * 0.88, features: []) }
+        return face == "et" ? font("ETBookOT-Roman", size: 10, features: ["onum", "kern"])
+                            : font("LMRoman10-Regular", size: 10, features: ["onum", "kern"])
     }
+    static func naturalCase(_ face: String) -> Bool { face == "et" || face == "od" }
 
     static func write(leaves: [Leaf], page: NotePrinter.Page, face: String, title: String, to dst: URL) throws {
         guard let first = leaves.first, let pg0 = first.doc.page(at: first.index) else { throw CocoaError(.fileReadCorruptFile) }
         var box = pg0.getBoxRect(.mediaBox)
         let meta: [CFString: Any] = [kCGPDFContextTitle: title, kCGPDFContextCreator: "Onyx", kCGPDFContextAuthor: NSFullUserName()]
         guard let ctx = CGContext(dst as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
-        let et = face == "et"
         let headF = headFont(face: face)
         let folioF = folioFont(face: face)
+        let headKern: CGFloat = face == "od" ? 0 : 0.9
         for leaf in leaves {
             guard let pg = leaf.doc.page(at: leaf.index) else { continue }
             var mb = pg.getBoxRect(.mediaBox)
@@ -373,8 +377,8 @@ enum PDFChrome {
             ctx.drawPDFPage(pg)
             let x0 = mb.minX + page.left, w = page.textWidth
             if let raw = leaf.head, !raw.isEmpty {
-                let text = et ? raw : raw.lowercased()
-                let l = line(text, headF, kern: 0.9)
+                let text = naturalCase(face) ? raw : raw.lowercased()
+                let l = line(text, headF, kern: headKern)
                 let lw = CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
                 ctx.textPosition = CGPoint(x: x0 + (w - min(lw, w)) / 2, y: mb.maxY - page.top + 26)
                 CTLineDraw(l, ctx)
@@ -406,7 +410,6 @@ enum PDFChrome {
         guard let ctx = CGContext(url as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
         let titleF = headFont(face: face, size: 18)
         let body = bodyFont(face: face, size: 11)
-        let et = face == "et"
         let textW = page.textWidth
         let x0 = page.left
         let topY = page.paper.height - page.top
@@ -420,7 +423,7 @@ enum PDFChrome {
             ctx.beginPDFPage([kCGPDFContextMediaBox: Data(bytes: &mb, count: MemoryLayout<CGRect>.size)] as CFDictionary)
             pages += 1
             if pages == 1 {
-                let label = et ? "Contents" : "contents"
+                let label = naturalCase(face) ? "Contents" : "contents"
                 let l = line(label, titleF, kern: 1.2)
                 ctx.textPosition = CGPoint(x: x0, y: topY - 8)
                 CTLineDraw(l, ctx)
@@ -438,7 +441,7 @@ enum PDFChrome {
             let indent = CGFloat(it.depth) * 16
             let folio = start[it.path].map(String.init) ?? ""
             let f = it.kind == .part ? headFont(face: face, size: 11) : body
-            let name = et && it.kind == .part ? it.title : it.title
+            let name = it.title
             let titleLine = line(name, f, kern: it.kind == .part ? 0.4 : 0)
             let folioLine = line(folio, folioFont(face: face))
             let tw = CGFloat(CTLineGetTypographicBounds(titleLine, nil, nil, nil))
@@ -476,9 +479,8 @@ enum PDFChrome {
         guard let ctx = CGContext(url as CFURL, mediaBox: &box, meta as CFDictionary) else { throw CocoaError(.fileWriteUnknown) }
         ctx.beginPDFPage([kCGPDFContextMediaBox: Data(bytes: &box, count: MemoryLayout<CGRect>.size)] as CFDictionary)
         let f = headFont(face: face, size: 22)
-        let et = face == "et"
-        let text = et ? title : title.lowercased()
-        let l = line(text, f, kern: 1.6)
+        let text = naturalCase(face) ? title : title.lowercased()
+        let l = line(text, f, kern: face == "od" ? 0 : 1.6)
         let lw = CGFloat(CTLineGetTypographicBounds(l, nil, nil, nil))
         let x0 = page.left, w = page.textWidth
         ctx.textPosition = CGPoint(x: x0 + (w - min(lw, w)) / 2, y: page.paper.height * 0.62)

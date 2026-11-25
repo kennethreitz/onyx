@@ -430,3 +430,59 @@ test('bleedSide caps at 8rem and leaves a 1.2rem gutter', () => {
   assert.ok(T.bleedSide(900, 980, 16) < 40);
   assert.equal(T.bleedSide(980, 980, 16), 0);
 });
+
+// --- OpenDyslexic typeface ----------------------------------------------------
+
+test('OpenDyslexic @font-face declares all four cuts with real weights, styles, and size-adjust', () => {
+  const css = fs.readFileSync(path.join(web, 'reader.css'), 'utf8');
+  const faces = [...css.matchAll(/@font-face\s*\{[^}]*OpenDyslexic[^}]*\}/g)].map(m => m[0]);
+  assert.equal(faces.length, 4);
+  const src = f => (f.match(/OpenDyslexic-(\w+)\.woff2/) || [])[1];
+  const by = Object.fromEntries(faces.map(f => [src(f), f]));
+  assert.ok(by.Regular && by.Bold && by.Italic && by.BoldItalic);
+  assert.match(by.Regular, /font-style:\s*normal/);
+  assert.match(by.Regular, /font-weight:\s*100 500/);
+  assert.match(by.Bold, /font-style:\s*normal/);
+  assert.match(by.Bold, /font-weight:\s*600 900/);
+  assert.match(by.Italic, /font-style:\s*italic/);
+  assert.match(by.Italic, /font-weight:\s*100 500/);
+  assert.match(by.BoldItalic, /font-style:\s*italic/);
+  assert.match(by.BoldItalic, /font-weight:\s*600 900/);
+  for (const f of faces) {
+    assert.match(f, /size-adjust:\s*85%/);
+    assert.match(f, /font-family:\s*'OpenDyslexic'/);
+  }
+});
+
+test('OpenDyslexic typeset CSS is a full face-od style, not a Tufte overlay', () => {
+  const css = fs.readFileSync(path.join(web, 'typeset.css'), 'utf8');
+  assert.match(css, /body\.typeset\.face-od\s*\{/);
+  assert.doesNotMatch(css, /face-dyslexic/);
+  assert.match(css, /body\.typeset\.face-od\s*\{[^}]*--font-text:\s*'OpenDyslexic'/);
+  assert.match(css, /body\.typeset\.face-od\s*\{[^}]*--line-height-normal:\s*1\.65/);
+  const page = css.match(/body\.typeset\.face-od \.markdown-preview-view\s*\{[^}]*\}/)?.[0];
+  assert.ok(page, 'preview-view rule');
+  assert.match(page, /font-synthesis:\s*none/);
+  assert.match(page, /font-feature-settings:\s*normal/);
+  assert.match(page, /letter-spacing:\s*0/);
+  assert.match(page, /word-spacing:\s*0\.05em/);
+  assert.match(page, /max-width:\s*min\(var\(--file-line-width\),\s*60ch\)/);
+  assert.match(page, /hyphens:\s*manual/);
+  assert.match(page, /text-align:\s*left/);
+  assert.match(page, /text-rendering:\s*auto/);
+  assert.match(css, /body\.typeset\.face-od \.markdown-preview-view :is\(code, pre, kbd, \.tag\)\s*\{[^}]*font-family:\s*var\(--font-monospace\)/);
+  assert.match(css, /body\.typeset\.face-od \.lead-in\s*\{[^}]*font-weight:\s*700/);
+});
+
+test('typesetClasses treats OpenDyslexic as its own face', () => {
+  const C = ctx.window.Onyx.typesetClasses;
+  assert.equal(typeof C, 'function');
+  assert.equal(C({ on: true, face: 'od' }).trim(), 'typeset face-od');
+  assert.equal(C({ on: true, face: 'od', onum: true, hyphens: true, justify: true }).trim(), 'typeset face-od');
+  assert.equal(C({ on: true, face: 'et', onum: true, hyphens: true }).trim(), 'typeset onum hyph face-et');
+  assert.equal(C({ on: true, face: 'lm', onum: true, hyphens: false }).trim(), 'typeset onum');
+  assert.equal(C({ on: false, face: 'od' }).trim(), '');
+  assert.equal(C({ on: true, face: 'od', print: true }).trim(), 'typeset face-od print');
+  // a leftover dyslexic flag still selects the OpenDyslexic face
+  assert.equal(C({ on: true, face: 'lm', dyslexic: true }).trim(), 'typeset face-od');
+});

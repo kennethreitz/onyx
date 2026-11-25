@@ -10,10 +10,13 @@
 @font-face { font-family: 'Latin Modern Mono'; font-weight: 400; src: url(../fonts/LatinModernMono-Regular.woff2) format('woff2'); }
 @font-face { font-family: 'Latin Modern Mono'; font-weight: 700; src: url(../fonts/LatinModernMono-Bold.woff2) format('woff2'); }
 @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; src: url(../fonts/IBMPlexMono-Regular.woff2) format('woff2'); }
-@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-style: normal; src: url(../fonts/OpenDyslexic-Regular.woff2) format('woff2'); }
-@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-style: normal; src: url(../fonts/OpenDyslexic-Bold.woff2) format('woff2'); }
-@font-face { font-family: 'OpenDyslexic'; font-weight: 400; font-style: italic; src: url(../fonts/OpenDyslexic-Italic.woff2) format('woff2'); }
-@font-face { font-family: 'OpenDyslexic'; font-weight: 700; font-style: italic; src: url(../fonts/OpenDyslexic-BoldItalic.woff2) format('woff2'); }
+/* OpenDyslexic: all four bundled cuts, with weight ranges so 600/800 use real Bold
+   rather than a faux face. size-adjust compensates for the large x-height and wide glyphs
+   (about 30% taller x-height and 60% wider lowercase than Latin Modern at the same px). */
+@font-face { font-family: 'OpenDyslexic'; font-weight: 100 500; font-style: normal; font-display: block; size-adjust: 85%; src: url(../fonts/OpenDyslexic-Regular.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 600 900; font-style: normal; font-display: block; size-adjust: 85%; src: url(../fonts/OpenDyslexic-Bold.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 100 500; font-style: italic; font-display: block; size-adjust: 85%; src: url(../fonts/OpenDyslexic-Italic.woff2) format('woff2'); }
+@font-face { font-family: 'OpenDyslexic'; font-weight: 600 900; font-style: italic; font-display: block; size-adjust: 85%; src: url(../fonts/OpenDyslexic-BoldItalic.woff2) format('woff2'); }
 
 :root {
   --font-text: 'Latin Modern Roman', Georgia, 'Times New Roman', serif;

@@ -436,9 +436,12 @@
     if (by && by.matches('blockquote.epigraph')) by = by.nextElementSibling;
     if (by && by.tagName === 'P' && words(by) < 15 && !by.querySelector('img')) by.classList.add('byline');
     figures(page);
-    if (opts.smallCaps !== false) smallCapsDOM(page);
-    hangQuotes(page);
-    opening(page, opts.opening || 'smallcaps');
+    const od = opts.face === 'od' || !!opts.dyslexic;
+    if (opts.smallCaps !== false && !od) smallCapsDOM(page);
+    if (!od) hangQuotes(page);
+    // OpenDyslexic has no small caps or drop caps; a bold lead-in is the typeset opening.
+    const open = opts.opening || 'smallcaps';
+    opening(page, od && open !== 'none' ? 'smallcaps' : open);
     layoutTables(page);
   }
 

@@ -491,7 +491,7 @@ struct EditorView: NSViewRepresentable {
     @Bindable var ws: Workspace
     var fontSize: Double = 14
     var measure: Double = 41
-    @AppStorage(Typeset.openDyslexic) private var openDyslexic = false
+    @AppStorage(Typeset.face) private var typeface = "lm"
     /// Set for an unfocused split pane: show this note, read-only until the pane is focused.
     var source: (path: String?, text: String)? = nil
     /// The split pane this view belongs to when unfocused (nil = the focused pane).
@@ -629,7 +629,7 @@ struct EditorView: NSViewRepresentable {
             DispatchQueue.main.async { c.reveal(line: line); ws.editorJump = nil }
         }
         if c.scheme != scheme { c.scheme = scheme; c.rehighlight() }
-        let tk = "\(fontSize)/\(measure)/\(openDyslexic)"
+        let tk = "\(fontSize)/\(measure)/\(typeface)"
         if c.typeKey != tk {
             if !c.typeKey.isEmpty { c.rehighlight() }
             c.typeKey = tk
