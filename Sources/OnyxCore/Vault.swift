@@ -444,7 +444,7 @@ public struct VaultSnapshot: Sendable {
         for p in notes.keys { box(for: (p as NSString).deletingLastPathComponent).files.append(p) }
         for p in attachments.keys { box(for: (p as NSString).deletingLastPathComponent).files.append(p) }
         func convert(_ b: Box) -> FileNode {
-            let folderNotePath = b.path.isEmpty ? nil : b.path + "/" + b.name + ".md"
+            let folderNotePath = FolderIndex.notePath(forFolder: b.path)
             let hasFolderNote = folderNotePath.map { notes[$0] != nil } ?? false
             let subs = b.folders.values.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }.map(convert)
             let files = b.files.filter { !(hasFolderNote && $0 == folderNotePath) }

@@ -517,6 +517,9 @@ struct FileMenu: View {
         }
         if isFolder {
             Button("New Note Here") { ws.createNote(named: "Untitled", folder: path) }
+            if folderNote == nil, FolderIndex.notePath(forFolder: path) != nil {
+                Button("New Index Here") { ws.createIndex(in: path) }
+            }
             Button("New Folder") { ws.newFolder(in: path) }
             Menu("Sort This Folder By") { SortChoices(ws: ws, folder: path) }
             Button("Lint Notes in Folder…") { DispatchQueue.main.async { ws.previewLintFolder(path) } }

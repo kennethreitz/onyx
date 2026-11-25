@@ -603,6 +603,25 @@ final class Workspace {
         return path
     }
 
+    /// Create a folder note (`<folder>/<Folder>.md`) when the folder has none, seed
+    /// a modest index template, and open it in the editor. One file creation.
+    @discardableResult
+    func createIndex(in folder: String) -> String? {
+        guard let path = FolderIndex.notePath(forFolder: folder) else { return nil }
+        if snapshot?.notes[path] != nil
+            || FileManager.default.fileExists(atPath: root?.appendingPathComponent(path).path ?? "") {
+            toast = "This folder already has an index."
+            return nil
+        }
+        let body = snapshot.map { FolderIndex.draft(forFolder: folder, in: $0) }
+            ?? FolderIndex.draft(folder: folder, childNotes: [], childFolders: [])
+        guard write(body, to: path, create: true) else { return nil }
+        vaultMutated("Add Index", paths: [path])
+        openNote(path)
+        mode = .edit
+        return path
+    }
+
     func newNote() {
         let folder = newNoteFolder(contextual: NoteNaming.folderForNewNote(
             selected: treeSelection.selected,
