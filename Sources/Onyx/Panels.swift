@@ -580,11 +580,25 @@ struct NoteRow: View {
     var path: String
     var detail: String? = nil
     var preview = false
+    /// 0-based source line to open at, when set.
+    var line: Int? = nil
+    var linkTitle: String? = nil
+    var onLink: (() -> Void)? = nil
     @State private var hover = false
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(((path as NSString).lastPathComponent as NSString).deletingPathExtension).font(.system(size: 12.5)).foregroundStyle(Color.ink).lineLimit(1)
-            Text(detail ?? (path as NSString).deletingLastPathComponent).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(detail == nil ? 1 : 3)
+        HStack(alignment: .top, spacing: 6) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(((path as NSString).lastPathComponent as NSString).deletingPathExtension).font(.system(size: 12.5)).foregroundStyle(Color.ink).lineLimit(1)
+                Text(detail ?? (path as NSString).deletingLastPathComponent).font(.system(size: 10.5)).foregroundStyle(Color.faint).lineLimit(detail == nil ? 1 : 3)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            if let onLink, let linkTitle {
+                Button(linkTitle, action: onLink)
+                    .font(.system(size: 10.5, weight: .medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+                    .padding(.top, 2)
+            }
         }
         .padding(.horizontal, 12).padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -593,7 +607,10 @@ struct NoteRow: View {
         .background { if preview { GraphPreviewTrigger(ws: ws, path: path) } }
         .contextMenu { FileMenu(ws: ws, path: path) }
         .onHover { hover = $0 }
-        .onTapGesture { GraphPreviewController.shared.close(); ws.openNote(path) }
+        .onTapGesture {
+            GraphPreviewController.shared.close()
+            if let line { ws.openNote(path, line: line + 1) } else { ws.openNote(path) }
+        }
     }
 }
 
@@ -753,16 +770,31 @@ struct InspectorView: View {
         sectionTitle("Linked mentions · \(links.count)")
         if links.isEmpty { QuietEmpty(title: "Nothing links here yet.", hint: "Write [[\(note.name)]] in another note.") }
         ForEach(links, id: \.self) { b in
-            NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context))
+            NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context), line: b.line)
         }
-        Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
-            HStack(spacing: Space.xs) { Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold)); Text("UNLINKED MENTIONS").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8) }
-                .foregroundStyle(Color.faint)
-        }.buttonStyle(.plain).padding(.horizontal, 14).padding(.top, 14)
+        let unlinked = snap.unlinkedMentions(of: note.path)
+        HStack(spacing: Space.s) {
+            Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
+                HStack(spacing: Space.xs) {
+                    Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold))
+                    Text("UNLINKED MENTIONS · \(unlinked.count)").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8)
+                }.foregroundStyle(Color.faint)
+            }.buttonStyle(.plain)
+            Spacer(minLength: 0)
+            if showUnlinked && !unlinked.isEmpty {
+                Button("Link all") { ws.linkAllUnlinkedMentions(of: note.path, mentions: unlinked) }
+                    .font(.system(size: 10.5, weight: .medium))
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color.muted)
+            }
+        }.padding(.horizontal, 14).padding(.top, 14)
         if showUnlinked {
-            let unlinked = snap.unlinkedMentions(of: note.path)
-            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.") }
-            ForEach(unlinked, id: \.self) { b in NoteRow(ws: ws, path: b.source, detail: b.context) }
+            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.", hint: "Plain-text uses of this note's title or aliases, outside code and links.") }
+            ForEach(unlinked, id: \.self) { m in
+                NoteRow(ws: ws, path: m.source, detail: m.context, line: m.line, linkTitle: "Link") {
+                    ws.linkUnlinkedMention(m, title: note.name)
+                }
+            }
         }
     }
 

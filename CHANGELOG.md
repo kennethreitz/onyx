@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The inspector's Backlinks tab (⌥⌘2) now opens a linked or unlinked mention at the matching line, and unlinked mentions — plain-text uses of the current note's title or aliases, case-insensitive and at word boundaries, skipping code, comments, and existing links — each have a Link action that turns that occurrence into a `[[wikilink]]`, plus Link all. A file that already links here can still show other unlinked mentions. Logic lives in OnyxCore.
+
 ### Changed
 - OpenDyslexic is a typeset reading style in the same Settings ▸ Reading typeface picker as Latin Modern (Reitz LaTeX) and ET Book (Tufte), not a separate toggle on top of those faces. It has its own page: all four bundled cuts (Regular, Bold, Italic, BoldItalic) with real weights and styles and no faux bold or italic; a size-adjust so the large x-height and wide glyphs sit closer to the other faces; a 1.65 line-height, slightly relaxed word spacing, no extra letter-spacing, and a measure capped at 60ch; no small caps, old-style figures, hyphenation, or justification (ragged left). Headings use a tighter scale, and sidenotes, captions, footnotes, and blockquotes follow. A lead-in is bold rather than small caps; drop caps are not used. The editor uses the same face (a slightly smaller body size, no added tracking). PDF export uses the same stylesheet, and running heads and folios are in OpenDyslexic, natural case. An existing `onyx.openDyslexic` toggle is migrated to this typeface (and typeset reading is turned on) then removed. Code, `pre`, and `kbd` stay monospace. The setting is still local to Onyx.
 

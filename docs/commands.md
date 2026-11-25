@@ -97,6 +97,7 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Appearance: Dark | — |
 | Appearance: Match System | — |
 | Show Sync Log | — |
+
 | Fold Section | <kbd>⌥⌘←</kbd> |
 | Unfold Section | <kbd>⌥⌘→</kbd> |
 | Toggle Fold | — |
@@ -105,6 +106,8 @@ Every command below is in the command palette (<kbd>⌘P</kbd>) and the menu bar
 | Zoom In | <kbd>⌘=</kbd> |
 | Zoom Out | <kbd>⌘-</kbd> |
 | Actual Size | <kbd>⌘0</kbd> |
+
+Backlinks lists notes that link to the current one (click to open at that line) and unlinked mentions of its title or aliases, each with Link or Link all to turn them into wikilinks.
 
 ## Navigate
 

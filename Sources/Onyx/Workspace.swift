@@ -1333,7 +1333,64 @@ final class Workspace {
         flushSave()
     }
 
-    func toggleTask(index: Int) {
+    /// Write `new` to a vault note. If that note is open in the editor, the change goes
+    /// through the text view so ⌘Z can undo it; unfocused split panes stay in sync.
+    @discardableResult
+    func applyNoteText(_ new: String, to path: String, action: String) -> Bool {
+        if path == currentPath {
+            if let tv = liveEditor, tv.string == text, tv.isEditable {
+                let r = NSRange(location: 0, length: (tv.string as NSString).length)
+                if tv.shouldChangeText(in: r, replacementString: new) {
+                    tv.breakUndoCoalescing()
+                    tv.replaceCharacters(in: r, with: new)
+                    tv.didChangeText()
+                    tv.undoManager?.setActionName(action)
+                    tv.breakUndoCoalescing()
+                }
+            }
+            text = new
+            flushSave()
+            return true
+        }
+        for i in panes.indices where panes[i].path == path { panes[i].text = new }
+        guard write(new, to: path, create: false) else { return false }
+        snapshot?.update(path: path, content: new)
+        renderToken += 1
+        return true
+    }
+
+    /// Current body of a note: the open editor or pane buffer if that file is open, else the snapshot or disk.
+    func noteText(for path: String) -> String? {
+        if path == currentPath { return text }
+        if let pane = panes.first(where: { $0.path == path }) { return pane.text }
+        if let body = snapshot?.notes[path]?.content { return body }
+        guard let root else { return nil }
+        return try? String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+    }
+
+    func linkUnlinkedMention(_ mention: UnlinkedMention, title: String) {
+        guard let body = noteText(for: mention.source),
+              let next = UnlinkedMentions.link(body, range: mention.range, title: title) else { return }
+        if applyNoteText(next, to: mention.source, action: "Link Mention") {
+            toast = "Linked “\(mention.matched)” in \(((mention.source as NSString).lastPathComponent as NSString).deletingPathExtension)"
+        }
+    }
+
+    func linkAllUnlinkedMentions(of path: String, mentions: [UnlinkedMention]) {
+        let title = snapshot?.notes[path]?.name ?? ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+        let groups = Dictionary(grouping: mentions, by: \.source)
+        var files = 0, count = 0
+        for (src, items) in groups {
+            guard let body = noteText(for: src) else { continue }
+            let (next, n) = UnlinkedMentions.linkAll(body, mentions: items, title: title)
+            guard n > 0, next != body else { continue }
+            if applyNoteText(next, to: src, action: "Link Mentions") { files += 1; count += n }
+        }
+        if count == 0 { toast = "Nothing to link" }
+        else { toast = "Linked \(count) mention\(count == 1 ? "" : "s") in \(files) note\(files == 1 ? "" : "s")" }
+    }
+
+        func toggleTask(index: Int) {
         let lines = text.components(separatedBy: "\n")
         var out = lines
         var n = 0
