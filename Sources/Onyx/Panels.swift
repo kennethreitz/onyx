@@ -727,37 +727,26 @@ struct InspectorView: View {
         VStack(spacing: 0) {
             PanelHeader(tabs: InspectorTab.allCases, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned)
             Divider().overlay(Color.hairline)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    if let note = ws.currentNote, let snap = ws.snapshot {
-                        switch ws.inspectorTab {
-                        case .outline: outline(note)
-                        case .backlinks: backlinks(note, snap)
-                        case .properties: properties(note, snap)
+            if ws.inspectorTab == .outline {
+                OutlinePane(ws: ws)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if let note = ws.currentNote, let snap = ws.snapshot {
+                            switch ws.inspectorTab {
+                            case .outline: EmptyView()
+                            case .backlinks: backlinks(note, snap)
+                            case .properties: properties(note, snap)
+                            }
                         }
-                    }
-                }.padding(.vertical, 8).thinScrollers()
+                    }.padding(.vertical, 8).thinScrollers()
+                }
             }
         }
     }
 
     func sectionTitle(_ s: String) -> some View {
         Text(s.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 4)
-    }
-
-    @ViewBuilder func outline(_ note: NoteRecord) -> some View {
-        let hs = NoteParser.parseHeadings(ws.settledText)
-        if hs.isEmpty { QuietEmpty(title: "No headings yet.", hint: "Lines that start with # build the outline.").padding(.top, Space.xs) }
-        let minLevel = hs.map(\.level).min() ?? 1
-        ForEach(Array(hs.enumerated()), id: \.offset) { i, h in
-            Text(h.text)
-                .font(Theme.serif(h.level == minLevel ? 14 : 13, bold: h.level == minLevel))
-                .foregroundStyle(h.level <= minLevel + 1 ? Color.ink : Color.muted)
-                .lineLimit(2)
-                .padding(.leading, 14 + CGFloat(h.level - minLevel) * 12).padding(.trailing, 12).padding(.vertical, 3.5)
-                .frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
-                .onTapGesture { ws.readerJump = i; ws.editorJump = h.line }
-        }
     }
 
     @ViewBuilder func relations(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {

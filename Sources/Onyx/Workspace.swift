@@ -126,6 +126,16 @@ final class Workspace {
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
     var inspectorTab: InspectorTab = .outline
+    /// How far the Outline pane looks. Remembered across launches.
+    var outlineScope: OutlineScope = OutlineScope(rawValue: UserDefaults.standard.string(forKey: "onyx.outlineScope") ?? "") ?? .note {
+        didSet { if outlineScope != oldValue { UserDefaults.standard.set(outlineScope.rawValue, forKey: "onyx.outlineScope") } }
+    }
+    var outlineExpanded: Set<String> = []
+    /// Heading branches are open by default; ids listed here are collapsed.
+    var outlineCollapsed: Set<String> = []
+    /// The focused pane's source line, updated while scrolling when the Outline tab is open
+    /// so the current heading can highlight without refreshing the rest of the workspace.
+    var outlineTop: Double = 0
     var overlay: Overlay = .none { didSet { if overlay != oldValue { overlayChanged(from: oldValue) } } }
     var searchQuery = ""
     var focusSearch = 0
@@ -388,6 +398,7 @@ final class Workspace {
         let alreadyOpen = currentPath == path
         if !alreadyOpen {
             liveTop = 0
+            outlineTop = 0
             speech.stop()
             editedSinceLint = false
         }
@@ -1556,6 +1567,7 @@ final class Workspace {
             if inspectorVisible { hideInspector(animated: false) }
             else { if focusMode { toggleFocusMode() }; inspectorVisible = true; inspectorPinned = true; persistInspector() }
         }
+        if inspectorVisible, inspectorTab == .outline { syncOutlineTop() }
     }
     func hideInspector(animated: Bool = true) {
         let body = { self.inspectorVisible = false; self.inspectorPinned = false }
@@ -1936,7 +1948,35 @@ extension Workspace {
         if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
             FileHandle.standardError.write("[top] \(pane.map { String($0.uuidString.prefix(4)) } ?? "live") \(String(format: "%.2f", line)) \(mode)\n".data(using: .utf8)!)
         }
+        if inspectorVisible, inspectorTab == .outline, isFocusedPane(pane), Int(outlineTop) != Int(line) {
+            outlineTop = line
+        }
     }
+    /// Keep the outline highlight in sync when the pane is opened or focus changes.
+    func syncOutlineTop() {
+        let line: Double
+        if isSplit, panes.indices.contains(focusedPane), let t = paneTop[panes[focusedPane].id] {
+            line = t
+        } else {
+            line = liveTop
+        }
+        if outlineTop != line { outlineTop = line }
+    }
+    func isFocusedPane(_ pane: UUID?) -> Bool {
+        if !isSplit { return true }
+        if let pane { return panes.indices.contains(focusedPane) && panes[focusedPane].id == pane }
+        return false
+    }
+    func jumpToOutlineHeading(path: String, index: Int, line: Int) {
+        if currentPath != path { openNote(path) }
+        readerJump = index
+        editorJump = line
+    }
+    func scrollToNoteTop() {
+        scrollRequest = ScrollRequest(line: 0, id: (scrollRequest?.id ?? 0) + 1)
+        editorJump = 0
+    }
+
     /// Where a newly created view should open.
     func initialTop(_ pane: UUID?) -> Double { pane.map { paneTop[$0] ?? 0 } ?? liveTop }
 
