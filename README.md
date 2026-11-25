@@ -54,9 +54,11 @@ Opening a second copy of Onyx (a newly built app, `open -n`, or another folder w
 ```sh
 git clone https://github.com/kennethreitz/onyx && cd onyx
 make install            # universal (Apple silicon + Intel) build into /Applications/Onyx.app
+make install ONE_ARCH=1 # this machine's architecture only (faster); also `make install-native`
+make install ARCH=arm64 # one slice (arm64 or x86_64)
 ```
 
-`make install` builds the same universal app as `make release` (without the zip), asks a running Onyx to quit (it saves first; never force-killed), swaps the new app in with `ditto` so the signature is kept, then prints the installed version and architectures. `INSTALL_DIR=~/Applications` (or `DESTDIR`) installs elsewhere, `NO_QUIT=1` skips quitting, `RELAUNCH=1` reopens Onyx if it was running, and `make uninstall` removes it. Details and other targets are in [Building from source](docs/DEVELOP.md).
+`make install` builds the same universal app as `make release` (without the zip), asks a running Onyx to quit (it saves first; never force-killed), swaps the new app in with `ditto` so the signature is kept, then prints the installed version and architectures. `make install ONE_ARCH=1` or `make install-native` does the same install for only this machine's architecture; `ARCH=arm64` or `ARCH=x86_64` selects the slice. `INSTALL_DIR=~/Applications` (or `DESTDIR`) installs elsewhere, `NO_QUIT=1` skips quitting, `RELAUNCH=1` reopens Onyx if it was running, and `make uninstall` removes it. Details and other targets are in [Building from source](docs/DEVELOP.md).
 
 ## Docs
 

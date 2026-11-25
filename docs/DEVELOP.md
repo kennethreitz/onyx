@@ -16,6 +16,8 @@ UNIVERSAL=1 make app           # universal app, no zip
 make test                      # Swift tests, then the reader tests
 swift run -c release onyx-bench /tmp/vault-copy   # timings against a vault copy (docs/performance.md)
 make install                   # universal Onyx.app into /Applications (quits a running Onyx first)
+make install ONE_ARCH=1        # this machine's architecture only (faster); also `make install-native`
+make install ARCH=arm64        # one slice (arm64 or x86_64)
 make install INSTALL_DIR=~/Applications RELAUNCH=1   # elsewhere; RELAUNCH reopens it if it was running
 make uninstall                 # remove $(INSTALL_DIR)/Onyx.app
 make dev                       # debug binary, pointed at a test vault
@@ -25,6 +27,8 @@ make clean                     # remove .build and build/
 ```
 
 `make install` is the same universal `Onyx.app` as `make release`, without the zip. It asks a running Onyx to quit first only when the target is the real `/Applications` (never `kill -9`; `NO_QUIT=1` skips this), copies the bundle with `ditto` so the code signature is kept, and swaps it in beside the old app. `INSTALL_DIR` and `DESTDIR` stage or install elsewhere (a path other than `/Applications` never quits the running app). `RELAUNCH=1` reopens Onyx if it was running. `make uninstall` removes `$(INSTALL_DIR)/Onyx.app`.
+
+`make install ONE_ARCH=1` or `make install-native` is the same install path, but builds only this machine's architecture (`uname -m`) in release config. `ARCH=arm64` or `ARCH=x86_64` selects the slice (`make install ARCH=x86_64`, or together with `ONE_ARCH=1`). Make cannot pass `--one-arch` as a flag, so these are variables and an alias target.
 
 With no `--vault`, Onyx opens the last vault you chose, or `~/Notes` if that folder exists. A vault in `/tmp` is never remembered, so test copies don’t stick. `ONYX_NO_DEFAULT_VAULT=1` skips the fallback entirely (used by `make run-test` and `make dev`). `--vault` never overwrites the remembered vault.
 

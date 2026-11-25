@@ -6,19 +6,39 @@ ARGS ?=
 # UNIVERSAL=1 (or `make release`) builds an arm64 + x86_64 binary.
 # `make app` stays native so everyday rebuilds stay fast.
 UNIVERSAL ?= 0
-# make install: where the universal app goes. DESTDIR stages under a prefix.
+# make install is universal unless ONE_ARCH=1 or ARCH=arm64|x86_64.
+# `make install-native` is an alias for ONE_ARCH=1 (this machine's arch).
+ONE_ARCH ?= 0
+ARCH ?=
+HOST_ARCH := $(shell uname -m)
+# make install: where the app goes. DESTDIR stages under a prefix.
 INSTALL_DIR ?= /Applications
 DESTDIR ?=
 NO_QUIT ?=
 RELAUNCH ?=
 
-.PHONY: build app run dev test icon demo-vault clean install uninstall release
+# `make install` stays universal unless a one-arch flag is set.
+INSTALL_UNIVERSAL = 1
+ifeq ($(ONE_ARCH),1)
+INSTALL_UNIVERSAL = 0
+endif
+ifneq ($(strip $(ARCH)),)
+INSTALL_UNIVERSAL = 0
+endif
+INSTALL_ARCH = $(strip $(ARCH))
+ifeq ($(INSTALL_UNIVERSAL),0)
+ifeq ($(INSTALL_ARCH),)
+INSTALL_ARCH = $(HOST_ARCH)
+endif
+endif
+
+.PHONY: build app run dev test icon demo-vault clean install install-native uninstall release
 
 build:
-	UNIVERSAL=$(UNIVERSAL) ./scripts/build-binary.sh release
+	UNIVERSAL=$(UNIVERSAL) ARCH="$(ARCH)" ./scripts/build-binary.sh release
 
 app: build icon
-	UNIVERSAL=$(UNIVERSAL) ./scripts/bundle.sh release
+	UNIVERSAL=$(UNIVERSAL) ARCH="$(ARCH)" ./scripts/bundle.sh release
 
 # Universal (Apple silicon + Intel) app, plus the GitHub Releases zip.
 # Asset name must stay Onyx-<version>-macOS.zip; the auto-updater looks for it.
@@ -60,12 +80,16 @@ demo-vault:
 	cd ~/Notes && rsync -a Writing/Essays Writing/Poetry Writing/Music "Writing/Artificial Intelligence" Writing/Writing.md /tmp/onyx-vault/Writing/
 	cd ~/Notes/.obsidian && cp app.json appearance.json bookmarks.json daily-notes.json /tmp/onyx-vault/.obsidian/
 
-# Universal app (same build as `make release`, no zip) into $(INSTALL_DIR)/Onyx.app.
-# Quits a running Onyx gracefully only for the real /Applications (NO_QUIT=1 skips);
-# RELAUNCH=1 reopens it afterwards if it was running.
+# App (universal by default; same build as `make release`, no zip) into $(INSTALL_DIR)/Onyx.app.
+# ONE_ARCH=1 or `make install-native` builds only this machine's architecture (`uname -m`);
+# ARCH=arm64 or ARCH=x86_64 selects the slice. Quits a running Onyx gracefully only for
+# the real /Applications (NO_QUIT=1 skips); RELAUNCH=1 reopens it afterwards if it was running.
 install:
-	$(MAKE) app UNIVERSAL=1
-	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" RELAUNCH="$(RELAUNCH)" ./scripts/install.sh install
+	$(MAKE) app UNIVERSAL=$(INSTALL_UNIVERSAL) ARCH="$(INSTALL_ARCH)"
+	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" RELAUNCH="$(RELAUNCH)" UNIVERSAL="$(INSTALL_UNIVERSAL)" ONE_ARCH="$(ONE_ARCH)" ARCH="$(INSTALL_ARCH)" ./scripts/install.sh install
+
+install-native:
+	$(MAKE) install ONE_ARCH=1
 
 uninstall:
 	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" ./scripts/install.sh uninstall

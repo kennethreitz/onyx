@@ -4,10 +4,20 @@ set -euo pipefail
 CONFIG="${1:-release}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 UNIVERSAL="${UNIVERSAL:-0}"
+ARCH="${ARCH:-}"
 if [ "$UNIVERSAL" = 1 ]; then
   BIN="$ROOT/.build/universal/Onyx"
 else
-  BIN="$ROOT/.build/$CONFIG/Onyx"
+  SHOW_ARGS=(-c "$CONFIG")
+  if [ -n "$ARCH" ]; then
+    SHOW_ARGS+=(--arch "$ARCH")
+  fi
+  SHOW=$(swift build "${SHOW_ARGS[@]}" --show-bin-path 2>/dev/null || true)
+  if [ -n "$SHOW" ] && [ -x "$SHOW/Onyx" ]; then
+    BIN="$SHOW/Onyx"
+  else
+    BIN="$ROOT/.build/$CONFIG/Onyx"
+  fi
 fi
 if [ ! -x "$BIN" ]; then
   echo "error: missing binary at $BIN" >&2

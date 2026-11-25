@@ -1,7 +1,8 @@
 #!/bin/bash
 # Install (or uninstall) build/Onyx.app into $INSTALL_DIR (default /Applications).
 #   scripts/install.sh install | uninstall
-# Env: INSTALL_DIR, DESTDIR (staging prefix), NO_QUIT=1, RELAUNCH=1.
+# Env: INSTALL_DIR, DESTDIR (staging prefix), NO_QUIT=1, RELAUNCH=1,
+#      UNIVERSAL, ONE_ARCH, ARCH (so a one-arch install is not warned as "not universal").
 # A running Onyx is asked to quit (never force-killed) only when the target is the
 # real /Applications with no DESTDIR, so test installs never touch a running app.
 set -euo pipefail
@@ -65,7 +66,14 @@ case "$ACTION" in
     ARCHS="$(lipo -archs "$BIN")"
     VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$TARGET/Contents/Info.plist")"
     echo "Installed Onyx $VERSION ($ARCHS) to $TARGET"
-    case "$ARCHS" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "warning: not universal ($ARCHS)" >&2 ;; esac
+    if [ "${UNIVERSAL:-1}" = 1 ]; then
+      case "$ARCHS" in *arm64*x86_64*|*x86_64*arm64*) ;; *) echo "warning: not universal ($ARCHS)" >&2 ;; esac
+    elif [ -n "${ARCH:-}" ]; then
+      case " $ARCHS " in
+        *" $ARCH "*) ;;
+        *) echo "warning: expected architecture $ARCH, got ($ARCHS)" >&2 ;;
+      esac
+    fi
     codesign --verify --deep "$TARGET" >/dev/null 2>&1 && echo "Code signature: valid" || echo "warning: code signature did not verify" >&2
     if [ "$WAS_RUNNING" = 1 ] && [ "${RELAUNCH:-0}" = 1 ]; then
       echo "Relaunching Onyx."

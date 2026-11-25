@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 CONFIG="${1:-release}"
 UNIVERSAL="${UNIVERSAL:-0}"
+ARCH="${ARCH:-}"
 
 is_universal() {
   local info
@@ -36,7 +37,16 @@ find_product() {
 }
 
 if [ "$UNIVERSAL" != 1 ]; then
-  swift build -c "$CONFIG"
+  if [ -n "$ARCH" ]; then
+    case "$ARCH" in
+      arm64|x86_64) ;;
+      *) echo "error: ARCH must be arm64 or x86_64 (got '$ARCH')" >&2; exit 1 ;;
+    esac
+    echo "Building $CONFIG for ${ARCH}..."
+    swift build -c "$CONFIG" --arch "$ARCH"
+  else
+    swift build -c "$CONFIG"
+  fi
   exit 0
 fi
 
