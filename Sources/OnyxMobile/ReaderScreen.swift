@@ -69,6 +69,9 @@ struct ReaderScreen: UIViewRepresentable {
     var snapshot: VaultSnapshot
     var vaultRoot: URL
     var dark: Bool
+    var typesetRevision: Int = 0
+    var jumpLine: Int? = nil
+    var jumpToken: Int = 0
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -92,11 +95,17 @@ struct ReaderScreen: UIViewRepresentable {
         let c = context.coordinator
         c.handler?.vaultRoot = vaultRoot
         c.snapshot = snapshot
-        if c.ready, (c.path != note.path || c.text != note.content || c.dark != dark) {
-            c.render(note: note, snapshot: snapshot, dark: dark)
+        let typeset = TypesetSettings.options()
+        let changed = c.path != note.path || c.text != note.content || c.dark != dark
+            || c.typesetRevision != typesetRevision || c.jumpToken != jumpToken
+        if c.ready, changed {
+            c.render(note: note, snapshot: snapshot, dark: dark, typeset: typeset, line: jumpLine)
+            c.typesetRevision = typesetRevision
+            c.jumpToken = jumpToken
         } else {
             c.pendingNote = note
             c.pendingDark = dark
+            c.pendingLine = jumpLine
         }
     }
 
@@ -111,27 +120,27 @@ struct ReaderScreen: UIViewRepresentable {
         var dark = false
         var pendingNote: NoteRecord?
         var pendingDark = false
+        var pendingLine: Int? = nil
+        var typesetRevision = -1
+        var jumpToken = -1
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             ready = true
             if let note = pendingNote {
-                render(note: note, snapshot: snapshot, dark: pendingDark)
+                render(note: note, snapshot: snapshot, dark: pendingDark, typeset: TypesetSettings.options(), line: pendingLine)
                 pendingNote = nil
             }
         }
 
-        func render(note: NoteRecord, snapshot: VaultSnapshot?, dark: Bool) {
+        func render(note: NoteRecord, snapshot: VaultSnapshot?, dark: Bool, typeset: [String: Any], line: Int?) {
             guard let snapshot else { return }
             path = note.path
             text = note.content
             self.dark = dark
-            let typeset: [String: Any] = [
-                "on": true, "onum": true, "hyphens": true, "smallCaps": true,
-                "justify": false, "face": "lm", "opening": "smallcaps"
-            ]
             let payload = ReaderPayload.build(
                 text: note.content, path: note.path, snap: snapshot,
                 dark: dark, sidenotes: true, keepScroll: false,
+                line: Double(line ?? 0),
                 typeset: typeset, backlinks: true
             )
             webView?.evaluateJavaScript("Onyx.setType(19, 36); Onyx.render(\(payload))", completionHandler: nil)
@@ -141,10 +150,36 @@ struct ReaderScreen: UIViewRepresentable {
             guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
             switch type {
             case "open":
+                let line = body["line"] as? Int
                 if let p = body["path"] as? String, !p.isEmpty, snapshot?.notes[p] != nil {
-                    NotificationCenter.default.post(name: .onyxOpenNote, object: p)
+                    var info: [String: Any] = ["path": p]
+                    if let line { info["line"] = line }
+                    NotificationCenter.default.post(name: .onyxOpenNote, object: p, userInfo: info)
                 } else if let t = body["target"] as? String, let resolved = snapshot?.resolve(t, from: path), snapshot?.notes[resolved] != nil {
-                    NotificationCenter.default.post(name: .onyxOpenNote, object: resolved)
+                    NotificationCenter.default.post(name: .onyxOpenNote, object: resolved, userInfo: ["path": resolved])
+                }
+            case "unlinked":
+                if let snap = snapshot, let p = path {
+                    let items = snap.unlinkedMentions(of: p).map { [
+                        "path": $0.source,
+                        "name": snap.notes[$0.source]?.name ?? $0.source,
+                        "text": ReaderPayload.snippet($0.context),
+                        "line": $0.line,
+                        "loc": $0.range.location,
+                        "len": $0.range.length,
+                        "matched": $0.matched,
+                    ] as [String: Any] }
+                    if let d = try? JSONSerialization.data(withJSONObject: items) {
+                        webView?.evaluateJavaScript("Onyx.setUnlinked(\(String(decoding: d, as: UTF8.self)))", completionHandler: nil)
+                    }
+                }
+            case "linkMention":
+                if let source = body["path"] as? String, let loc = body["loc"] as? Int, let len = body["len"] as? Int, let target = path {
+                    let matched = (body["matched"] as? String) ?? ""
+                    let title = snapshot?.notes[target]?.name ?? ((target as NSString).lastPathComponent as NSString).deletingPathExtension
+                    NotificationCenter.default.post(name: .onyxLinkMention, object: nil, userInfo: [
+                        "source": source, "loc": loc, "len": len, "matched": matched, "title": title,
+                    ])
                 }
             case "url":
                 if let s = body["url"] as? String, let u = URL(string: s) {
@@ -155,7 +190,7 @@ struct ReaderScreen: UIViewRepresentable {
                     NotificationCenter.default.post(name: .onyxSearch, object: "tag:" + t)
                 }
             default:
-                break // read-only: ignore edit, task, kanban, folds, imageSize
+                break // ignore edit, task, kanban, folds, imageSize
             }
         }
 
@@ -165,4 +200,6 @@ struct ReaderScreen: UIViewRepresentable {
 extension Notification.Name {
     static let onyxOpenNote = Notification.Name("onyx.ios.openNote")
     static let onyxSearch = Notification.Name("onyx.ios.search")
+    static let onyxOpenURL = Notification.Name("onyx.ios.openURL")
+    static let onyxLinkMention = Notification.Name("onyx.ios.linkMention")
 }

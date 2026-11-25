@@ -7,23 +7,35 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1B45BD778A5843FB4A8DAD16 /* HistoryScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 931BAB74D3ECB997E0ED16C9 /* HistoryScreen.swift */; };
+		20A0E01536DCC5612407A1AD /* ReadingSettingsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2888E7D92043535DD9C6D3D3 /* ReadingSettingsScreen.swift */; };
 		3EE68589EC230CE22B324A82 /* ReaderScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */; };
+		4F3F5DFC8BDFB96F9B6D6271 /* FindScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034D4D88383C27DCFB760B8B /* FindScreen.swift */; };
 		548211D60C5058678CD61D99 /* web in Resources */ = {isa = PBXBuildFile; fileRef = 75BDB5EB8C31E7F2279E3B91 /* web */; };
 		8E12BE7851DBE78779201BB6 /* OnyxCore in Frameworks */ = {isa = PBXBuildFile; productRef = B5025830C731886899C0FD1A /* OnyxCore */; };
+		96B4412DBF25E2ABCEEAEAD1 /* OutlineScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */; };
+		ABB9FEF2BDEDCE75ACE3FB69 /* BacklinksScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73CA0B15C54F5B963E9808FB /* BacklinksScreen.swift */; };
 		B18B0641C8469D163E09F096 /* OnyxMobileApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31BFC0108B1499C1BB51648 /* OnyxMobileApp.swift */; };
 		BA5D8C4EB3A6114D38C5049C /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 982A8D36684463E2A1AA3781 /* ContentView.swift */; };
+		D66C59CBDC2BBEBAAFD683C3 /* BookmarksScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5F5BF466AEA653DDD1805EA /* BookmarksScreen.swift */; };
 		FE43DED7160A86E7F0D97342 /* MobileVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D094C3151EF96A142877A9 /* MobileVault.swift */; };
 		FFBF037566BAE9EC3BCCD2D8 /* fonts in Resources */ = {isa = PBXBuildFile; fileRef = 0D1002CB5EA53726EFC1D099 /* fonts */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		034D4D88383C27DCFB760B8B /* FindScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindScreen.swift; sourceTree = "<group>"; };
 		0D1002CB5EA53726EFC1D099 /* fonts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = fonts; path = Resources/fonts; sourceTree = SOURCE_ROOT; };
 		0FA10F94ED7A2A1BFC3994F3 /* OnyxMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OnyxMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineScreen.swift; sourceTree = "<group>"; };
+		2888E7D92043535DD9C6D3D3 /* ReadingSettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSettingsScreen.swift; sourceTree = "<group>"; };
 		2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderScreen.swift; sourceTree = "<group>"; };
 		301E831E3BBDD7BFCF679FCE /* onyx-ios */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "onyx-ios"; path = .; sourceTree = SOURCE_ROOT; };
 		60D094C3151EF96A142877A9 /* MobileVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileVault.swift; sourceTree = "<group>"; };
+		73CA0B15C54F5B963E9808FB /* BacklinksScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklinksScreen.swift; sourceTree = "<group>"; };
 		75BDB5EB8C31E7F2279E3B91 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Resources/web; sourceTree = SOURCE_ROOT; };
+		931BAB74D3ECB997E0ED16C9 /* HistoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryScreen.swift; sourceTree = "<group>"; };
 		982A8D36684463E2A1AA3781 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		B5F5BF466AEA653DDD1805EA /* BookmarksScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksScreen.swift; sourceTree = "<group>"; };
 		F31BFC0108B1499C1BB51648 /* OnyxMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnyxMobileApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -69,10 +81,16 @@
 		CC4773689818F3FB1BCCAD7D /* OnyxMobile */ = {
 			isa = PBXGroup;
 			children = (
+				73CA0B15C54F5B963E9808FB /* BacklinksScreen.swift */,
+				B5F5BF466AEA653DDD1805EA /* BookmarksScreen.swift */,
 				982A8D36684463E2A1AA3781 /* ContentView.swift */,
+				034D4D88383C27DCFB760B8B /* FindScreen.swift */,
+				931BAB74D3ECB997E0ED16C9 /* HistoryScreen.swift */,
 				60D094C3151EF96A142877A9 /* MobileVault.swift */,
 				F31BFC0108B1499C1BB51648 /* OnyxMobileApp.swift */,
+				18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */,
 				2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */,
+				2888E7D92043535DD9C6D3D3 /* ReadingSettingsScreen.swift */,
 			);
 			name = OnyxMobile;
 			path = Sources/OnyxMobile;
@@ -154,10 +172,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ABB9FEF2BDEDCE75ACE3FB69 /* BacklinksScreen.swift in Sources */,
+				D66C59CBDC2BBEBAAFD683C3 /* BookmarksScreen.swift in Sources */,
 				BA5D8C4EB3A6114D38C5049C /* ContentView.swift in Sources */,
+				4F3F5DFC8BDFB96F9B6D6271 /* FindScreen.swift in Sources */,
+				1B45BD778A5843FB4A8DAD16 /* HistoryScreen.swift in Sources */,
 				FE43DED7160A86E7F0D97342 /* MobileVault.swift in Sources */,
 				B18B0641C8469D163E09F096 /* OnyxMobileApp.swift in Sources */,
+				96B4412DBF25E2ABCEEAEAD1 /* OutlineScreen.swift in Sources */,
 				3EE68589EC230CE22B324A82 /* ReaderScreen.swift in Sources */,
+				20A0E01536DCC5612407A1AD /* ReadingSettingsScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

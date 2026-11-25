@@ -23,43 +23,31 @@ enum Prefs {
 
 /// Typeset reading (Settings ▸ Reading). Read fresh at every render, so a toggle applies at once.
 enum Typeset {
-    static let on = "onyx.typeset"                 // the whole pass; off = plain Reitz LaTeX
-    static let oldstyle = "onyx.oldstyleFigures"
-    static let hyphens = "onyx.hyphenation"
-    static let smallCaps = "onyx.smallCaps"        // runs of capitals (PSF, HTTP) in true small caps
-    static let face = "onyx.typeface"              // "lm" (Latin Modern, Reitz LaTeX) | "et" (ET Book, Tufte) | "od" (OpenDyslexic)
-    static let opening = "onyx.opening"            // "smallcaps" | "dropcap" | "none"
-    static let justify = "onyx.justify"            // justified paragraphs; off = ragged right (default)
-    /// Retired in 0.1.18: OpenDyslexic is a typeface (`od`), not a separate toggle.
-    static let openDyslexicLegacy = "onyx.openDyslexic"
+    // Keys live in OnyxCore so the iOS reader uses the same defaults.
+    static let on = TypesetSettings.Key.on
+    static let oldstyle = TypesetSettings.Key.oldstyle
+    static let hyphens = TypesetSettings.Key.hyphens
+    static let smallCaps = TypesetSettings.Key.smallCaps
+    static let face = TypesetSettings.Key.face
+    static let opening = TypesetSettings.Key.opening
+    static let justify = TypesetSettings.Key.justify
+    static let openDyslexicLegacy = TypesetSettings.Key.openDyslexicLegacy
 
     static func bool(_ k: String, dflt: Bool = true) -> Bool { UserDefaults.standard.object(forKey: k) as? Bool ?? dflt }
     static var faceName: String {
         migrateOpenDyslexicIfNeeded()
-        let f = UserDefaults.standard.string(forKey: face) ?? "lm"
-        return (f == "et" || f == "od") ? f : "lm"
+        return TypesetSettings.normalizedFace(UserDefaults.standard.string(forKey: face))
     }
     static var openingName: String { UserDefaults.standard.string(forKey: opening) ?? "smallcaps" }
     static var openDyslexicEnabled: Bool { faceName == "od" }
 
-    /// Promote the old `onyx.openDyslexic` toggle to the OpenDyslexic typeface and drop the key.
     static func migrateOpenDyslexicIfNeeded() {
-        let d = UserDefaults.standard
-        guard d.object(forKey: openDyslexicLegacy) != nil else { return }
-        if d.bool(forKey: openDyslexicLegacy) {
-            d.set("od", forKey: face)
-            d.set(true, forKey: on)
-        }
-        d.removeObject(forKey: openDyslexicLegacy)
+        TypesetSettings.migrateOpenDyslexic(in: .standard)
     }
 
     /// The `typeset` object the reader's typeset.js and typeset.css key off.
     static func options(preview: Bool = false, print: [String: Any]? = nil) -> [String: Any] {
-        let face = faceName
-        var o: [String: Any] = ["on": bool(on), "onum": bool(oldstyle), "hyphens": bool(hyphens), "smallCaps": bool(smallCaps),
-                                "justify": bool(justify, dflt: false), "face": face, "opening": preview ? "none" : openingName]
-        if let print { o["print"] = print }
-        return o
+        TypesetSettings.options(from: .standard, preview: preview, print: print)
     }
     static var signature: String { "\(bool(on))\(bool(oldstyle))\(bool(hyphens))\(bool(smallCaps))\(bool(justify, dflt: false))\(faceName)\(openingName)" }
 }

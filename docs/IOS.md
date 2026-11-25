@@ -123,6 +123,20 @@ make ios    # xcodegen generate && xcodebuild -scheme OnyxMobile -destination 'g
 
 Requires Xcode with the iOS Simulator SDK (17+) and [XcodeGen](https://github.com/yonaskolb/XcodeGen). Open `Onyx.xcodeproj` and run the `OnyxMobile` scheme on an iPhone or iPad simulator.
 
+## Screens added after the first cut
+
+The iOS shell now surfaces the features that landed on master the same day, reusing OnyxCore:
+
+- **Bookmarks** — a sidebar tab. The list is `.obsidian/bookmarks.json` (Obsidian's format, including groups). Swipe a note or use the note menu to pin or unpin; swipe a bookmark to remove it. File, folder, search, and URL bookmarks open; graph bookmarks explain that the graph isn't in the iOS app yet.
+- **Outline** — This note, Folder, Linked & partOf, or Whole vault, flattened lazily the same way as the Mac inspector. Tapping a heading opens that note at the line.
+- **Backlinks** — from the note menu, or under the note in the reader. Linked mentions open at the line. Unlinked mentions follow the same rules as the Mac app. **Link** / **Link all** write the wikilink through the security-scoped vault folder (`NSFileCoordinator`, atomic write, then the snapshot is updated).
+- **Find** — a sidebar tab: match case, whole word, regular expression, a preview grouped by file with checkboxes. **Replace selected** writes the same way as Link, or rolls the whole pass back if one file fails. (The usual vault search operators stay on the Notes search field.)
+- **Reading** — Latin Modern, ET Book, and OpenDyslexic, plus the typeset toggles, stored in the same UserDefaults keys as Mac Settings ▸ Reading. The setting is local to Onyx, not the vault. The bundled fonts already ship in the iOS target.
+- **Version History** — a short “not available on iPhone” screen. History on the Mac uses git; the iOS app does not ship git, and we don't pretend otherwise.
+- **Web clipper** — not on iOS. Article HTML is converted with `HTMLToMarkdown`, which needs macOS `XMLDocument`.
+
+Limited writing is intentional: only bookmarks, linking a mention, and vault replace, all inside the folder the user picked. Creating notes, a full editor, and git are still later milestones.
+
 ## What’s in this first cut
 
 - Package platforms include iOS 17; `OnyxCore` (and `OnyxSync`) are built as libraries
