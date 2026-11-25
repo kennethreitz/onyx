@@ -7,7 +7,7 @@ final class MobileVault: ObservableObject {
     static let bookmarkKey = "onyx.ios.vaultBookmark"
 
     @Published var root: URL?
-    @Published var snapshot: VaultSnapshot?
+    @Published var snapshot: VaultSnapshot? { didSet { snapshotGeneration += 1 } }
     @Published var selectedPath: String?
     @Published var query = ""
     @Published var error: String?
@@ -158,6 +158,21 @@ final class MobileVault: ObservableObject {
     @Published var showHistory = false
     @Published var showBacklinks = false
     @Published var typesetRevision = 0
+    // Tags tab (TagsScreen.swift)
+    @Published var tagSelected: String?
+    @Published var tagFilter = ""
+    @Published var tagSort: TagTree.Sort = TagTree.Sort(rawValue: UserDefaults.standard.string(forKey: "onyx.ios.tags.sort") ?? "") ?? .name {
+        didSet { UserDefaults.standard.set(tagSort.rawValue, forKey: "onyx.ios.tags.sort") }
+    }
+    @Published var tagExact = UserDefaults.standard.bool(forKey: "onyx.ios.tags.exact") {
+        didSet { UserDefaults.standard.set(tagExact, forKey: "onyx.ios.tags.exact") }
+    }
+    @Published var tagExpanded: Set<String> = Set(UserDefaults.standard.stringArray(forKey: MobileVault.tagExpandedKey) ?? []) {
+        didSet { UserDefaults.standard.set(tagExpanded.sorted(), forKey: MobileVault.tagExpandedKey) }
+    }
+    var tagCache: (gen: Int, sort: TagTree.Sort, tree: TagTree)?
+    /// Bumped whenever `snapshot` is replaced, so derived caches know.
+    var snapshotGeneration = 0
 }
 
 extension MobileVault {
@@ -208,18 +223,19 @@ extension MobileVault {
         selectedPath = path
         jumpLine = line
         jumpToken += 1
-        if libraryTab == .find || libraryTab == .bookmarks { libraryTab = .notes }
+        if libraryTab == .find || libraryTab == .bookmarks { libraryTab = .notes }   // the Tags tab stays put, so back returns to the tag
     }
 
     // MARK: - Navigation extras
 
     enum LibraryTab: String, CaseIterable, Identifiable {
-        case notes, bookmarks, outline, find
+        case notes, bookmarks, tags, outline, find
         var id: String { rawValue }
         var title: String {
             switch self {
             case .notes: "Notes"
             case .bookmarks: "Bookmarks"
+            case .tags: "Tags"
             case .outline: "Outline"
             case .find: "Find"
             }
@@ -228,6 +244,7 @@ extension MobileVault {
             switch self {
             case .notes: "doc.text"
             case .bookmarks: "bookmark"
+            case .tags: "number"
             case .outline: "list.bullet.indent"
             case .find: "magnifyingglass"
             }

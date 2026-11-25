@@ -12,6 +12,7 @@
 		3EE68589EC230CE22B324A82 /* ReaderScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */; };
 		4F3F5DFC8BDFB96F9B6D6271 /* FindScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 034D4D88383C27DCFB760B8B /* FindScreen.swift */; };
 		548211D60C5058678CD61D99 /* web in Resources */ = {isa = PBXBuildFile; fileRef = 75BDB5EB8C31E7F2279E3B91 /* web */; };
+		696E2EC43A8A1374DCD12509 /* TagsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C238585A16612A8123AB552 /* TagsScreen.swift */; };
 		8E12BE7851DBE78779201BB6 /* OnyxCore in Frameworks */ = {isa = PBXBuildFile; productRef = B5025830C731886899C0FD1A /* OnyxCore */; };
 		8E4D054C2013102B91AA8EFA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F9E95A057F61029C430B86A1 /* Assets.xcassets */; };
 		96B4412DBF25E2ABCEEAEAD1 /* OutlineScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */; };
@@ -29,14 +30,15 @@
 		0FA10F94ED7A2A1BFC3994F3 /* OnyxMobile.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OnyxMobile.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutlineScreen.swift; sourceTree = "<group>"; };
 		2888E7D92043535DD9C6D3D3 /* ReadingSettingsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingSettingsScreen.swift; sourceTree = "<group>"; };
+		2C238585A16612A8123AB552 /* TagsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagsScreen.swift; sourceTree = "<group>"; };
 		2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderScreen.swift; sourceTree = "<group>"; };
 		60D094C3151EF96A142877A9 /* MobileVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileVault.swift; sourceTree = "<group>"; };
 		73CA0B15C54F5B963E9808FB /* BacklinksScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BacklinksScreen.swift; sourceTree = "<group>"; };
 		75BDB5EB8C31E7F2279E3B91 /* web */ = {isa = PBXFileReference; lastKnownFileType = folder; name = web; path = Resources/web; sourceTree = SOURCE_ROOT; };
 		931BAB74D3ECB997E0ED16C9 /* HistoryScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryScreen.swift; sourceTree = "<group>"; };
 		982A8D36684463E2A1AA3781 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A169A3334D2A8E8EB6045D14 /* onyx-wt-ios-tags */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "onyx-wt-ios-tags"; path = .; sourceTree = SOURCE_ROOT; };
 		B5F5BF466AEA653DDD1805EA /* BookmarksScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksScreen.swift; sourceTree = "<group>"; };
-		CBAA01098C34D2BFC3B962B5 /* ios-icon-32698 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = "ios-icon-32698"; path = .; sourceTree = SOURCE_ROOT; };
 		F31BFC0108B1499C1BB51648 /* OnyxMobileApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnyxMobileApp.swift; sourceTree = "<group>"; };
 		F9E95A057F61029C430B86A1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -76,7 +78,7 @@
 		573275C59A65A7C11CCEC90A /* Packages */ = {
 			isa = PBXGroup;
 			children = (
-				CBAA01098C34D2BFC3B962B5 /* ios-icon-32698 */,
+				A169A3334D2A8E8EB6045D14 /* onyx-wt-ios-tags */,
 			);
 			name = Packages;
 			sourceTree = "<group>";
@@ -103,6 +105,7 @@
 				18C4FA54CE7A05468DEEC3AC /* OutlineScreen.swift */,
 				2D459C4A17F7211F62AC1902 /* ReaderScreen.swift */,
 				2888E7D92043535DD9C6D3D3 /* ReadingSettingsScreen.swift */,
+				2C238585A16612A8123AB552 /* TagsScreen.swift */,
 			);
 			name = OnyxMobile;
 			path = Sources/OnyxMobile;
@@ -195,6 +198,7 @@
 				96B4412DBF25E2ABCEEAEAD1 /* OutlineScreen.swift in Sources */,
 				3EE68589EC230CE22B324A82 /* ReaderScreen.swift in Sources */,
 				20A0E01536DCC5612407A1AD /* ReadingSettingsScreen.swift in Sources */,
+				696E2EC43A8A1374DCD12509 /* TagsScreen.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

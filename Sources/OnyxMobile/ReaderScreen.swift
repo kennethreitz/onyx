@@ -187,7 +187,7 @@ struct ReaderScreen: UIViewRepresentable {
                 }
             case "tag":
                 if let t = body["tag"] as? String {
-                    NotificationCenter.default.post(name: .onyxSearch, object: "tag:" + t)
+                    NotificationCenter.default.post(name: .onyxRevealTag, object: t)   // the Tags tab, on that tag
                 }
             default:
                 break // ignore edit, task, kanban, folds, imageSize

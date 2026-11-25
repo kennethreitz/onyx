@@ -40,6 +40,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .onyxSearch)) { n in
             if let q = n.object as? String { vault.query = q; vault.libraryTab = .notes }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .onyxRevealTag)) { n in
+            if let t = n.object as? String { vault.revealTag(t) }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .onyxOpenURL)) { n in
             if let u = n.object as? URL { openURL(u) }
         }
@@ -114,6 +117,7 @@ struct ContentView: View {
                     switch vault.libraryTab {
                     case .notes: notesList
                     case .bookmarks: BookmarksScreen()
+                    case .tags: TagsScreen()
                     case .outline: OutlineScreen()
                     case .find: FindScreen()
                     }
