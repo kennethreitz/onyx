@@ -533,6 +533,7 @@ struct FileMenu: View {
         Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
         Button("Move to…") { ws.beginMove(path) }
         Divider()
+        // Adjacent on purpose: Open in Obsidian is a hidden Option-alternate of Reveal in Finder.
         Button("Reveal in Finder") { ws.revealInFinder(path) }
         if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }
         Divider()
@@ -556,6 +557,7 @@ struct SelectionMenu: View {
         Button("Rename…") {}.disabled(true)
         Button("Move \(paths.count) Items to…") { ws.beginMove(paths) }
         Divider()
+        // Adjacent on purpose: the disabled Open in Obsidian item is a hidden Option-alternate of Reveal.
         Button("Reveal \(paths.count) Items in Finder") {
             if let r = ws.root { NSWorkspace.shared.activateFileViewerSelecting(paths.map { r.appendingPathComponent($0) }) }
         }

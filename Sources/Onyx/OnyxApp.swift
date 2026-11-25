@@ -31,6 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in Self.freeControlCommandF() }
         UpdateController.shared.start()
+        ObsidianOptionMenu.install()
     }
     /// Debug: every menu item that has a key equivalent, to audit for double bindings.
     static func dumpMenus() {
@@ -347,6 +348,7 @@ struct OnyxApp: App {
         CommandMenu("Note") {
             ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.isBookmarked($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
             ShortcutMenus.button("copy") { ws.copyWikilink() }
+            // Adjacent on purpose: ObsidianOptionMenu makes Open in Obsidian a hidden Option-alternate of Reveal in Finder.
             ShortcutMenus.button("finder") { ws.revealInFinder() }
             ShortcutMenus.button("obsidian") { ws.openInObsidian() }
             Divider()

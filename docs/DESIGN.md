@@ -223,7 +223,7 @@ horizontal swipe when the system setting allows it (outside overlays). The title
 ## Deleting and the file menu
 
 Right-click any note, file or folder (tree, recent, bookmarks, search): Open, Open in Split,
-Bookmark / Remove Bookmark, New Note Here (folders), Rename…, Move to…, Reveal in Finder, Open in Obsidian (`obsidian://open?vault=…&file=…`),
+Bookmark / Remove Bookmark, New Note Here (folders), Rename…, Move to…, Reveal in Finder (hold Option to swap in Open in Obsidian, `obsidian://open?vault=…&file=…`),
 Delete…. Bookmarks are also a section at the top of the file sidebar, stored in `.obsidian/bookmarks.json` and shared with Obsidian; drag to reorder. Delete Note… is also in the File menu and the palette (no default shortcut). Delete always confirms and
 always goes to the Trash (`NSWorkspace.recycle`), so it can be undone from Finder. A new Untitled
 note is named from its first heading (or first line) when you save or leave it. Afterwards the
@@ -235,8 +235,7 @@ Sidebar multi-select works like Finder: click selects one row and opens it; ⇧-
 visible rows between the anchor and the click; ⌘-click toggles a row without changing the open note
 (the anchor moves to it). Selected rows share one highlight; during a multi-selection the open note,
 if not selected, keeps only a faint one. Right-clicking a selected row gives a selection menu: Move N
-Items to…, Reveal N Items in Finder, Delete N Items… (Open, Rename and Open in Obsidian are shown
-disabled). ⌘⌫ deletes the selection when the last click was in the tree and no text field is editing; Esc clears it. A folder
+Items to…, Reveal N Items in Finder, Delete N Items… (Open and Rename are shown disabled; hold Option and Open in Obsidian takes the place of Reveal, still disabled). ⌘⌫ deletes the selection when the last click was in the tree and no text field is editing; Esc clears it. A folder
 in the selection swallows its selected descendants (`TreeSelection.roots`). Batch moves rewrite
 links per item but report one vault change, and batch deletes are one Trash call, so git sync makes
 one commit per batch ("Move 3 items: a, b, c → Folder", "Delete a and b").
