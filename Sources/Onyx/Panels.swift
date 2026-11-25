@@ -918,6 +918,7 @@ struct GitPanel: View {
     @State private var branch = ""
     @State private var changes: [(String, String)] = []
     @State private var message = ""
+    @State private var suggested = ""
     @State private var status = ""
     @State private var isRepo = true
     var body: some View {
@@ -1018,14 +1019,58 @@ struct GitPanel: View {
         changes = git(["status", "--porcelain"]).1.split(separator: "\n").map { l in
             (String(l.prefix(2)).trimmingCharacters(in: .whitespaces), String(l.dropFirst(3)))
         }
+        let next = suggestedMessage()
+        if message.isEmpty || message == suggested { message = next }
+        suggested = next
+    }
+    /// Working-tree changes (including untracked) with note texts, for a prefilled message the user can edit.
+    func suggestedMessage() -> String {
+        var files: [GitText.FileEdit] = []
+        let (headOK, _) = git(["rev-parse", "--verify", "--quiet", "HEAD"])
+        if headOK == 0 {
+            files = GitText.parseNameStatus(git(["diff", "HEAD", "--name-status", "-M"]).1).map { c in
+                let oldPath = c.from ?? c.path
+                let oldText = c.status == "A" ? nil : gitBlob("HEAD:" + oldPath)
+                let newText = c.status == "D" ? nil : workingText(c.path)
+                return GitText.FileEdit(change: c, oldText: oldText, newText: newText)
+            }
+            let untracked = git(["ls-files", "--others", "--exclude-standard"]).1.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
+            for path in untracked where !files.contains(where: { $0.change.path == path }) {
+                files.append(GitText.FileEdit(change: GitText.Change(status: "A", path: path), oldText: nil, newText: workingText(path)))
+            }
+        } else {
+            files = changes.compactMap { status, path -> GitText.FileEdit? in
+                guard !path.isEmpty else { return nil }
+                let added = status.contains("?") || status.contains("A")
+                let deleted = status.contains("D")
+                let st: Character = deleted ? "D" : (added ? "A" : "M")
+                return GitText.FileEdit(change: GitText.Change(status: st, path: path), oldText: nil, newText: deleted ? nil : workingText(path))
+            }
+        }
+        guard !files.isEmpty else { return "" }
+        return GitText.commitMessage(files)
+    }
+    func gitBlob(_ spec: String) -> String? {
+        let (code, out) = git(["show", spec])
+        if code != 0 || out.utf8.count > 1_000_000 || out.contains("\0") { return nil }
+        return out
+    }
+    func workingText(_ path: String) -> String? {
+        guard let root = ws.root else { return nil }
+        let url = root.appendingPathComponent(path)
+        guard let data = try? Data(contentsOf: url), data.count <= 1_000_000, !data.contains(0) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
     func commit() {
         ws.flushSave()
-        let msg = message.isEmpty ? "vault backup: \(Workspace.stamp())" : message
+        let typed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let msg = typed.isEmpty ? suggestedMessage() : message
+        let final = msg.isEmpty ? "vault backup: \(Workspace.stamp())" : msg
         _ = git(["add", "-A"])
-        let (code, out) = git(["commit", "-m", msg])
+        let (code, out) = git(["commit", "-m", final])
         status = code == 0 ? "Committed." : out
         message = ""
+        suggested = ""
         refresh()
     }
 }

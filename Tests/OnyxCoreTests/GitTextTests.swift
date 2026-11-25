@@ -38,4 +38,66 @@ final class GitTextTests: XCTestCase {
     func testBackoff() {
         XCTAssertEqual(G.backoff(1), 5); XCTAssertEqual(G.backoff(2), 10); XCTAssertEqual(G.backoff(3), 20); XCTAssertEqual(G.backoff(20), 300)
     }
+
+    func edit(_ path: String, old: String?, new: String?, status: Character = "M") -> G.FileEdit {
+        G.FileEdit(change: G.Change(status: status, path: path), oldText: old, newText: new)
+    }
+
+    func testDescriptiveSingleEdit() {
+        let heading = edit("Knowledge/Mercury.md",
+                           old: "# Mercury\n\nThe messenger.\n",
+                           new: "# Mercury\n\n## Orbit\n\nThe messenger.\n")
+        XCTAssertEqual(G.commitMessage([heading]), "Update Mercury: add Orbit")
+
+        let task = edit("Mercury.md",
+                        old: "- [ ] write tests\n",
+                        new: "- [x] write tests\n")
+        XCTAssertEqual(G.commitMessage([task]), "Update Mercury: check 1 task")
+
+        let fm = edit("Mercury.md",
+                      old: "---\nstatus: draft\nupdated: 2026-01-01\n---\n\nBody.\n",
+                      new: "---\nstatus: published\nupdated: 2026-11-25\n---\n\nBody.\n")
+        XCTAssertEqual(G.commitMessage([fm]), "Update Mercury: change status")
+
+        let link = edit("Mercury.md",
+                        old: "See also.\n",
+                        new: "See also [[Venus]].\n")
+        XCTAssertEqual(G.commitMessage([link]), "Update Mercury: add link to Venus")
+    }
+
+    func testDescriptiveKeepsGenericEditWithoutStructure() {
+        let prose = edit("Mercury.md", old: "The messenger.\n", new: "The messenger of the gods.\n")
+        XCTAssertEqual(G.commitMessage([prose]), "Edit Mercury")
+    }
+
+    func testDescriptiveMultiFileBody() {
+        let a = edit("Mercury.md", old: "# Mercury\n", new: "# Mercury\n\n## Orbit\n")
+        let b = edit("Venus.md", old: "- [ ] observe\n", new: "- [x] observe\n")
+        let c = edit("Mars.md", old: "plain\n", new: "plain [[Venus]]\n")
+        let msg = G.commitMessage([a, b, c])
+        XCTAssertTrue(msg.hasPrefix("Edit Mercury, Venus, Mars\n\n"), msg)
+        XCTAssertTrue(msg.contains("Mercury: add Orbit"), msg)
+        XCTAssertTrue(msg.contains("Venus: check 1 task"), msg)
+        XCTAssertTrue(msg.contains("Mars: add link to Venus"), msg)
+        let subject = String(msg.split(separator: "\n").first!)
+        XCTAssertLessThanOrEqual(subject.count, 72)
+    }
+
+    func testDescriptiveAddDeleteRenameUnchanged() {
+        XCTAssertEqual(G.commitMessage([G.Change(status: "A", path: "Venus.md")]), "Add Venus")
+        XCTAssertEqual(G.commitMessage([edit("Venus.md", old: nil, new: "# Venus\n\n## Atmosphere\n", status: "A")]), "Add Venus")
+        XCTAssertEqual(G.commitMessage([G.Change(status: "D", path: "Old Note.md")]), "Delete Old Note")
+        XCTAssertEqual(G.commitMessage([G.Change(status: "R", path: "Notes/B.md", from: "Notes/A.md")]), "Rename A → B")
+    }
+
+    func testDescriptiveSubjectStaysShort() {
+        let longHeads = (1...8).map { "A very long heading name \($0) that should be counted" }
+        let old = "# Note\n"
+        let new = "# Note\n\n" + longHeads.map { "## \($0)\n" }.joined()
+        let msg = G.commitMessage([edit("Note.md", old: old, new: new)])
+        let subject = String(msg.split(separator: "\n").first!)
+        XCTAssertLessThanOrEqual(subject.count, 72)
+        XCTAssertTrue(subject.hasPrefix("Update Note:"), subject)
+        XCTAssertTrue(subject.contains("headings"), subject)
+    }
 }

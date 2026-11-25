@@ -25,36 +25,8 @@ public enum GitText {
         return last.lowercased().hasSuffix(".md") ? String(last.dropLast(3)) : last
     }
 
-    /// "Edit Mercury", "Edit Mercury, Venus", "Add Today; edit Mercury", "Rename A → B",
-    /// "Delete Old Note", "Edit 7 notes: A, B, C, …". At most ~72 chars for the subject.
-    public static func commitMessage(_ changes: [Change], reason: String? = nil) -> String {
-        guard !changes.isEmpty else { return reason ?? "Onyx: sync" }
-        if let reason, !reason.isEmpty { return clip(reason) + body(changes) }
-        var groups: [(String, [String])] = []
-        func add(_ verb: String, _ s: String) {
-            if let i = groups.firstIndex(where: { $0.0 == verb }) { groups[i].1.append(s) } else { groups.append((verb, [s])) }
-        }
-        for c in changes {
-            switch c.status {
-            case "A": add("Add", title(c.path))
-            case "D": add("Delete", title(c.path))
-            case "R":
-                let from = c.from ?? ""
-                let moved = (from as NSString).deletingLastPathComponent != (c.path as NSString).deletingLastPathComponent
-                let renamed = title(from) != title(c.path)
-                if renamed && !moved { add("Rename", "\(title(from)) → \(title(c.path))") }
-                else if moved && !renamed { add("Move", "\(title(c.path)) → \(dir(c.path))") }
-                else { add("Move", "\(title(from)) → \(c.path.hasSuffix(".md") ? String(c.path.dropLast(3)) : c.path)") }
-            default: add("Edit", title(c.path))
-            }
-        }
-        let subject = groups.enumerated().map { i, g in
-            let verb = i == 0 ? g.0 : g.0.lowercased()
-            if g.1.count > 3 { return "\(verb) \(g.1.count) notes: \(g.1.prefix(3).joined(separator: ", ")), …" }
-            return "\(verb) \(g.1.joined(separator: ", "))"
-        }.joined(separator: "; ")
-        return clip(subject) + (changes.count > 1 || subject.count > 72 ? body(changes) : "")
-    }
+    /// Commit subject and body: see CommitMessage.swift.
+
     static func dir(_ p: String) -> String { let d = (p as NSString).deletingLastPathComponent; return d.isEmpty ? "/" : d }
     static func clip(_ s: String) -> String { s.count <= 72 ? s : String(s.prefix(71)) + "…" }
     static func body(_ changes: [Change]) -> String {
