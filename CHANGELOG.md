@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.17] - 2026-11-25
+
 ### Added
 - Table of contents rows in a folder or selection PDF are clickable and jump to that note or folder page. In-note heading links (`[[#Heading]]` and Markdown `#heading`) do the same in a single-note export and inside a book. The PDF also gets an outline (bookmarks): the contents for a book, with each note's headings nested under it, or just the headings of a single note. External links were already kept. Heading jumps follow the laid-out positions; a heading that WebKit moved to the next page to avoid a break may land a little early or late.
 
@@ -271,7 +273,8 @@ First public release.
 - Quick switcher, split panes, back/forward navigation, and a command palette.
 - Daily notes, wikilinks, and search.
 
-[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.16...HEAD
+[Unreleased]: https://github.com/kennethreitz/onyx/compare/v0.1.17...HEAD
+[0.1.17]: https://github.com/kennethreitz/onyx/compare/v0.1.16...v0.1.17
 [0.1.16]: https://github.com/kennethreitz/onyx/compare/v0.1.15...v0.1.16
 [0.1.15]: https://github.com/kennethreitz/onyx/compare/v0.1.14...v0.1.15
 [0.1.14]: https://github.com/kennethreitz/onyx/compare/v0.1.13...v0.1.14
