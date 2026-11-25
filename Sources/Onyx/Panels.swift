@@ -40,7 +40,7 @@ struct PanelHeader<Tab: Identifiable & Hashable>: View {
     var body: some View {
         // tabs compress (28pt → 17pt each) so the header still fits a 140pt sidebar
         HStack(spacing: 1) {
-            ForEach(tabs) { t in
+            ForEach(Array(tabs.enumerated()), id: \.offset) { _, t in
                 Button { withAnimation(Motion.quick) { selection = t } } label: {
                     Image(systemName: symbol(t))
                         .font(.system(size: 12.5, weight: selection == t ? .semibold : .regular))
@@ -784,7 +784,7 @@ struct InspectorView: View {
     @State private var showUnlinked = false
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(tabs: InspectorTab.allCases, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned)
+            PanelHeader(tabs: InspectorTab.barTabs, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned)
             Divider().overlay(Color.hairline)
             if ws.inspectorTab == .outline {
                 OutlinePane(ws: ws)

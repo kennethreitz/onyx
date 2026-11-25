@@ -116,6 +116,12 @@ struct ReaderView: NSViewRepresentable {
             c.typeKey = "\(fontSize)/\(measure)"
             c.eval("Onyx.setType(\(fontSize), \(measure))")
         }
+        let fade = (preview || ws.focusMode) ? 0 : ReadingChrome.titleFade
+        let chromeKey = "\(fade)/\(wv.magnification)"
+        if c.chromeKey != chromeKey {
+            c.chromeKey = chromeKey
+            c.eval("Onyx.setChromeInset(\(fade))")
+        }
         if source == nil, let r = ws.scrollRequest, r.id != c.scrollHandled {
             c.scrollHandled = r.id
             c.eval("Onyx.scrollToLine(\(r.line))")
@@ -151,6 +157,7 @@ struct ReaderView: NSViewRepresentable {
         var dark = false
         var sidenotes = true
         var typeKey = ""
+        var chromeKey = ""
         var typeset = ""
         var paneID: UUID?
         var preview = false
@@ -275,6 +282,11 @@ struct ReaderView: NSViewRepresentable {
                                occurrence: body["occurrence"] as? Int ?? 0, width: (body["width"] as? NSNumber)?.intValue)
             case "edit": ws.toggleMode()
             case "top": if let l = body["line"] as? Double { ws.reportTop(paneID, l) }
+            case "outline":
+                if let l = body["line"] as? Double { ws.reportOutline(paneID, l) }
+            case "outlineEnd":
+                ws.unlockOutline()
+                if let l = body["line"] as? Double { ws.reportOutline(paneID, l) }
             case "diffExpand":
                 if let i = body["index"] as? Int { onDiffExpand?(i) }
             default: break

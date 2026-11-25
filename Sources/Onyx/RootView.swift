@@ -120,7 +120,7 @@ struct RootView: View {
                 // body text scrolls up under a soft paper fade instead of colliding with the path
                 LinearGradient(stops: [.init(color: Color.paper, location: 0), .init(color: Color.paper, location: 0.55), .init(color: Color.paper.opacity(0), location: 1)],
                                startPoint: .top, endPoint: .bottom)
-                    .frame(height: 46).allowsHitTesting(false)
+                    .frame(height: ReadingChrome.titleFade).allowsHitTesting(false)
             }
             Spacer().allowsHitTesting(false)
         }

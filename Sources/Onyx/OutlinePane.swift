@@ -72,9 +72,10 @@ struct OutlinePane: View {
                 }
             }
         }
-        .onAppear { syncReveal(force: true); ws.syncOutlineTop() }
-        .onChange(of: ws.outlineScope) { syncReveal(force: true) }
-        .onChange(of: ws.currentPath) { syncReveal(force: true) }
+        .onAppear { syncReveal(force: true); applyFollow(); ws.syncOutlineTop() }
+        .onChange(of: ws.outlineScope) { syncReveal(force: true); applyFollow() }
+        .onChange(of: ws.currentPath) { syncReveal(force: true); applyFollow() }
+        .onChange(of: activeId) { applyFollow() }
         .onChange(of: ws.inspectorTab) { if ws.inspectorTab == .outline { ws.syncOutlineTop() } }
         .onChange(of: ws.inspectorVisible) { if ws.inspectorVisible { ws.syncOutlineTop() } }
         .onChange(of: ws.focusedPane) { ws.syncOutlineTop() }
@@ -118,14 +119,39 @@ struct OutlinePane: View {
         if !add.isEmpty { ws.outlineExpanded.formUnion(add) }
     }
 
+    /// Expand only the active path (and a heading's own children); collapse off-path siblings.
+    /// Does not scroll the document.
+    func applyFollow() {
+        guard let id = activeId else { return }
+        let result = OutlineTree.follow(
+            activeId: id, roots: roots, headings: headings,
+            expanded: ws.outlineExpanded, heldOpen: ws.outlineHeldOpen,
+            entered: ws.outlineHoldEntered, keepOpen: []
+        )
+        if result.expand != ws.outlineExpanded { ws.outlineExpanded = result.expand }
+        if result.collapse != ws.outlineCollapsed { ws.outlineCollapsed = result.collapse }
+        if result.heldOpen != ws.outlineHeldOpen { ws.outlineHeldOpen = result.heldOpen }
+        if result.entered != ws.outlineHoldEntered { ws.outlineHoldEntered = result.entered }
+    }
+
     func toggle(_ row: OutlineRow) {
         withAnimation(Motion.quick) {
             if row.kind == .heading {
-                if ws.outlineCollapsed.contains(row.id) { ws.outlineCollapsed.remove(row.id) }
-                else { ws.outlineCollapsed.insert(row.id) }
+                if ws.outlineCollapsed.contains(row.id) {
+                    ws.outlineCollapsed.remove(row.id)
+                    ws.outlineHeldOpen.insert(row.id)
+                } else {
+                    ws.outlineCollapsed.insert(row.id)
+                    ws.outlineHeldOpen.remove(row.id)
+                    ws.outlineHoldEntered.remove(row.id)
+                }
+            } else if ws.outlineExpanded.contains(row.id) {
+                ws.outlineExpanded.remove(row.id)
+                ws.outlineHeldOpen.remove(row.id)
+                ws.outlineHoldEntered.remove(row.id)
             } else {
-                if ws.outlineExpanded.contains(row.id) { ws.outlineExpanded.remove(row.id) }
-                else { ws.outlineExpanded.insert(row.id) }
+                ws.outlineExpanded.insert(row.id)
+                ws.outlineHeldOpen.insert(row.id)
             }
         }
     }

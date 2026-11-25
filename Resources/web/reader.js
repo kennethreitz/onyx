@@ -229,6 +229,74 @@
   // frontmatter included) and data-lines (how many source lines it spans), so the reader and
   // editor can hand each other "where you are" by source position rather than pixels.
   const ANCHOR = 48;   // px under the visible top that counts as the reading position (matches the editor)
+  // Outline jumps land the heading text just below the title-path fade, with a little
+  // air (16–24px). The fade lives in Swift, so the inset is set from there and scaled
+  // for pinch-zoom; scroll-spy uses the same offset.
+  const OUTLINE_GAP = 20;
+  let chromeInsetPt = 0;
+  function viewScale() { return (window.visualViewport && window.visualViewport.scale) || 1; }
+  function cssChromeInset() { return chromeInsetPt / viewScale(); }
+  function stickyHeaderHeight() {
+    let bottom = 0;
+    const roots = [];
+    const pageEl = document.getElementById('page');
+    if (pageEl) for (const el of pageEl.children) roots.push(el);
+    document.querySelectorAll('header, [data-sticky]').forEach(el => roots.push(el));
+    for (const el of roots) {
+      const s = getComputedStyle(el);
+      if (s.position !== 'sticky' && s.position !== 'fixed') continue;
+      const r = el.getBoundingClientRect();
+      if (r.height > 0 && r.top <= 1 && r.bottom > 0) bottom = Math.max(bottom, r.bottom);
+    }
+    return bottom;
+  }
+  function outlineOffset() { return cssChromeInset() + OUTLINE_GAP + stickyHeaderHeight(); }
+  function headingEls() {
+    return [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
+  }
+  // Last heading whose border-box top is at or above offset+1 (1px hysteresis).
+  // `items` is [{top, line}, ...] in document order. Returns 0 when none have reached the line (title).
+  function activeOutlineLine(items, offset) {
+    const threshold = offset + 1;
+    let line = 0;
+    for (const it of items) {
+      if (it.top <= threshold) line = it.line;
+      else break;
+    }
+    return line;
+  }
+  function headingScrollY(headingTop, scrollY, offset) {
+    return Math.max(0, Math.round(headingTop + scrollY - offset));
+  }
+  function readOutlineLine() {
+    const off = outlineOffset();
+    return activeOutlineLine(headingEls().map(h => ({ top: h.getBoundingClientRect().top, line: h.dataset.line != null ? +h.dataset.line : 0 })), off);
+  }
+  let outlineJump = 0;
+  function postOutline() {
+    if (outlineJump) return;
+    post({ type: 'outline', line: readOutlineLine() });
+  }
+  function beginOutlineJump() {
+    const token = ++outlineJump;
+    let quiet = 0;
+    const done = () => {
+      if (token !== outlineJump) return;
+      outlineJump = 0;
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('scrollend', onEnd);
+      post({ type: 'outlineEnd', line: readOutlineLine() });
+    };
+    const onScroll = () => {
+      if (token !== outlineJump) return;
+      if (quiet) clearTimeout(quiet);
+      quiet = setTimeout(done, 150);
+    };
+    const onEnd = () => { if (token === outlineJump) done(); };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('scrollend', onEnd);
+    setTimeout(() => { if (token === outlineJump && !quiet) done(); }, 160);
+  }
   function parseWithLines(md, base) {
     const prep = window.OnyxMath ? window.OnyxMath.protect(md) : { text: md, slots: [] };
     prep.text = escapeWikilinkPipesInTables(prep.text);
@@ -299,7 +367,7 @@
   function reportTop() {
     if (restoring || reportQueued) return;
     reportQueued = true;
-    setTimeout(() => { reportQueued = false; if (!restoring) { anchorLine = topLine(); post({ type: 'top', line: anchorLine }); } }, 60);  // not rAF: throttled in occluded windows
+    setTimeout(() => { reportQueued = false; if (!restoring) { anchorLine = topLine(); post({ type: 'top', line: anchorLine }); postOutline(); } }, 60);  // not rAF: throttled in occluded windows
   }
   window.addEventListener('scroll', reportTop, { passive: true });
   // Hold a restored position while late layout lands (fonts, Mermaid), unless the reader scrolls.
@@ -1249,12 +1317,27 @@
       }
       refreshFolds(); postFolds();
     },
+    setChromeInset(pt) {
+      chromeInsetPt = +pt || 0;
+      const off = outlineOffset();
+      document.documentElement.style.scrollPaddingTop = off + 'px';
+    },
     scrollToHeading(i) {
-      const hs = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(h => !h.closest('.markdown-embed') && !h.classList.contains('fallback-title') && !h.closest('.footnotes') && !h.closest('.kanban'));
+      const hs = headingEls();
       const h = hs[i];
       if (h) revealFolded(h);
-      if (h) h.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      if (!h) return;
+      const offset = outlineOffset();
+      const y = headingScrollY(h.getBoundingClientRect().top, window.scrollY, offset);
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      beginOutlineJump();
+      window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
     },
+    reportOutline() { postOutline(); },
+    _outlineGap: OUTLINE_GAP,
+    _activeOutlineLine: activeOutlineLine,
+    _headingScrollY: headingScrollY,
+    _outlineOffset: outlineOffset,
   };
 
   // The native graph card is shared with inspector links. Swift owns the 400 ms delay.
