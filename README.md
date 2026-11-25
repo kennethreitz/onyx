@@ -47,6 +47,8 @@ The latest build is on the [releases page](https://github.com/kennethreitz/onyx/
 
 This build is not notarized, so the first launch needs System Settings ▸ Privacy & Security ▸ **Open Anyway**. It updates itself from v0.1.1 on. Requires macOS 14 (Sonoma) or later, on Apple silicon or Intel.
 
+An iPhone and iPad app is in progress on the [`ios`](https://github.com/kennethreitz/onyx/tree/ios) branch: the same repo and `OnyxCore` package, with a SwiftUI shell that opens a vault folder and reads notes in the typeset reader. See [docs/IOS.md](docs/IOS.md). It is not a release yet.
+
 Opening a second copy of Onyx (a newly built app, `open -n`, or another folder with the same app) quits the one that's already running, after it saves. Set `ONYX_ALLOW_MULTIPLE=1` if you want both to stay open.
 
 ## Build from source

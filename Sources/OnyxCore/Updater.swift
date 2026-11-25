@@ -77,6 +77,7 @@ public enum UpdateError: Error, Equatable, LocalizedError {
     case bundleMismatch(found: String?, expected: String)
     case notNewer
     case translocated
+    case unsupportedPlatform
     case notAnApp
     case notWritable
     case dittoFailed(Int32)
@@ -92,6 +93,7 @@ public enum UpdateError: Error, Equatable, LocalizedError {
         case .bundleMismatch: return "The download is not an Onyx app (bundle id did not match)."
         case .notNewer: return "The download is not newer than the app that’s running."
         case .translocated: return "Onyx is running from a temporary copy (for example, opened from Downloads). Move it to Applications and open it from there, then update."
+        case .unsupportedPlatform: return "Installing a macOS update is not available on this platform."
         case .notAnApp: return "The download did not contain an Onyx app."
         case .notWritable: return "Onyx can’t replace this app. Check that you have permission to write to it."
         case .dittoFailed: return "The update archive could not be unpacked."
@@ -216,6 +218,9 @@ public final class Updater {
 
     /// Download the zip, unpack it with ditto, verify the bundle, and replace `appURL`. Does not relaunch.
     public func install(_ release: GitHubRelease, progress: ((String) -> Void)? = nil) async throws {
+        #if !os(macOS)
+        throw UpdateError.unsupportedPlatform
+        #else
         if Self.isTranslocated(appURL) { throw UpdateError.translocated }
         try assertWritable()
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent("onyx-update-\(UUID().uuidString)", isDirectory: true)
@@ -225,10 +230,14 @@ public final class Updater {
         let zip = try await download(release.assetURL, to: dir.appendingPathComponent(release.assetName))
         progress?("Installing…")
         try install(fromZip: zip)
+        #endif
     }
 
     /// Unpack a local zip (the same format as the GitHub asset) and replace `appURL`.
     public func install(fromZip zip: URL) throws {
+        #if !os(macOS)
+        throw UpdateError.unsupportedPlatform
+        #else
         if Self.isTranslocated(appURL) { throw UpdateError.translocated }
         try assertWritable()
         let fm = FileManager.default
@@ -241,6 +250,7 @@ public final class Updater {
         try verify(incoming)
         try stripQuarantine(incoming)
         try replaceApp(new: incoming, dest: appURL)
+        #endif
     }
 
     func assertWritable() throws {
@@ -327,6 +337,7 @@ public final class Updater {
 
     @discardableResult
     func run(_ path: String, _ args: [String]) throws -> Int32 {
+        #if os(macOS)
         let p = Process()
         p.executableURL = URL(fileURLWithPath: path)
         p.arguments = args
@@ -336,6 +347,9 @@ public final class Updater {
         try p.run()
         p.waitUntilExit()
         return p.terminationStatus
+        #else
+        throw UpdateError.unsupportedPlatform
+        #endif
     }
 
     private struct GHRelease: Decodable {

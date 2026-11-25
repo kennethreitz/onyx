@@ -3,9 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "Onyx",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .executable(name: "Onyx", targets: ["Onyx"]),
+        .library(name: "OnyxCore", targets: ["OnyxCore"]),
         .library(name: "OnyxSync", targets: ["OnyxSync"]),
     ],
     targets: [

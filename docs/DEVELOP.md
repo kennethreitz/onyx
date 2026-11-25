@@ -20,6 +20,7 @@ make install ONE_ARCH=1        # this machine's architecture only (faster); also
 make install ARCH=arm64        # one slice (arm64 or x86_64)
 make install INSTALL_DIR=~/Applications RELAUNCH=1   # elsewhere; RELAUNCH reopens it if it was running
 make uninstall                 # remove $(INSTALL_DIR)/Onyx.app
+make ios                       # iOS simulator app (branch ios; docs/IOS.md)
 make dev                       # debug binary, pointed at a test vault
 make open                      # open the built app on the remembered vault
 make demo-vault                # a disposable copy under /tmp/onyx-vault

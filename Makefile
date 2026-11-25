@@ -32,7 +32,7 @@ INSTALL_ARCH = $(HOST_ARCH)
 endif
 endif
 
-.PHONY: build app run dev test icon demo-vault clean install install-native uninstall release
+.PHONY: build app run dev test icon demo-vault clean install install-native uninstall release ios
 
 build:
 	UNIVERSAL=$(UNIVERSAL) ARCH="$(ARCH)" ./scripts/build-binary.sh release
@@ -93,6 +93,12 @@ install-native:
 
 uninstall:
 	INSTALL_DIR="$(INSTALL_DIR)" DESTDIR="$(DESTDIR)" NO_QUIT="$(NO_QUIT)" ./scripts/install.sh uninstall
+
+# iOS simulator app (branch ios). Regenerates Onyx.xcodeproj from project.yml.
+# Does not touch /Applications or a running Mac Onyx.
+ios:
+	xcodegen generate
+	xcodebuild -project Onyx.xcodeproj -scheme OnyxMobile -destination 'generic/platform=iOS Simulator' -configuration Debug -derivedDataPath .build/DerivedData CODE_SIGNING_ALLOWED=NO build
 
 clean:
 	rm -rf .build build

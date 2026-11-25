@@ -3,6 +3,7 @@ import CoreText
 import PDFKit
 import UniformTypeIdentifiers
 import WebKit
+import OnyxCore
 
 /// File ▸ Export as PDF… and Print…: the note set as a book page.
 ///
