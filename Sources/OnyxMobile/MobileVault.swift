@@ -1,10 +1,20 @@
 import Foundation
 import OnyxCore
+import OnyxSync
 
 /// The open vault on iOS: a security-scoped folder bookmark, a `VaultSnapshot`, and search.
 @MainActor
 final class MobileVault: ObservableObject {
     static let bookmarkKey = "onyx.ios.vaultBookmark"
+    /// The open sync-only vault's remote id (instead of a folder bookmark); see MobileSync.swift.
+    static let managedKey = "onyx.ios.managedVault"
+
+    /// Set while a sync-only vault (a copy in Application Support/Onyx/Vaults) is open.
+    @Published var managed: ManagedVault?
+    @Published var syncStatus: SyncStatus?
+    var syncEngine: SyncEngine?
+    var pendingSyncRescan = false
+    var lastSyncRescan = Date.distantPast
 
     @Published var root: URL?
     @Published var snapshot: VaultSnapshot? { didSet { snapshotGeneration += 1 } }
@@ -55,6 +65,10 @@ final class MobileVault: ObservableObject {
     }
 
     func restore() {
+        if let id = UserDefaults.standard.string(forKey: Self.managedKey) {
+            if let v = SyncVaultLibrary.default.vault(remoteID: id) { openManaged(v); return }
+            UserDefaults.standard.removeObject(forKey: Self.managedKey)
+        }
         guard let data = UserDefaults.standard.data(forKey: Self.bookmarkKey) else { return }
         do {
             var stale = false
@@ -68,6 +82,9 @@ final class MobileVault: ObservableObject {
     }
 
     func open(_ url: URL) {
+        stopSync()
+        managed = nil
+        UserDefaults.standard.removeObject(forKey: Self.managedKey)
         stopAccess()
         let access = url.startAccessingSecurityScopedResource()
         isAccessing = access
@@ -119,6 +136,9 @@ final class MobileVault: ObservableObject {
     }
 
     func forgetVault() {
+        stopSync()
+        managed = nil
+        UserDefaults.standard.removeObject(forKey: Self.managedKey)
         stopAccess()
         root = nil
         snapshot = nil
@@ -134,6 +154,8 @@ final class MobileVault: ObservableObject {
         let data = try url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
         UserDefaults.standard.set(data, forKey: Self.bookmarkKey)
     }
+
+    func stopAccessForManaged() { stopAccess() }
 
     private func stopAccess() {
         if isAccessing { root?.stopAccessingSecurityScopedResource() }
@@ -207,7 +229,7 @@ extension MobileVault {
             error = coordError.localizedDescription
             return false
         }
-        if ok { snapshot?.update(path: rel, content: content) }
+        if ok { snapshot?.update(path: rel, content: content); syncEdited() }
         return ok
     }
 

@@ -24,9 +24,17 @@ These are Foundation (plus simd, CryptoKit, JavaScriptCore, Observation) and alr
 
 `Resources/web` and `Resources/fonts` are also shared. The iOS app bundles them next to the same `onyx://app/…` and `onyx://vault/…` scheme the Mac reader uses.
 
-### Shared later (`OnyxSync`)
+### Shared: Obsidian Sync (`OnyxSync`)
 
-Obsidian Sync (`OnyxSync`) is almost entirely Foundation + CryptoKit + CommonCrypto + Security + JavaScriptCore. It should compile for iOS; Keychain (`SecretStore`) uses generic passwords with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`, which is valid on iOS. It is **not** wired into the mobile app yet (Phase 1 is local folder access). When it is, the same engine can talk to Obsidian’s servers from the phone, with the same warnings as on the Mac (unofficial protocol).
+Obsidian Sync (`OnyxSync`) is Foundation + CryptoKit + CommonCrypto + Security + JavaScriptCore and compiles for iOS 17. The two Mac-only bits are guarded: the conflict-copy device name falls back to the binding's device name instead of `Host`, and local deletions, which go to the Trash on the Mac, are moved into the vault's backups folder on iOS (no user-visible Trash). Keychain (`SecretStore`) uses generic passwords under Onyx's own service (`md.onyx.sync`) with `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`.
+
+The iOS app uses it for **sync-only vaults** (see [sync.md](sync.md#sync-only-vaults)):
+
+- The empty state and the Vault menu offer **Connect Obsidian Sync Vault**: sign in (2FA when the account asks), pick a remote vault, type its end-to-end password if it has one, and Onyx creates a local copy in the app container (`Application Support/Onyx/Vaults/<name>`), pulls everything, and opens it. No folder picker or security-scoped bookmark is involved; the open sync-only vault is remembered by remote id (`onyx.ios.managedVault`).
+- A sync icon next to the vault name in the toolbar shows the status; tapping it (or Vault ▸ Manage Sync…) opens **Manage Sync**: Sync Now, Pause/Resume, Continue Anyway (after a mass-delete pause), Disconnect (keeps the local copy), Reconnect, other sync-only vaults on the device, and Delete Local Copy (confirmed, and it warns when the vault isn't fully synced).
+- Sync runs while Onyx is in the foreground (the engine's 30 s rescan and edits trigger passes; returning to the app syncs at once). On leaving the app Onyx asks iOS for a short background grace period (up to about 25 s) to finish the current sync. There is no background refresh (`BGAppRefreshTask`) yet, so changes made elsewhere arrive the next time Onyx is opened.
+- The note list rescans as files arrive (at most every few seconds during a large first pull, and once when it finishes).
+- The same unofficial-protocol caveats as on the Mac apply; try a throwaway vault first.
 
 ### Mac-only (`Sources/Onyx` and a few Core types)
 

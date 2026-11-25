@@ -7,6 +7,8 @@ struct ContentView: View {
     @Environment(\.colorScheme) private var scheme
     @Environment(\.openURL) private var openURL
     @State private var picking = false
+    @State private var connectingSync = false
+    @State private var managingSync = false
 
     var body: some View {
         NavigationSplitView {
@@ -25,7 +27,7 @@ struct ContentView: View {
                     .toolbar { noteToolbar(note) }
             } else if vault.root == nil {
                 ContentUnavailableView("Open a vault", systemImage: "folder",
-                                       description: Text("Choose the folder that holds your notes — an Obsidian vault on this device or in iCloud Drive."))
+                                       description: Text("Choose the folder that holds your notes — an Obsidian vault on this device or in iCloud Drive — or connect an Obsidian Sync vault."))
             } else {
                 ContentUnavailableView("No note selected", systemImage: "doc")
             }
@@ -72,6 +74,15 @@ struct ContentView: View {
         } message: {
             Text(vault.error ?? "")
         }
+        .sheet(isPresented: $connectingSync) {
+            NavigationStack { SyncConnectScreen().environmentObject(vault) }
+        }
+        .sheet(isPresented: $managingSync) {
+            NavigationStack {
+                ManageSyncScreen().environmentObject(vault)
+                    .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { managingSync = false } } }
+            }
+        }
         .sheet(isPresented: $vault.showReadingSettings) {
             NavigationStack {
                 ReadingSettingsScreen { vault.typesetRevision += 1 }
@@ -109,9 +120,18 @@ struct ContentView: View {
                     ContentUnavailableView {
                         Label("No vault", systemImage: "folder.badge.plus")
                     } description: {
-                        Text("Open a folder of Markdown notes. iCloud Drive ▸ Obsidian works if the vault is there.")
+                        Text("Open a folder of Markdown notes (iCloud Drive ▸ Obsidian works if the vault is there), or keep a sync-only copy of an Obsidian Sync vault inside Onyx.")
                     } actions: {
                         Button("Open Vault") { picking = true }
+                        Button("Connect Obsidian Sync Vault") { connectingSync = true }
+                        let local = vault.managedVaults
+                        if !local.isEmpty {
+                            Menu("Sync-only Vaults on This Device") {
+                                ForEach(local) { v in Button(v.name) { vault.openManaged(v) } }
+                                Divider()
+                                Button("Manage…") { managingSync = true }
+                            }
+                        }
                     }
                 } else {
                     switch vault.libraryTab {
@@ -179,6 +199,13 @@ struct ContentView: View {
         ToolbarItem(placement: .topBarLeading) {
             Menu {
                 Button("Open Vault…", systemImage: "folder") { picking = true }
+                Button("Connect Obsidian Sync Vault…", systemImage: "icloud") { connectingSync = true }
+                if vault.isSyncOnly || !vault.managedVaults.isEmpty {
+                    Button("Manage Sync…", systemImage: "arrow.triangle.2.circlepath.icloud") { managingSync = true }
+                }
+                if vault.isSyncOnly {
+                    Button("Sync Now", systemImage: "arrow.triangle.2.circlepath") { vault.syncNow() }
+                }
                 if vault.dailyPath != nil {
                     Button("Today’s daily note", systemImage: "calendar") { vault.openDaily() }
                 }
@@ -194,7 +221,17 @@ struct ContentView: View {
         }
         if let name = vault.root?.lastPathComponent {
             ToolbarItem(placement: .principal) {
-                Text(name).font(.headline)
+                HStack(spacing: 6) {
+                    Text(name).font(.headline)
+                    if vault.isSyncOnly {
+                        let s = vault.syncStatus
+                        Button { managingSync = true } label: {
+                            Image(systemName: s?.symbol ?? "icloud").font(.caption)
+                                .foregroundStyle(s?.isProblem == true ? Color.orange : Color.secondary)
+                        }
+                        .accessibilityLabel("Obsidian Sync: \(s?.text ?? "not running")")
+                    }
+                }
             }
         }
     }
