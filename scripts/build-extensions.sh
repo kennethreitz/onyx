@@ -74,8 +74,11 @@ plist "$SAFARI/Contents/Info.plist" "$APP_ID.SafariExtension" OnyxSafari "Clip t
 cp "$ROOT/Extensions/Safari/Resources/background.js" "$SAFARI/Contents/Resources/"
 sed "s/__VERSION__/$VERSION/" "$ROOT/Extensions/Safari/Resources/manifest.json" > "$SAFARI/Contents/Resources/manifest.json"
 ICNS="$ROOT/Resources/AppIcon.icns"
-for s in 48 96 128 256 512; do sips -s format png -z $s $s "$ICNS" --out "$SAFARI/Contents/Resources/images/icon-$s.png" >/dev/null; done
-for s in 16 32; do sips -s format png -z $s $s "$ICNS" --out "$SAFARI/Contents/Resources/images/toolbar-$s.png" >/dev/null; done
+# Manifest icons (full-color stone) and toolbar glyphs (monochrome O, tinted by Safari) are
+# committed; regenerate with `swift scripts/make-extension-icons.swift`.
+cp "$ROOT"/Extensions/Safari/Resources/images/*.png "$SAFARI/Contents/Resources/images/"
+cp "$ICNS" "$SAFARI/Contents/Resources/AppIcon.icns"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon" "$SAFARI/Contents/Info.plist"
 
 # Share extension
 SHARE="$APP/Contents/PlugIns/OnyxShare.appex"
