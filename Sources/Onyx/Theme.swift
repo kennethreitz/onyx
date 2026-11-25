@@ -117,6 +117,17 @@ enum TypeScale {
 
 /// Motion: a few named curves, and Reduce Motion respected everywhere. With Reduce Motion on,
 /// springs become a short dissolve and slides/scales become plain fades.
+/// The title path sits over the page; body text scrolls under a soft paper fade.
+enum ReadingChrome {
+    /// Height of the title-path fade, in points (RootView.titleLine).
+    static let titleFade: CGFloat = 46
+    /// Breathing room below the visible top (just under the fade) when jumping to a heading.
+    static let outlineGap: CGFloat = 20
+    static func outlineOffset(focusMode: Bool) -> CGFloat {
+        (focusMode ? 0 : titleFade) + outlineGap
+    }
+}
+
 @MainActor enum Motion {
     static var reduced: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     /// Hover and press feedback (color/opacity only, so it stays on with Reduce Motion).

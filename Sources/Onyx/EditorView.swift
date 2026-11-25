@@ -703,7 +703,12 @@ struct EditorView: NSViewRepresentable {
             c.restore(r.line, caret: true, tries: 30)
         }
         if live, let line = ws.editorJump {
-            DispatchQueue.main.async { c.reveal(line: line); ws.editorJump = nil }
+            let fromOutline = ws.editorJumpFromOutline
+            DispatchQueue.main.async {
+                c.reveal(line: line, outline: fromOutline)
+                ws.editorJump = nil
+                ws.editorJumpFromOutline = false
+            }
         }
         if c.scheme != scheme { c.scheme = scheme; c.rehighlight() }
         let tk = "\(fontSize)/\(measure)/\(typeface)"
@@ -730,6 +735,7 @@ struct EditorView: NSViewRepresentable {
         var anchor: Double = 0   // last position the writer chose (scroll or restore)
         var scrollHandled: Int?
         private var reportQueued = false
+        private var outlineJumpWork: DispatchWorkItem?
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }
         /// The styled text's shape and the one character edit since, for restyling just its lines.
         private var shape: MarkdownHighlighter.Shape?
@@ -820,7 +826,9 @@ struct EditorView: NSViewRepresentable {
             return Double(line) + Double(frac)
         }
 
-        func scrollTo(line: Double, caret: Bool) {
+        func outlineOffset() -> CGFloat { ReadingChrome.outlineOffset(focusMode: parent.ws.focusMode) }
+
+        func scrollTo(line: Double, caret: Bool, anchorY: CGFloat? = nil) {
             guard let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer,
                   let scroll = tv.enclosingScrollView else { return }
             let ns = tv.string as NSString
@@ -830,10 +838,40 @@ struct EditorView: NSViewRepresentable {
             let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
             let frac = CGFloat(line - line.rounded(.down))
             let maxY = max(0, tv.frame.height - scroll.contentView.bounds.height)
-            let y = min(max(0, rect.minY + frac * rect.height + tv.textContainerOrigin.y - Self.anchorY), maxY)
+            let anchor = anchorY ?? Self.anchorY
+            let y = min(max(0, rect.minY + frac * rect.height + tv.textContainerOrigin.y - anchor), maxY)
             scroll.contentView.scroll(to: NSPoint(x: 0, y: y))
             scroll.reflectScrolledClipView(scroll.contentView)
             if caret { tv.setSelectedRange(NSRange(location: loc, length: 0)) }
+        }
+
+        /// Last heading whose top is at or above outlineOffset+1, matching the reader spy.
+        func outlineSpyLine() -> Double? {
+            guard let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer,
+                  let clip = tv.enclosingScrollView?.contentView else { return nil }
+            let threshold = clip.bounds.minY + outlineOffset() + 1 - tv.textContainerOrigin.y
+            let hs = NoteParser.parseHeadings(tv.string)
+            var best: Double = 0
+            for h in hs {
+                let loc = lineStart(h.line, in: tv.string as NSString)
+                let lr = (tv.string as NSString).lineRange(for: NSRange(location: loc, length: 0))
+                lm.ensureLayout(forCharacterRange: NSRange(location: 0, length: NSMaxRange(lr)))
+                let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
+                if rect.minY <= threshold { best = Double(h.line) } else { break }
+            }
+            return best
+        }
+
+        func armOutlineJumpEnd() {
+            outlineJumpWork?.cancel()
+            let work = DispatchWorkItem { [weak self] in
+                guard let self else { return }
+                self.restoring = false
+                self.parent.ws.unlockOutline()
+                if let line = self.outlineSpyLine() { self.parent.ws.reportOutline(self.parent.paneID, line) }
+            }
+            outlineJumpWork = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
         }
 
         /// Wait for the scroll view to get a real size (SwiftUI lays it out after creation).
@@ -865,10 +903,19 @@ struct EditorView: NSViewRepresentable {
                 guard let self else { return }
                 self.reportQueued = false
                 if !self.restoring, let t = self.topLine() { self.anchor = t; self.parent.ws.reportTop(self.parent.paneID, t) }
+                if self.parent.ws.outlineLock { self.armOutlineJumpEnd(); return }
+                if !self.restoring, let o = self.outlineSpyLine() { self.parent.ws.reportOutline(self.parent.paneID, o) }
             }
         }
 
-        func reveal(line: Int) {
+        func reveal(line: Int, outline: Bool = false) {
+            if outline {
+                parent.ws.lockOutline(to: Double(line))
+                restoring = true
+                scrollTo(line: Double(line), caret: true, anchorY: outlineOffset())
+                armOutlineJumpEnd()
+                return
+            }
             guard let tv = textView else { return }
             let ns = tv.string as NSString
             var loc = 0

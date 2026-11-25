@@ -26,6 +26,8 @@ enum InspectorTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self { case .outline: return "list.bullet.indent"; case .backlinks: return "arrow.uturn.backward"; case .properties: return "tablecells" }
     }
+    /// Outline stays first (where it has always been) and is also the last tab, before the pin.
+    static var barTabs: [InspectorTab] { [.outline, .backlinks, .properties, .outline] }
 }
 enum GitPanelSection: String, CaseIterable, Identifiable {
     case status, history
@@ -148,7 +150,9 @@ final class Workspace {
     var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
-    var inspectorTab: InspectorTab = .outline
+    var inspectorTab: InspectorTab = InspectorTab(rawValue: UserDefaults.standard.string(forKey: "onyx.inspectorTab") ?? "") ?? .outline {
+        didSet { if inspectorTab != oldValue { UserDefaults.standard.set(inspectorTab.rawValue, forKey: "onyx.inspectorTab") } }
+    }
     /// How far the Outline pane looks. Remembered across launches.
     var outlineScope: OutlineScope = OutlineScope(rawValue: UserDefaults.standard.string(forKey: "onyx.outlineScope") ?? "") ?? .note {
         didSet { if outlineScope != oldValue { UserDefaults.standard.set(outlineScope.rawValue, forKey: "onyx.outlineScope") } }
@@ -156,9 +160,14 @@ final class Workspace {
     var outlineExpanded: Set<String> = []
     /// Heading branches are open by default; ids listed here are collapsed.
     var outlineCollapsed: Set<String> = []
-    /// The focused pane's source line, updated while scrolling when the Outline tab is open
-    /// so the current heading can highlight without refreshing the rest of the workspace.
+    /// Branches the user expanded by hand; follow leaves them open until the path leaves that area.
+    var outlineHeldOpen: Set<String> = []
+    var outlineHoldEntered: Set<String> = []
+    /// The focused pane's outline spy line. Not the 48px reading anchor.
     var outlineTop: Double = 0
+    /// True while a click-scroll to an outline heading is still settling.
+    var outlineLock = false
+    var editorJumpFromOutline = false
     var overlay: Overlay = .none { didSet { if overlay != oldValue { overlayChanged(from: oldValue) } } }
     var searchQuery = ""
     var focusSearch = 0
@@ -2165,19 +2174,27 @@ extension Workspace {
         if ProcessInfo.processInfo.environment["ONYX_DEBUG"] != nil {
             FileHandle.standardError.write("[top] \(pane.map { String($0.uuidString.prefix(4)) } ?? "live") \(String(format: "%.2f", line)) \(mode)\n".data(using: .utf8)!)
         }
-        if inspectorVisible, inspectorTab == .outline, isFocusedPane(pane), Int(outlineTop) != Int(line) {
-            outlineTop = line
-        }
     }
-    /// Keep the outline highlight in sync when the pane is opened or focus changes.
-    func syncOutlineTop() {
-        let line: Double
-        if isSplit, panes.indices.contains(focusedPane), let t = paneTop[panes[focusedPane].id] {
-            line = t
-        } else {
-            line = liveTop
-        }
+    /// Outline auto-select uses the heading-top spy, not the 48px reading anchor in `reportTop`.
+    func reportOutline(_ pane: UUID?, _ line: Double) {
+        guard !outlineLock, isFocusedPane(pane) else { return }
+        guard inspectorVisible, inspectorTab == .outline else { return }
         if outlineTop != line { outlineTop = line }
+    }
+    func lockOutline(to line: Double) {
+        outlineTop = line
+        outlineLock = true
+    }
+    func unlockOutline() { outlineLock = false }
+    /// Keep the outline highlight in sync when the pane is opened or focus changes.
+    /// Do not copy `liveTop` (that is the reader/editor sync anchor). The live view posts an outline line.
+    func syncOutlineTop() {
+        liveReader?.eval("Onyx.reportOutline()")
+    }
+    func dismissGraphIfNeeded() {
+        if overlay == .graph {
+            withAnimation(Motion.overlay) { overlay = .none }
+        }
     }
     func isFocusedPane(_ pane: UUID?) -> Bool {
         if !isSplit { return true }
@@ -2185,13 +2202,19 @@ extension Workspace {
         return false
     }
     func jumpToOutlineHeading(path: String, index: Int, line: Int) {
+        dismissGraphIfNeeded()
+        lockOutline(to: Double(line))
         if currentPath != path { openNote(path) }
         readerJump = index
         editorJump = line
+        editorJumpFromOutline = true
     }
     func scrollToNoteTop() {
+        dismissGraphIfNeeded()
+        lockOutline(to: 0)
         scrollRequest = ScrollRequest(line: 0, id: (scrollRequest?.id ?? 0) + 1)
         editorJump = 0
+        editorJumpFromOutline = true
     }
 
     /// Where a newly created view should open.

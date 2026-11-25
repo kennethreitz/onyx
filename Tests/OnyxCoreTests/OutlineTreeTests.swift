@@ -33,6 +33,7 @@ final class OutlineTreeTests: XCTestCase {
         XCTAssertEqual(OutlineTree.headingIndex(at: 1.9, in: hs), 0)
         XCTAssertEqual(OutlineTree.headingIndex(at: 2, in: hs), 1)
         XCTAssertEqual(OutlineTree.headingIndex(at: 4.2, in: hs), 2)
+        XCTAssertEqual(OutlineTree.activeId(path: "X.md", line: 0, headings: hs), OutlineTree.noteId("X.md"))
         let id = OutlineTree.activeId(path: "X.md", line: 2, headings: hs)
         XCTAssertEqual(id, OutlineTree.headingId("X.md", index: 1, line: 2))
     }
@@ -42,8 +43,11 @@ final class OutlineTreeTests: XCTestCase {
         let live = "# New\n## Live\n### Deep\n"
         let roots = OutlineTree.build(scope: .note, currentPath: "A.md", currentText: live, snapshot: snap)
         XCTAssertEqual(roots.map(\.title), ["New"])
+        XCTAssertEqual(roots[0].kind, .note)
         XCTAssertEqual(roots[0].children.map(\.title), ["Live"])
         XCTAssertEqual(roots[0].children[0].children.map(\.title), ["Deep"])
+        // the leading H1 is the title row, not also a child
+        XCTAssertFalse(roots[0].children.contains { $0.title == "New" })
     }
 
     func testFolderScopeIsTheNotesFolderWithSubfolders() {
@@ -138,14 +142,15 @@ final class OutlineTreeTests: XCTestCase {
 
         let one = OutlineTree.noteId("A/One.md")
         let open = OutlineTree.flatten(roots, expanded: [folderA, one], headings: hs)
-        XCTAssertEqual(open.map(\.title), ["A", "One", "One", "A", "Deep", "Two", "B"])
-        XCTAssertEqual(open.filter { $0.kind == .heading }.map(\.title), ["One", "A", "Deep"])
+        XCTAssertEqual(open.map(\.title), ["A", "One", "A", "Deep", "Two", "B"])
+        XCTAssertEqual(open.filter { $0.kind == .heading }.map(\.title), ["A", "Deep"])
+        XCTAssertEqual(open.first { $0.id == one }?.title, "One")  // leading H1 is the note title
         // Two's headings stay unloaded
         XCTAssertFalse(open.contains { $0.title == "B" && $0.kind == .heading })
-        let oneH = OutlineTree.nestHeadings(hs("A/One.md"), path: "A/One.md")
+        let body = OutlineTree.nestHeadings(OutlineTree.bodyHeadings(hs("A/One.md")), path: "A/One.md")
         let folded = OutlineTree.flatten(roots, expanded: [folderA, one], headings: hs,
-                                         collapsedHeadings: [oneH[0].id])
-        XCTAssertEqual(folded.filter { $0.kind == .heading }.map(\.title), ["One"])
+                                         collapsedHeadings: [body[0].id])
+        XCTAssertEqual(folded.filter { $0.kind == .heading }.map(\.title), ["A"])
     }
 
     func testRevealOpensThePathAndTheNotesHeadingBranches() {
@@ -160,7 +165,8 @@ final class OutlineTreeTests: XCTestCase {
         XCTAssertTrue(ids.contains(OutlineTree.noteId("A/One.md")))
         XCTAssertFalse(ids.contains(OutlineTree.noteId("A/Two.md")))
         let rows = OutlineTree.flatten(roots, expanded: ids, headings: hs)
-        XCTAssertEqual(rows.filter { $0.kind == .heading }.map(\.title), ["One", "A", "Deep"])
+        XCTAssertEqual(rows.filter { $0.kind == .heading }.map(\.title), ["A", "Deep"])
+        XCTAssertTrue(rows.contains { $0.title == "One" && $0.kind == .note })
     }
 
     func testThisNoteRevealExpandsEveryHeadingBranch() {
@@ -202,9 +208,139 @@ final class OutlineTreeTests: XCTestCase {
         // 40 top-level folders + 50 notes in the open folder + the open note's headings
         XCTAssertLessThan(rows.count, 100)
         XCTAssertEqual(rows.filter { $0.kind == .folder }.count, 40)
-        XCTAssertTrue(rows.contains { $0.title == "Focus" && $0.kind == .heading })
+        XCTAssertTrue(rows.contains { $0.title == "Focus" && $0.kind == .note })
+        XCTAssertTrue(rows.contains { $0.title == "A" && $0.kind == .heading })
+        XCTAssertFalse(rows.contains { $0.title == "Focus" && $0.kind == .heading })
         XCTAssertFalse(rows.contains { $0.title.hasPrefix("Note 1-") })
         XCTAssertLessThan(flat, 0.05, "lazy flatten took \(flat)s")
+    }
+
+
+    func testLeadingH1IsTheNoteTitleNotAChild() {
+        let snap = snapshot([
+            "Planet.md": "# The Sun\n## Rise\n### Dawn\n## Set\n",
+            "Notes.md": "## Just a section\n### Nested\n",
+        ])
+        let vault = OutlineTree.build(scope: .vault, currentPath: "Planet.md", snapshot: snap)
+        let planet = vault.first { $0.path == "Planet.md" }
+        XCTAssertEqual(planet?.kind, .note)
+        XCTAssertEqual(planet?.title, "The Sun")
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let rows = OutlineTree.flatten(vault, expanded: [OutlineTree.noteId("Planet.md")], headings: hs)
+        XCTAssertEqual(rows.filter { $0.path == "Planet.md" }.map { ($0.kind, $0.title) }.map { "\($0.0):\($0.1)" },
+                       ["note:The Sun", "heading:Rise", "heading:Dawn", "heading:Set"])
+
+        let notes = vault.first { $0.path == "Notes.md" }
+        XCTAssertEqual(notes?.title, "Notes")  // no leading H1: file name
+        let rows2 = OutlineTree.flatten(vault, expanded: [OutlineTree.noteId("Notes.md")], headings: hs)
+        XCTAssertEqual(rows2.filter { $0.path == "Notes.md" }.map(\.title), ["Notes", "Just a section", "Nested"])
+    }
+
+    func testThisNoteLeadingH1IsTheRootTitle() {
+        let snap = snapshot(["X.md": "# Title\n## A\n# Other\n## B\n"])
+        let roots = OutlineTree.build(scope: .note, currentPath: "X.md", snapshot: snap)
+        XCTAssertEqual(roots.map(\.title), ["Title"])
+        XCTAssertEqual(roots[0].kind, .note)
+        XCTAssertEqual(roots[0].children.map(\.title), ["A", "Other"])
+        XCTAssertEqual(roots[0].children[1].children.map(\.title), ["B"])
+        XCTAssertEqual(OutlineTree.activeId(path: "X.md", line: 0, headings: NoteParser.parseHeadings(snap.notes["X.md"]!.content)),
+                       OutlineTree.noteId("X.md"))
+        let noH1 = snapshot(["Y.md": "## A\n## B\n"])
+        let roots2 = OutlineTree.build(scope: .note, currentPath: "Y.md", snapshot: noH1)
+        XCTAssertEqual(roots2[0].title, "Y")
+        XCTAssertEqual(roots2[0].children.map(\.title), ["A", "B"])
+    }
+
+    func testFolderNoteLeadingH1IsNotRepeatedUnderTheFolder() {
+        let snap = snapshot([
+            "Knowledge/Knowledge.md": "# Knowledge index\n## Overview\n",
+            "Knowledge/Sun.md": "# Sun\n## Rise\n",
+        ])
+        let roots = OutlineTree.build(scope: .vault, currentPath: "Knowledge/Sun.md", snapshot: snap)
+        let knowledge = roots[0]
+        XCTAssertEqual(knowledge.title, "Knowledge")  // folder name stays
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let rows = OutlineTree.flatten(roots, expanded: [OutlineTree.folderId("Knowledge")], headings: hs)
+        XCTAssertFalse(rows.contains { $0.title == "Knowledge index" })
+        XCTAssertTrue(rows.contains { $0.title == "Overview" && $0.kind == .heading })
+    }
+
+    func testFollowCollapsesOffPathSiblingsAndKeepsTopLevelVisible() {
+        let snap = snapshot(["X.md": "# Title\n## A\n### A1\n#### Deep\n## B\n### B1\n"])
+        let roots = OutlineTree.build(scope: .note, currentPath: "X.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { _ in NoteParser.parseHeadings(snap.notes["X.md"]!.content) }
+        let a = roots[0].children.first { $0.title == "A" }!
+        let a1 = a.children.first { $0.title == "A1" }!
+        let b = roots[0].children.first { $0.title == "B" }!
+        let followed = OutlineTree.follow(
+            activeId: a1.id, roots: roots, headings: hs,
+            expanded: [roots[0].id], heldOpen: [], entered: []
+        )
+        XCTAssertTrue(followed.expand.contains(roots[0].id))
+        XCTAssertFalse(followed.collapse.contains(a.id))
+        XCTAssertFalse(followed.collapse.contains(a1.id))
+        XCTAssertTrue(followed.collapse.contains(b.id))
+        let rows = OutlineTree.flatten(roots, expanded: followed.expand, headings: hs, collapsedHeadings: followed.collapse)
+        XCTAssertEqual(rows.map(\.title), ["Title", "A", "A1", "Deep", "B"])
+        XCTAssertFalse(rows.contains { $0.title == "B1" })
+    }
+
+    func testFollowRespectsHeldOpenUntilPathLeavesTheRoot() {
+        let snap = snapshot(["X.md": "# Title\n## A\n### A1\n## B\n### B1\n# Other\n## C\n"])
+        let roots = OutlineTree.build(scope: .note, currentPath: "X.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { _ in NoteParser.parseHeadings(snap.notes["X.md"]!.content) }
+        let a1 = roots[0].children.first { $0.title == "A" }!.children[0]
+        let b = roots[0].children.first { $0.title == "B" }!
+        let other = roots[0].children.first { $0.title == "Other" }!
+        // Manually expand B while reading A1: it stays open
+        var followed = OutlineTree.follow(
+            activeId: a1.id, roots: roots, headings: hs,
+            expanded: [roots[0].id], heldOpen: [b.id], entered: []
+        )
+        XCTAssertTrue(followed.heldOpen.contains(b.id))
+        XCTAssertFalse(followed.collapse.contains(b.id))
+        let open = OutlineTree.flatten(roots, expanded: followed.expand, headings: hs, collapsedHeadings: followed.collapse)
+        XCTAssertTrue(open.contains { $0.title == "B1" })
+        // Moving to a different top-level heading (Other) releases the hold on B
+        let c = other.children[0]
+        followed = OutlineTree.follow(
+            activeId: c.id, roots: roots, headings: hs,
+            expanded: followed.expand, heldOpen: followed.heldOpen, entered: followed.entered
+        )
+        XCTAssertFalse(followed.heldOpen.contains(b.id))
+        XCTAssertTrue(followed.collapse.contains(b.id))
+    }
+
+    func testFollowKeepsFilterMatchesOpen() {
+        let snap = snapshot(["X.md": "# Title\n## A\n### A1\n## B\n### B1\n"])
+        let roots = OutlineTree.build(scope: .note, currentPath: "X.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { _ in NoteParser.parseHeadings(snap.notes["X.md"]!.content) }
+        let a1 = roots[0].children.first { $0.title == "A" }!.children[0]
+        let b = roots[0].children.first { $0.title == "B" }!
+        let followed = OutlineTree.follow(
+            activeId: a1.id, roots: roots, headings: hs,
+            expanded: [roots[0].id], heldOpen: [], entered: [], keepOpen: [b.id]
+        )
+        XCTAssertFalse(followed.collapse.contains(b.id))
+        let rows = OutlineTree.flatten(roots, expanded: followed.expand, headings: hs, collapsedHeadings: followed.collapse)
+        XCTAssertTrue(rows.contains { $0.title == "B1" })
+    }
+
+    func testFollowDoesNotLoadOffPathVaultHeadings() {
+        var files: [String: String] = ["F00/N00.md": "# Focus\n## A\n### Deep\n"]
+        for i in 1..<20 { files[String(format: "F00/N%02d.md", i)] = "# Note \(i)\n## Hidden\n" }
+        let snap = snapshot(files)
+        let roots = OutlineTree.build(scope: .vault, currentPath: "F00/N00.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let ids = OutlineTree.reveal("F00/N00.md", in: roots, headings: hs)
+        let a = OutlineTree.nestHeadings(OutlineTree.bodyHeadings(hs("F00/N00.md")), path: "F00/N00.md")[0]
+        let followed = OutlineTree.follow(
+            activeId: a.id, roots: roots, headings: hs,
+            expanded: ids, heldOpen: [], entered: []
+        )
+        let rows = OutlineTree.flatten(roots, expanded: followed.expand, headings: hs, collapsedHeadings: followed.collapse)
+        XCTAssertTrue(rows.contains { $0.title == "A" })
+        XCTAssertFalse(rows.contains { $0.title == "Hidden" })
     }
 
     private func flattenTitles(_ roots: [OutlineNode], expandAll: Bool) -> [String] {

@@ -660,3 +660,27 @@ test('rich diffs render a control for collapsed unchanged stretches', () => {
   assert.match(out, /data-index="3"/);
   assert.match(out, /Show 12 unchanged lines/);
 });
+
+test('outline heading scroll lands below the chrome inset with a gap, and spy uses the same offset', () => {
+  const O = ctx.window.Onyx;
+  assert.equal(O._outlineGap, 20);
+  // heading border-box at 100, scrollY 200, offset 66 (46 fade + 20) => 234
+  assert.equal(O._headingScrollY(100, 200, 66), 234);
+  // Round so a fractional short landing cannot hide the heading under the fade.
+  assert.equal(O._headingScrollY(100.4, 200, 66), 234);
+  O.setChromeInset(46);
+  assert.equal(O._outlineOffset(), 66);
+  O.setChromeInset(0);
+  assert.equal(O._outlineOffset(), 20);
+  // After landing, heading top is 66. Spy threshold is offset+1 = 67.
+  // The heading stays active; a next heading at 68 is not.
+  assert.equal(O._activeOutlineLine([{top: 66, line: 10}, {top: 68, line: 20}], 66), 10);
+  // Subpixel just past the landing: still selected (1px hysteresis).
+  assert.equal(O._activeOutlineLine([{top: 66.5, line: 10}, {top: 90, line: 20}], 66), 10);
+  // After a correct landing (heading top = 66), the 48px reading anchor
+  // has not reached the heading yet and would fall back to the title.
+  assert.equal(O._activeOutlineLine([{top: 66, line: 10}, {top: 80, line: 20}], 66), 10);
+  assert.equal(O._activeOutlineLine([{top: 66, line: 10}, {top: 80, line: 20}], 48), 0);
+  // Nothing has reached the line yet: stay on the title (line 0).
+  assert.equal(O._activeOutlineLine([{top: 80, line: 10}], 66), 0);
+});
