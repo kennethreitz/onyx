@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- The left sidebar has an Outline tab after Files, sharing the same pane and behaviour as the inspector Outline tabs (current-note outline, click-to-scroll with the landing offset, scroll-spy, auto-collapse, closing graph mode on click, and index-heading dedupe). The selected sidebar tab is remembered. Command Palette ▸ Outline in Sidebar opens it; the inspector Outline stays on <kbd>⌥⌘1</kbd> ([docs](docs/navigation.md)).
 - Sync-only vaults: keep an Obsidian Sync vault in Onyx without picking a folder. **Connect Obsidian Sync Vault…** (welcome screen, File menu, and Settings ▸ General ▸ Vault ▸ Sync-only Vault…) signs in (Keychain, 2FA when asked), lists your remote vaults, checks the end-to-end password, creates a local copy in `~/Library/Application Support/Onyx/Vaults/<name>`, pulls everything down, and keeps it synced with the usual footer status. Sync-only vaults are listed with Open, Reveal in Finder, and Delete Local Copy… (confirmed first; deletes only this Mac's copy, never the remote vault). Disconnect keeps the copy for a later reconnect, which reuses it and never deletes on either side. The library and its delete safeguards are in OnyxCore and the connect flow in OnyxSync, tested against the fake sync server; OnyxSync now builds for iOS too ([docs](docs/sync.md#sync-only-vaults)).
 
 ### Fixed

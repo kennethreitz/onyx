@@ -6,11 +6,12 @@ import OnyxCore
 enum ViewMode: String { case read, edit }
 enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory, findReplace }
 enum SidebarTab: String, CaseIterable, Identifiable {
-    case files, search, recent, bookmarks, tags, git
+    case files, outline, search, recent, bookmarks, tags, git
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .files: return "folder"
+        case .outline: return "list.bullet.indent"
         case .search: return "magnifyingglass"
         case .recent: return "clock"
         case .bookmarks: return "bookmark"
@@ -119,7 +120,9 @@ final class Workspace {
     var holdHints = false
     @ObservationIgnored var commandHold = CommandHold()
     @ObservationIgnored private var commandHoldTimer: DispatchWorkItem?
-    var sidebarTab: SidebarTab = .files
+    var sidebarTab: SidebarTab = SidebarTab(rawValue: UserDefaults.standard.string(forKey: "onyx.sidebarTab") ?? "") ?? .files {
+        didSet { if sidebarTab != oldValue { UserDefaults.standard.set(sidebarTab.rawValue, forKey: "onyx.sidebarTab") } }
+    }
     // Split panes. Empty = one pane. The focused pane's note lives in currentPath/text/mode;
     // the others keep their own path, text and mode until focused (swap model).
     var panes: [Pane] = []
@@ -1650,6 +1653,7 @@ final class Workspace {
             if sidebarVisible { focusMode = false }
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
+        if sidebarVisible, sidebarTab == .outline { syncOutlineTop() }
     }
     /// Open the git sidebar on this note's version history (does not hide a sidebar that's already open).
     func showNoteHistory() {
@@ -1818,6 +1822,7 @@ final class Workspace {
             if sidebarVisible { focusMode = false }
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
+        if sidebarVisible, sidebarTab == .outline { syncOutlineTop() }
     }
 
     private var preFocus: (Bool, Bool, Bool, Bool)?
@@ -2177,9 +2182,13 @@ extension Workspace {
         }
     }
     /// Outline auto-select uses the heading-top spy, not the 48px reading anchor in `reportTop`.
+    /// True when an Outline pane is showing, in the left sidebar or the right inspector (or both).
+    var outlineVisible: Bool {
+        (sidebarVisible && sidebarTab == .outline) || (inspectorVisible && inspectorTab == .outline)
+    }
     func reportOutline(_ pane: UUID?, _ line: Double) {
         guard !outlineLock, isFocusedPane(pane) else { return }
-        guard inspectorVisible, inspectorTab == .outline else { return }
+        guard outlineVisible else { return }
         if outlineTop != line { outlineTop = line }
     }
     func lockOutline(to line: Double) {

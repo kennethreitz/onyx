@@ -269,6 +269,7 @@ enum PaletteCommands {
             item("new", title: "New note") { ws.newNote() },
             item("newfolder") { ws.newFolder() },
             item("files", title: "Show files") { ws.toggleSidebar(.files) },
+            item("sidebaroutline", title: "Outline in the left sidebar") { ws.toggleSidebar(.outline) },
             item("search", title: "Search vault") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 },
             item("recent") { ws.toggleSidebar(.recent) },
             item("bookmarks") { ws.toggleSidebar(.bookmarks) },
