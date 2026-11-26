@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- The left sidebar has an Outline tab after Files, sharing the same pane and behaviour as the inspector Outline tabs (current-note outline, click-to-scroll with the landing offset, scroll-spy, auto-collapse, closing graph mode on click, and index-heading dedupe). The selected sidebar tab is remembered. Command Palette ▸ Outline in Sidebar opens it; the inspector Outline stays on <kbd>⌥⌘1</kbd> ([docs](docs/navigation.md)).
 - Sync-only vaults: keep an Obsidian Sync vault in Onyx without picking a folder. **Connect Obsidian Sync Vault…** (welcome screen, File menu, and Settings ▸ General ▸ Vault ▸ Sync-only Vault…) signs in (Keychain, 2FA when asked), lists your remote vaults, checks the end-to-end password, creates a local copy in `~/Library/Application Support/Onyx/Vaults/<name>`, pulls everything down, and keeps it synced with the usual footer status. Sync-only vaults are listed with Open, Reveal in Finder, and Delete Local Copy… (confirmed first; deletes only this Mac's copy, never the remote vault). Disconnect keeps the copy for a later reconnect, which reuses it and never deletes on either side. The library and its delete safeguards are in OnyxCore and the connect flow in OnyxSync, tested against the fake sync server; OnyxSync now builds for iOS too ([docs](docs/sync.md#sync-only-vaults)).
 
 ### Fixed
@@ -21,11 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking an Outline heading or title row while graph mode is open closes the graph first, then jumps to the target, with the same click-scroll hold.
 
 ### Changed
-- The inspector is always docked. The pin button and auto-hide overlay are gone; <kbd>⌥⌘I</kbd> still shows or hides it ([docs](docs/navigation.md)).
+- The right sidebar is outline-only: no tab bar, just the outline of the current note (with the existing scope menu, click-to-scroll, scroll-spy, auto-collapse, graph-dismiss, and index-heading dedupe). It stays always docked. <kbd>⌥⌘I</kbd> and <kbd>⌥⌘1</kbd> both show or hide it. Backlinks, unlinked mentions, and `partOf` / related rows move to a Links tab in the left sidebar (<kbd>⌥⌘2</kbd>). Properties (frontmatter and note stats) move to a popover on the note’s title bar, also in the Note menu and <kbd>⌥⌘3</kbd>. The left-sidebar Outline tab is gone; a remembered `onyx.sidebarTab` of `outline` is restored to Files. Version history stays in the git sidebar’s History tab and Version History; vault tags stay in the Tags tab; unlinked mentions also stay at the bottom of the reader ([docs](docs/navigation.md)).
+- The outline sidebar is always docked. The pin button and auto-hide overlay are gone; <kbd>⌥⌘I</kbd> still shows or hides it ([docs](docs/navigation.md)).
 - In the vault-wide and folder Outline, a heading in a folder's index note is omitted when it only names a sibling subfolder or child note (case-insensitive, ignoring extra whitespace and markdown or wikilink markup, including a `[[wikilink]]` to the subfolder or its index). The folder or note row is kept; unique headings stay ([docs](docs/navigation.md)).
 - The outline auto-collapses branches that are off the path of the current heading: only the ancestor chain and that heading's own children stay open. Top-level rows stay visible. A branch you expand by hand stays open until the path leaves it.
 - In folder, neighbors, and vault scopes, a leading H1 is the note's title row and is not listed again as a child. In This note, that H1 is the root of the tree. Clicking the title row opens the note or scrolls to the top.
-- The inspector keeps Outline as its first tab (<kbd>⌥⌘1</kbd>) and also shows the same Outline pane as the last tab. The selected inspector tab is remembered.
 
 ## [0.1.18] - 2026-11-25
 

@@ -77,11 +77,11 @@ struct SidebarView: View {
             Group {
                 switch ws.sidebarTab {
                 case .files: FileTreeView(ws: ws)
-                case .outline: OutlinePane(ws: ws)
                 case .search: SearchPanel(ws: ws)
                 case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.attachments[$0] != nil }, empty: "Nothing opened yet.", hint: "Notes you open land here, newest first.")
                 case .bookmarks: BookmarksPanel(ws: ws)
                 case .tags: TagsPanel(ws: ws)
+                case .links: LinksPane(ws: ws)
                 case .git: GitPanel(ws: ws)
                 }
             }
@@ -782,98 +782,102 @@ struct BookmarksPanel: View {
 
 struct InspectorView: View {
     @Bindable var ws: Workspace
+    var body: some View {
+        OutlinePane(ws: ws)
+    }
+}
+
+/// Relationships, backlinks, and unlinked mentions for the open note.
+struct LinksPane: View {
+    @Bindable var ws: Workspace
     @State private var showUnlinked = false
     var body: some View {
-        VStack(spacing: 0) {
-            PanelHeader(tabs: InspectorTab.barTabs, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned, showsPin: false)
-            Divider().overlay(Color.hairline)
-            if ws.inspectorTab == .outline {
-                OutlinePane(ws: ws)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        if let note = ws.currentNote, let snap = ws.snapshot {
-                            switch ws.inspectorTab {
-                            case .outline: EmptyView()
-                            case .backlinks: backlinks(note, snap)
-                            case .properties: properties(note, snap)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if let note = ws.currentNote, let snap = ws.snapshot {
+                    RelationshipsSection(ws: ws, note: note, snap: snap).id(note.path)
+                    let links = snap.backlinks(to: note.path)
+                    sectionTitle("Linked mentions · \(links.count)")
+                    if links.isEmpty { QuietEmpty(title: "Nothing links here yet.", hint: "Write [[\(note.name)]] in another note.") }
+                    ForEach(links, id: \.self) { b in
+                        NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context), line: b.line)
+                    }
+                    let unlinked = snap.unlinkedMentions(of: note.path)
+                    HStack(spacing: Space.s) {
+                        Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
+                            HStack(spacing: Space.xs) {
+                                Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold))
+                                Text("UNLINKED MENTIONS · \(unlinked.count)").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8)
+                            }.foregroundStyle(Color.faint)
+                        }.buttonStyle(.plain)
+                        Spacer(minLength: 0)
+                        if showUnlinked && !unlinked.isEmpty {
+                            Button("Link all") { ws.linkAllUnlinkedMentions(of: note.path, mentions: unlinked) }
+                                .font(.system(size: 10.5, weight: .medium))
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.muted)
+                        }
+                    }.padding(.horizontal, 14).padding(.top, 14)
+                    if showUnlinked {
+                        if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.", hint: "Plain-text uses of this note's title or aliases, outside code and links.") }
+                        ForEach(unlinked, id: \.self) { m in
+                            NoteRow(ws: ws, path: m.source, detail: m.context, line: m.line, linkTitle: "Link") {
+                                ws.linkUnlinkedMention(m, title: note.name)
                             }
                         }
-                    }.padding(.vertical, 8).thinScrollers()
+                    }
+                } else {
+                    QuietEmpty(title: "Open a note to see its links.", hint: "Backlinks, unlinked mentions, and partOf / related rows for the current note.").padding(.top, Space.xs)
                 }
-            }
+            }.padding(.vertical, 8).thinScrollers()
         }
     }
-
     func sectionTitle(_ s: String) -> some View {
         Text(s.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 4)
     }
+}
 
-    @ViewBuilder func relations(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
-        RelationshipsSection(ws: ws, note: note, snap: snap).id(note.path)
-    }
-
-    @ViewBuilder func backlinks(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
-        relations(note, snap)
-        let links = snap.backlinks(to: note.path)
-        sectionTitle("Linked mentions · \(links.count)")
-        if links.isEmpty { QuietEmpty(title: "Nothing links here yet.", hint: "Write [[\(note.name)]] in another note.") }
-        ForEach(links, id: \.self) { b in
-            NoteRow(ws: ws, path: b.source, detail: b.context.isEmpty ? nil : NoteParser.stripInline(b.context), line: b.line)
-        }
-        let unlinked = snap.unlinkedMentions(of: note.path)
-        HStack(spacing: Space.s) {
-            Button { withAnimation(Motion.quick) { showUnlinked.toggle() } } label: {
-                HStack(spacing: Space.xs) {
-                    Image(systemName: "chevron.right").rotationEffect(.degrees(showUnlinked ? 90 : 0)).font(.system(size: 8, weight: .semibold))
-                    Text("UNLINKED MENTIONS · \(unlinked.count)").font(.system(size: TypeScale.label, weight: .semibold)).tracking(0.8)
-                }.foregroundStyle(Color.faint)
-            }.buttonStyle(.plain)
-            Spacer(minLength: 0)
-            if showUnlinked && !unlinked.isEmpty {
-                Button("Link all") { ws.linkAllUnlinkedMentions(of: note.path, mentions: unlinked) }
-                    .font(.system(size: 10.5, weight: .medium))
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.muted)
-            }
-        }.padding(.horizontal, 14).padding(.top, 14)
-        if showUnlinked {
-            if unlinked.isEmpty { QuietEmpty(title: "No unlinked mentions.", hint: "Plain-text uses of this note's title or aliases, outside code and links.") }
-            ForEach(unlinked, id: \.self) { m in
-                NoteRow(ws: ws, path: m.source, detail: m.context, line: m.line, linkTitle: "Link") {
-                    ws.linkUnlinkedMention(m, title: note.name)
+/// Frontmatter and note stats for the open note (title-bar popover, Note menu, ⌥⌘3).
+struct PropertiesPane: View {
+    @Bindable var ws: Workspace
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                if let note = ws.currentNote, let snap = ws.snapshot {
+                    let fm = Frontmatter.parse(ws.settledText)
+                    sectionTitle("Properties")
+                    if fm.properties.isEmpty { QuietEmpty(title: "No properties.", hint: "Frontmatter between --- lines at the top shows here.") }
+                    ForEach(fm.properties, id: \.self) { p in
+                        HStack(alignment: .firstTextBaseline) {
+                            Image(systemName: icon(p.value)).font(.system(size: 10)).foregroundStyle(Color.faint).frame(width: 14)
+                            Text(p.key).font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 84, alignment: .leading).lineLimit(1)
+                            Text(p.value.display).font(.system(size: 11.5)).foregroundStyle(Color.ink).textSelection(.enabled).lineLimit(4)
+                            Spacer(minLength: 0)
+                        }.padding(.horizontal, 14).padding(.vertical, 3)
+                    }
+                    sectionTitle("Note")
+                    let s = NoteParser.summarize(ws.settledText)
+                    info("Words", "\(s.wordCount)")
+                    info("Links out", "\(s.links.count)")
+                    info("Backlinks", "\(snap.backlinks[note.path]?.count ?? 0)")
+                    if !s.tags.isEmpty {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("Tags").font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 98, alignment: .leading)
+                            TagChips(ws: ws, tags: s.tags)
+                            Spacer(minLength: 0)
+                        }.padding(.horizontal, 14).padding(.vertical, 3)
+                    }
+                    info("Modified", note.mtime.formatted(date: .abbreviated, time: .shortened))
+                    info("Created", note.ctime.formatted(date: .abbreviated, time: .omitted))
+                    info("Path", note.path)
+                } else {
+                    QuietEmpty(title: "Open a note to see its properties.", hint: "Frontmatter, word count, dates, and the file path.").padding(.top, Space.xs)
                 }
-            }
+            }.padding(.vertical, 8).thinScrollers()
         }
     }
-
-    @ViewBuilder func properties(_ note: NoteRecord, _ snap: VaultSnapshot) -> some View {
-        let fm = Frontmatter.parse(ws.settledText)
-        sectionTitle("Properties")
-        if fm.properties.isEmpty { QuietEmpty(title: "No properties.", hint: "Frontmatter between --- lines at the top shows here.") }
-        ForEach(fm.properties, id: \.self) { p in
-            HStack(alignment: .firstTextBaseline) {
-                Image(systemName: icon(p.value)).font(.system(size: 10)).foregroundStyle(Color.faint).frame(width: 14)
-                Text(p.key).font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 84, alignment: .leading).lineLimit(1)
-                Text(p.value.display).font(.system(size: 11.5)).foregroundStyle(Color.ink).textSelection(.enabled).lineLimit(4)
-                Spacer(minLength: 0)
-            }.padding(.horizontal, 14).padding(.vertical, 3)
-        }
-        sectionTitle("Note")
-        let s = NoteParser.summarize(ws.settledText)
-        info("Words", "\(s.wordCount)")
-        info("Links out", "\(s.links.count)")
-        info("Backlinks", "\(snap.backlinks[note.path]?.count ?? 0)")
-        if !s.tags.isEmpty {
-            HStack(alignment: .firstTextBaseline) {
-                Text("Tags").font(.system(size: 11.5)).foregroundStyle(Color.muted).frame(width: 98, alignment: .leading)
-                TagChips(ws: ws, tags: s.tags)
-                Spacer(minLength: 0)
-            }.padding(.horizontal, 14).padding(.vertical, 3)
-        }
-        info("Modified", note.mtime.formatted(date: .abbreviated, time: .shortened))
-        info("Created", note.ctime.formatted(date: .abbreviated, time: .omitted))
-        info("Path", note.path)
+    func sectionTitle(_ s: String) -> some View {
+        Text(s.uppercased()).font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(Color.faint).padding(.horizontal, 14).padding(.top, 8).padding(.bottom, 4)
     }
     func info(_ k: String, _ v: String) -> some View {
         HStack(alignment: .firstTextBaseline) {

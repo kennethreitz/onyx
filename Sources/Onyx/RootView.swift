@@ -107,6 +107,7 @@ struct RootView: View {
                     }
                     NavChevrons(ws: ws, only: .forward).padding(.leading, 3)
                     GraphButton(ws: ws).padding(.leading, 2)
+                    PropertiesButton(ws: ws)
                 }
             }
             .font(.system(size: 12))
@@ -163,7 +164,7 @@ struct RootView: View {
                     }
                 }
                 .padding(.trailing, 4)
-                FooterButton(symbol: "sidebar.right", help: "Inspector (⌥⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
+                FooterButton(symbol: "sidebar.right", help: "Outline (⌥⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
                     .opacity(footerHover ? 1 : 0.55)
                     .animation(.easeOut(duration: 0.2), value: footerHover)
             }
@@ -931,6 +932,32 @@ struct GraphButton: View {
         .accessibilityAddTraits(on ? .isSelected : [])
     }
 }
+
+/// Title-bar control: frontmatter and note stats for the open note (⌥⌘3).
+struct PropertiesButton: View {
+    @Bindable var ws: Workspace
+    @State private var hover = false
+    var on: Bool { ws.notePropertiesOpen }
+    var body: some View {
+        Button { ws.toggleNoteProperties() } label: {
+            Image(systemName: "tablecells")
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(on || hover ? Color.ink : Color.muted)
+                .frame(width: 20, height: 20)
+                .background(RoundedRectangle(cornerRadius: Radius.small).fill(Color.ink.opacity(on || hover ? 0.06 : 0)))
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(ws.currentPath == nil)
+        .popover(isPresented: $ws.notePropertiesOpen, arrowEdge: .bottom) {
+            PropertiesPane(ws: ws)
+                .frame(width: 320, height: 420)
+        }
+        .onHover { h in withAnimation(Motion.hover) { hover = h } }
+        .help("Properties (⌥⌘3)")
+    }
+}
+
 
 struct NavChevrons: View {
     enum Which { case both, back, forward }

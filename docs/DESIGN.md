@@ -12,9 +12,9 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   Folder segments are links (hover underline, pointer cursor): a click docks the Files
   sidebar, expands down to that folder, selects and scrolls to it, and opens its folder
   note (`Folder/Folder.md`, the folder-notes convention) when one exists. The last segment
-  copies `[[Note]]`.
+  copies `[[Note]]`. A tablecells button after the graph control opens the Properties popover (frontmatter and note stats; also Note ▸ Properties and ⌥⌘3).
 - **Footer** (auto-dims to ~40%, full on hover): files, switcher, graph, three-pane,
-  read/edit, focus mode · sync and git · word count · inspector. Counts sit with the
+  read/edit, focus mode · sync and git · word count · outline. Counts sit with the
   status chips on the right. As the bar tightens they shrink in priority order
   (words, then backlinks, then characters), using compact forms (“2 links”, “370w”)
   before dropping an item, rather than reserving a hover-only gap. A tooltip shows
@@ -22,8 +22,8 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   Reading/Paused chip keeps a fixed width; footer buttons are 22pt.
 - **Sidebar** is always docked. First launch shows it; ⌘K shows or hides it. Visibility is
   remembered (`onyx.sidebarOpen`). There is no pin button, floating overlay, or left-edge peek.
-- **Resizable panels**: drag the inner edge of the sidebar or inspector (a hairline that shows
-  a small grip and a resize cursor on hover). Sidebar 140–560pt (default 270), inspector
+- **Resizable panels**: drag the inner edge of the sidebar or outline sidebar (a hairline that shows
+  a small grip and a resize cursor on hover). Sidebar 140–560pt (default 270), outline sidebar
   150–600pt (default 300); widths persist (`onyx.sidebarWidth`, `onyx.inspectorWidth`), and a
   double-click on the edge resets to the default. Tab icons compress to fit narrow panels.
 - **Scrollbars**: thin and quiet everywhere. Editor and panels use `ThinScroller` (a 3pt
@@ -33,11 +33,14 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   scrollbar and draws a floating 3px thumb (draggable) from reader.js, so split panes meet at
   a bare hairline. `ONYX_SCROLL_TEST=<seconds>` scrolls everything in small steps that long
   after launch, for screenshots.
-- **Inspector** (outline, backlinks, properties) is always docked. ⌥⌘I or the footer
-  button shows or hides it; visibility is remembered (`onyx.inspectorOpen`). There is no
-  pin button, floating overlay, or right-edge peek (a pointer parked at the window's
-  right edge used to keep re-summoning it). ⌥⌘I is caught ahead of the editor so it
-  works while typing. Esc puts it away too.
+- **Outline sidebar** is always docked and has no tab bar: it shows the outline of the
+  current note (scope menu at the top). ⌥⌘I, ⌥⌘1, or the footer button shows or hides
+  it; visibility is remembered (`onyx.inspectorOpen`). There is no pin button, floating
+  overlay, or right-edge peek (a pointer parked at the window's right edge used to keep
+  re-summoning it). ⌥⌘I is caught ahead of the editor so it works while typing. Esc
+  puts it away too. Backlinks, unlinked mentions, and relationship rows live in the
+  left sidebar’s Links tab (⌥⌘2). Properties live on the note (title-bar button, Note
+  menu, ⌥⌘3).
 - **Title fade**: a paper-colored gradient sits behind the title path, so body text scrolls
   up into a soft fade instead of colliding with the path.
 - **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes; a new split sets
@@ -88,7 +91,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌘P, ⇧⌘P | Command palette (⇧⌘P for VS Code hands) |
 | ⌘K | Show or hide the sidebar (always docked; from another tab, switches to Files) |
 | ⇧⌘F | Search the vault |
-| ⌥⌘I | Show or hide the inspector (always docked) |
+| ⌥⌘I / ⌥⌘1 | Show or hide the outline sidebar (always docked) |
 | ⌘B / ⌘I | Toggle bold / italic |
 | ⌘G / ⇧⌘G | Focus graph / Atlas |
 | ⌘E, ⌘↩ | Read ⇄ edit; ⌘↩ also saves immediately |
@@ -102,7 +105,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌘N | New note (in the selected folder, or next to the open note). ⌘S names a still-Untitled file from its first heading |
 | ⇧⌘N | New folder |
 | ⌃⌘F | Focus mode |
-| Esc | Put away the topmost layer (overlay → inspector → focus mode) |
+| Esc | Put away the topmost layer (overlay → outline sidebar → focus mode) |
 
 ## Canvas
 
@@ -135,7 +138,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 ## Graph
 
 - **Focus graph** (⌘G): an overlay on the current pane (or the solo page) only — never
-  over the sidebar, inspector, or other split panes — with a short fade and scale-in,
+  over the sidebar, outline sidebar, or other split panes — with a short fade and scale-in,
   sitting on top of the note underneath. The note at the center, direct links on the
   first ring (out filled, in hollow), second hop faint beyond. Click travels with an
   animated re-center and a breadcrumb trail (⌫ back); double-click or ↩ opens that
@@ -303,11 +306,11 @@ are rewritten by rename/move like any wikilink, bare names included. `VaultSnaps
 kind: `parents(of:)`, `parts(of:)`, `siblings(of:)` and the symmetric `related(to:)`.
 
 The reader renders a field as a small monospace key plus link chips; the editor tints `key::`.
-The inspector's Links tab (`RelationshipsSection`) lists Part of, Parts and Related above the backlinks. Parts is a tree from
+The left sidebar’s Links tab (`RelationshipsSection`) lists Part of, Parts and Related above the backlinks. Parts is a tree from
 `Ancestry.partsTree` (cycle-safe: a note that is its own ancestor in a branch shows once more as ↻; depth 6), Siblings fold
 under a count, and `VaultSnapshot.fieldRelations(of:)` groups every other link-valued key both ways (`treats`, `treats · from`). In the focus graph, `partOf`
 spokes are firmer muted stems with a small open chevron halfway along, pointing part → parent; Filter ▸ Hierarchy only
-(`onyx.graph.hierarchyOnly`) lays out `FocusLayout.layout(hierarchy:)` from `GraphIndex.partOf`/`parts` alone. Related spokes are blue dotted lines. Hovering any resolved reader link or an inspector
+(`onyx.graph.hierarchyOnly`) lays out `FocusLayout.layout(hierarchy:)` from `GraphIndex.partOf`/`parts` alone. Related spokes are blue dotted lines. Hovering any resolved reader link or a Links-tab
 relation for 400 ms opens a card: the note's parents above, parts below (two staggered lanes, "+N more"),
 siblings faint at the side, related to the right, or its plain links when it has no fields. Click a node
 to open it, the card background for the note itself; leaving the link or the card closes it.
@@ -354,7 +357,7 @@ Below every note (not Kanban boards) the reader lists linked mentions, grouped b
 three context lines each. Field links count, wikilinks read as their alias, and table rows are flattened. Clicking
 a context opens the note at that line. "Unlinked mentions" loads on demand when expanded: whole-word, case-insensitive
 matches of the note's name, title, or aliases, skipping frontmatter, code, comments, and existing links. Link turns
-that mention into a `[[wikilink]]` (with a display alias when the visible text differs). The inspector's Backlinks
+that mention into a `[[wikilink]]` (with a display alias when the visible text differs). The left sidebar’s Links
 tab shows the same lists, and clicking a row opens the source at that line; Link all converts every remaining mention.
 Both sections collapse, and the open state is remembered.
 
@@ -363,7 +366,7 @@ Both sections collapse, and the open state is remembered.
 Hovering a resolved link in the reader (or holding ⌘ over a `[[link]]` in the editor) opens a card after 400 ms.
 The card shows the target note rendered compactly and scrollable, or its local graph. A toggle in the card header
 switches between the two, and links remember the last choice (page by default). The title-bar graph button and the
-inspector's relation rows always open on the graph. `[[Note#Heading]]` previews just that section. Inside the preview,
+Links tab's relation rows always open on the graph. `[[Note#Heading]]` previews just that section. Inside the preview,
 links navigate (and close the card) but do not nest further previews. Tasks are read-only there.
 
 ## Find in note (⌘F)
