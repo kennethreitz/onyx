@@ -79,6 +79,9 @@ public struct OutlineFollow: Equatable, Sendable {
 /// Pure outline construction: nest headings, widen scope around the open note, and
 /// flatten only the expanded branches so a large vault stays cheap to draw.
 public enum OutlineTree {
+    private static let mdLinkLabel = try! NSRegularExpression(pattern: #"\[([^\]]+)\]\([^)]+\)"#)
+    private static let whitespace = try! NSRegularExpression(pattern: #"\s+"#)
+
     public static func folderId(_ path: String) -> String { "f:" + path }
     public static func noteId(_ path: String) -> String { "n:" + path }
     public static func headingId(_ path: String, index: Int, line: Int) -> String { "h:\(path)#\(index)@\(line)" }
@@ -169,14 +172,100 @@ public enum OutlineTree {
         return snap.notes[path]?.summary.headings ?? []
     }
 
-    /// Structural children plus, when a note/folder-note is expanded, its body headings
-    /// (a leading H1 is the title row and is not repeated).
-    public static func headingChildren(of n: OutlineNode, headings: (String) -> [Heading]) -> [OutlineNode] {
-        var c = n.children
-        if n.loadsHeadings, let path = n.path {
-            c = nestBody(of: headings(path), path: path) + c
+    /// Fold a heading or child title for comparison: trim, strip markdown and wikilink
+    /// markup, collapse whitespace, and compare case-insensitively.
+    public static func normalizedLabel(_ raw: String) -> String {
+        var s = NoteParser.stripInline(raw)
+        s = mdLinkLabel.stringByReplacingMatches(in: s, range: NSRange(location: 0, length: (s as NSString).length), withTemplate: "$1")
+        s = s.trimmingCharacters(in: .whitespacesAndNewlines)
+        s = whitespace.stringByReplacingMatches(in: s, range: NSRange(location: 0, length: (s as NSString).length), withTemplate: " ")
+        return s.lowercased()
+    }
+
+    /// Names a folder or note row can be referred to by: display title, file/folder name,
+    /// path (with or without `.md`), and a folder's index-note path.
+    public static func childKeys(_ n: OutlineNode) -> Set<String> {
+        var keys: Set<String> = []
+        func add(_ raw: String) {
+            let k = normalizedLabel(raw)
+            guard !k.isEmpty else { return }
+            keys.insert(k)
+            let last = (k as NSString).lastPathComponent
+            if last != k, !last.isEmpty { keys.insert(last) }
+            if k.hasSuffix(".md") {
+                let stem = String(k.dropLast(3))
+                keys.insert(stem)
+                let stemLast = (stem as NSString).lastPathComponent
+                if !stemLast.isEmpty { keys.insert(stemLast) }
+            }
         }
-        return c
+        add(n.title)
+        if let path = n.path { add(path) }
+        if n.kind == .folder, n.id.hasPrefix("f:") {
+            let folder = String(n.id.dropFirst(2))
+            add(folder)
+            if let index = FolderIndex.notePath(forFolder: folder) { add(index) }
+        }
+        if n.kind == .note, n.id.hasPrefix("n:") { add(String(n.id.dropFirst(2))) }
+        return keys
+    }
+
+    /// Display text plus any `[[wikilink]]` target or alias still on the heading.
+    public static func headingKeys(_ n: OutlineNode) -> Set<String> {
+        var keys: Set<String> = []
+        func add(_ raw: String) {
+            let k = normalizedLabel(raw)
+            guard !k.isEmpty else { return }
+            keys.insert(k)
+            let last = (k as NSString).lastPathComponent
+            if last != k, !last.isEmpty { keys.insert(last) }
+            if k.hasSuffix(".md") {
+                let stem = String(k.dropLast(3))
+                keys.insert(stem)
+                let stemLast = (stem as NSString).lastPathComponent
+                if !stemLast.isEmpty { keys.insert(stemLast) }
+            }
+        }
+        add(n.title)
+        for link in NoteParser.parseWikiLinks(n.title) {
+            add(link.target)
+            if let alias = link.alias { add(alias) }
+        }
+        return keys
+    }
+
+    /// Drop heading rows that only repeat a sibling subfolder or child note, and
+    /// promote any remaining unique children so they are not lost. Prefer the
+    /// folder or note row.
+    public static func droppingDuplicateHeadings(_ headings: [OutlineNode], matching children: [OutlineNode]) -> [OutlineNode] {
+        guard !headings.isEmpty, !children.isEmpty else { return headings }
+        let childKeySet = Set(children.flatMap { childKeys($0) })
+        func filter(_ nodes: [OutlineNode]) -> [OutlineNode] {
+            var out: [OutlineNode] = []
+            for n in nodes {
+                if n.kind == .heading, !headingKeys(n).isDisjoint(with: childKeySet) {
+                    out += filter(n.children)
+                } else {
+                    var m = n
+                    m.children = filter(n.children)
+                    out.append(m)
+                }
+            }
+            return out
+        }
+        return filter(headings)
+    }
+
+    /// Structural children plus, when a note/folder-note is expanded, its body headings
+    /// (a leading H1 is the title row and is not repeated). Headings whose text matches
+    /// a sibling subfolder or child note are omitted; the folder or note row is kept.
+    public static func headingChildren(of n: OutlineNode, headings: (String) -> [Heading]) -> [OutlineNode] {
+        let structural = n.children
+        if n.loadsHeadings, let path = n.path {
+            let heads = droppingDuplicateHeadings(nestBody(of: headings(path), path: path), matching: structural)
+            return heads + structural
+        }
+        return structural
     }
 
     public static func build(scope: OutlineScope, currentPath: String?, currentText: String? = nil,
