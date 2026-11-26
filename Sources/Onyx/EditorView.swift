@@ -845,11 +845,13 @@ struct EditorView: NSViewRepresentable {
             if caret { tv.setSelectedRange(NSRange(location: loc, length: 0)) }
         }
 
-        /// Last heading whose top is at or above outlineOffset+1, matching the reader spy.
+        /// Last heading whose top (including paragraph spacing before) is at or before
+        /// visibleTop + landingOffset + 2px, matching the reader spy.
         func outlineSpyLine() -> Double? {
             guard let tv = textView, let lm = tv.layoutManager, let tc = tv.textContainer,
                   let clip = tv.enclosingScrollView?.contentView else { return nil }
-            let threshold = clip.bounds.minY + outlineOffset() + 1 - tv.textContainerOrigin.y
+            let visibleTop = clip.bounds.minY - tv.textContainerOrigin.y
+            let threshold = ReadingChrome.outlineThreshold(visibleTop: visibleTop, focusMode: parent.ws.focusMode)
             let hs = NoteParser.parseHeadings(tv.string)
             var best: Double = 0
             for h in hs {
@@ -857,7 +859,15 @@ struct EditorView: NSViewRepresentable {
                 let lr = (tv.string as NSString).lineRange(for: NSRange(location: loc, length: 0))
                 lm.ensureLayout(forCharacterRange: NSRange(location: 0, length: NSMaxRange(lr)))
                 let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
-                if rect.minY <= threshold { best = Double(h.line) } else { break }
+                let space: CGFloat
+                if loc < (tv.string as NSString).length,
+                   let style = tv.textStorage?.attribute(.paragraphStyle, at: loc, effectiveRange: nil) as? NSParagraphStyle {
+                    space = style.paragraphSpacingBefore
+                } else {
+                    space = 0
+                }
+                let top = OutlineTree.headingSpyTop(borderTop: Double(rect.minY), marginTop: Double(space))
+                if top <= Double(threshold) { best = Double(h.line) } else { break }
             }
             return best
         }
