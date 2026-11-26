@@ -735,7 +735,11 @@ struct EditorView: NSViewRepresentable {
         var anchor: Double = 0   // last position the writer chose (scroll or restore)
         var scrollHandled: Int?
         private var reportQueued = false
+        private var outlineReportQueued = false
         private var outlineJumpWork: DispatchWorkItem?
+        private var spyRev = 0
+        private var spyCachedRev = -1
+        private var spyHeads: [(line: Int, loc: Int)] = []
         private var highlighter: MarkdownHighlighter { MarkdownHighlighter() }
         /// The styled text's shape and the one character edit since, for restyling just its lines.
         private var shape: MarkdownHighlighter.Shape?
@@ -745,6 +749,7 @@ struct EditorView: NSViewRepresentable {
         func textStorage(_ textStorage: NSTextStorage, didProcessEditing editedMask: NSTextStorageEditActions, range editedRange: NSRange, changeInLength delta: Int) {
             guard editedMask.contains(.editedCharacters) else { return }
             editsSinceStyle += 1
+            spyRev += 1
             pendingEdit = MarkdownHighlighter.Edit(range: editedRange, delta: delta)
         }
 
@@ -845,6 +850,27 @@ struct EditorView: NSViewRepresentable {
             if caret { tv.setSelectedRange(NSRange(location: loc, length: 0)) }
         }
 
+        /// Headings of the current editor text, with precomputed source-line starts.
+        /// Rebuilt when the text changes, not on every scroll tick.
+        func spyHeadings() -> [(line: Int, loc: Int)] {
+            guard let tv = textView else { return [] }
+            if spyCachedRev == spyRev { return spyHeads }
+            let ns = tv.string as NSString
+            var starts: [Int] = [0]
+            var loc = 0
+            while loc < ns.length {
+                let next = NSMaxRange(ns.lineRange(for: NSRange(location: loc, length: 0)))
+                if next >= ns.length { break }
+                loc = next
+                starts.append(loc)
+            }
+            spyHeads = NoteParser.parseHeadings(tv.string).map { h in
+                (h.line, h.line < starts.count ? starts[h.line] : ns.length)
+            }
+            spyCachedRev = spyRev
+            return spyHeads
+        }
+
         /// Last heading whose top (including paragraph spacing before) is at or before
         /// visibleTop + landingOffset + 2px, matching the reader spy.
         func outlineSpyLine() -> Double? {
@@ -852,16 +878,27 @@ struct EditorView: NSViewRepresentable {
                   let clip = tv.enclosingScrollView?.contentView else { return nil }
             let visibleTop = clip.bounds.minY - tv.textContainerOrigin.y
             let threshold = ReadingChrome.outlineThreshold(visibleTop: visibleTop, focusMode: parent.ws.focusMode)
-            let hs = NoteParser.parseHeadings(tv.string)
+            let hs = spyHeadings()
+            let ns = tv.string as NSString
+            guard !hs.isEmpty, ns.length > 0 else { return 0 }
+            // Lay out from the start through just below the view; TextKit already needs
+            // everything above in order to place glyphs. Extend only if a heading we still
+            // need isn't laid out yet — do not re-parse or re-layout every heading.
+            let layoutH = max(clip.bounds.maxY - tv.textContainerOrigin.y + 64, 1)
+            lm.ensureLayout(forBoundingRect: NSRect(x: 0, y: 0, width: max(clip.bounds.width, 1), height: layoutH), in: tc)
             var best: Double = 0
             for h in hs {
-                let loc = lineStart(h.line, in: tv.string as NSString)
-                let lr = (tv.string as NSString).lineRange(for: NSRange(location: loc, length: 0))
-                lm.ensureLayout(forCharacterRange: NSRange(location: 0, length: NSMaxRange(lr)))
-                let rect = lm.boundingRect(forGlyphRange: lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil), in: tc)
+                let loc = min(h.loc, ns.length - 1)
+                let lr = ns.lineRange(for: NSRange(location: loc, length: 0))
+                var glyphs = lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil)
+                if glyphs.length == 0, h.loc > 0 {
+                    lm.ensureLayout(forCharacterRange: NSRange(location: 0, length: NSMaxRange(lr)))
+                    glyphs = lm.glyphRange(forCharacterRange: lr, actualCharacterRange: nil)
+                }
+                let rect = lm.boundingRect(forGlyphRange: glyphs, in: tc)
                 let space: CGFloat
-                if loc < (tv.string as NSString).length,
-                   let style = tv.textStorage?.attribute(.paragraphStyle, at: loc, effectiveRange: nil) as? NSParagraphStyle {
+                if h.loc < ns.length,
+                   let style = tv.textStorage?.attribute(.paragraphStyle, at: h.loc, effectiveRange: nil) as? NSParagraphStyle {
                     space = style.paragraphSpacingBefore
                 } else {
                     space = 0
@@ -914,7 +951,17 @@ struct EditorView: NSViewRepresentable {
                 self.reportQueued = false
                 if !self.restoring, let t = self.topLine() { self.anchor = t; self.parent.ws.reportTop(self.parent.paneID, t) }
                 if self.parent.ws.outlineLock { self.armOutlineJumpEnd(); return }
-                if !self.restoring, let o = self.outlineSpyLine() { self.parent.ws.reportOutline(self.parent.paneID, o) }
+                guard !self.restoring else { return }
+                // Match the reader's 60ms outline cadence so SwiftUI is not
+                // asked to re-diff the outline on every scroll frame.
+                if self.outlineReportQueued { return }
+                self.outlineReportQueued = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) { [weak self] in
+                    guard let self else { return }
+                    self.outlineReportQueued = false
+                    if self.restoring || self.parent.ws.outlineLock { return }
+                    if let o = self.outlineSpyLine() { self.parent.ws.reportOutline(self.parent.paneID, o) }
+                }
             }
         }
 

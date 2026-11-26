@@ -167,8 +167,17 @@ public enum OutlineTree {
         return nestHeadings(bodyHeadings(headings), path: path, startIndex: start)
     }
 
+    /// Last parse of the open note's text. Outline pane body evaluation used to
+    /// re-parse headings on every scroll-spy tick (`outlineTop` change).
+    private static var headingMemo: (path: String, text: String, headings: [Heading])?
+
     public static func headings(for path: String, currentPath: String?, currentText: String?, in snap: VaultSnapshot) -> [Heading] {
-        if path == currentPath, let currentText { return NoteParser.parseHeadings(currentText) }
+        if path == currentPath, let currentText {
+            if let memo = headingMemo, memo.path == path, memo.text == currentText { return memo.headings }
+            let hs = NoteParser.parseHeadings(currentText)
+            headingMemo = (path, currentText, hs)
+            return hs
+        }
         return snap.notes[path]?.summary.headings ?? []
     }
 

@@ -237,15 +237,35 @@
   let chromeInsetPt = 0;
   function viewScale() { return (window.visualViewport && window.visualViewport.scale) || 1; }
   function cssChromeInset() { return chromeInsetPt / viewScale(); }
-  function stickyHeaderHeight() {
-    let bottom = 0;
+  // Scroll-spy caches: heading/block element lists, heading margin-tops, and
+  // which page children are sticky. Positions are still read live. Invalidated
+  // when the page is re-rendered or folds change visibility.
+  let headCache = null, blockCache = null, stickyEls = null, lastOutlineLine = null;
+  function invalidateSpyCaches() {
+    headCache = null;
+    blockCache = null;
+    stickyEls = null;
+    lastOutlineLine = null;
+  }
+  function stickyCandidates() {
+    if (stickyEls) return stickyEls;
     const roots = [];
     const pageEl = document.getElementById('page');
     if (pageEl) for (const el of pageEl.children) roots.push(el);
     document.querySelectorAll('header, [data-sticky]').forEach(el => roots.push(el));
+    const seen = new Set(), out = [];
     for (const el of roots) {
+      if (seen.has(el)) continue;
+      seen.add(el);
       const s = getComputedStyle(el);
-      if (s.position !== 'sticky' && s.position !== 'fixed') continue;
+      if (s.position === 'sticky' || s.position === 'fixed') out.push(el);
+    }
+    stickyEls = out;
+    return out;
+  }
+  function stickyHeaderHeight() {
+    let bottom = 0;
+    for (const el of stickyCandidates()) {
       const r = el.getBoundingClientRect();
       if (r.height > 0 && r.top <= 1 && r.bottom > 0) bottom = Math.max(bottom, r.bottom);
     }
@@ -263,8 +283,15 @@
       && !h.closest('.footnotes')
       && !h.closest('.kanban');
   }
-  function headingEls() {
-    return [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(isOutlineHeading);
+  function headingEls() { return outlineHeadCache().map(h => h.el); }
+  function outlineHeadCache() {
+    if (headCache) return headCache;
+    const els = [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(isOutlineHeading);
+    headCache = els.map(h => {
+      const mt = parseFloat(getComputedStyle(h).marginTop);
+      return { el: h, marginTop: Number.isFinite(mt) ? mt : 0, line: h.dataset.line != null ? +h.dataset.line : 0 };
+    });
+    return headCache;
   }
   // Last heading whose top is at or before visibleTop + offset + 2px.
   // `items` is [{top, line}, ...] in document order, `top` already the margin-box
@@ -292,15 +319,18 @@
   }
   function readOutlineLine() {
     const off = outlineOffset();
-    return activeOutlineLine(headingEls().map(h => ({
-      top: headingElSpyTop(h),
-      line: h.dataset.line != null ? +h.dataset.line : 0
+    return activeOutlineLine(outlineHeadCache().map(h => ({
+      top: headingSpyTop(h.el.getBoundingClientRect().top, h.marginTop),
+      line: h.line
     })), off, 0);
   }
   let outlineJump = 0;
   function postOutline() {
     if (outlineJump) return;
-    post({ type: 'outline', line: readOutlineLine() });
+    const line = readOutlineLine();
+    if (lastOutlineLine === line) return;
+    lastOutlineLine = line;
+    post({ type: 'outline', line });
   }
   function beginOutlineJump() {
     const token = ++outlineJump;
@@ -365,7 +395,11 @@
       c.remove();
     }
   }
-  function blocks() { return [...page.querySelectorAll('[data-line]')].filter(e => e.offsetParent !== null || e.getClientRects().length); }
+  function blocks() {
+    if (blockCache) return blockCache;
+    blockCache = [...page.querySelectorAll('[data-line]')].filter(e => e.offsetParent !== null || e.getClientRects().length);
+    return blockCache;
+  }
   function topLine() {
     if (window.scrollY <= 0) return 0;
     let best = null;
@@ -878,6 +912,7 @@
     const hidden = new Set();
     for (const h of heads) if (h.classList.contains('folded')) for (const e of sectionOf(h)) hidden.add(e);
     for (const e of page.children) e.classList.toggle('fold-hidden', hidden.has(e));
+    blockCache = null;
     if (relayout && P && P.sidenotes) layoutSidenotes();
   }
   function postFolds() { post({ type: 'folds', lines: [...FOLDS] }); }
@@ -1235,6 +1270,7 @@
       mermaids();
       page.querySelectorAll('.table-wide').forEach(ensureZoomHint);
       setupFolds();
+      invalidateSpyCaches();
       if (kbx && page.querySelector('.kanban')) page.querySelector('.kanban').scrollLeft = kbx;
       if (FIND) post(Object.assign({ type: 'findCount' }, applyFind(false)));
       const ud = page.querySelector('details[data-k=unlinked]');
@@ -1359,6 +1395,21 @@
       window.scrollTo({ top: y, behavior: reduced ? 'auto' : 'smooth' });
     },
     reportOutline() { postOutline(); },
+    _readOutlineLine: readOutlineLine,
+    _topLine: topLine,
+    _invalidateSpyCaches: invalidateSpyCaches,
+    _benchSpy(n) {
+      n = n || 200;
+      const ms = (fn) => { const t0 = performance.now(); for (let i = 0; i < n; i++) fn(); return (performance.now() - t0) / n; };
+      invalidateSpyCaches();
+      const coldOutline = ms(() => { invalidateSpyCaches(); readOutlineLine(); });
+      const warmOutline = ms(() => readOutlineLine());
+      invalidateSpyCaches();
+      const coldTop = ms(() => { invalidateSpyCaches(); topLine(); });
+      const warmTop = ms(() => topLine());
+      const bothWarm = ms(() => { topLine(); readOutlineLine(); });
+      return { n, coldOutline, warmOutline, coldTop, warmTop, bothWarm, headings: outlineHeadCache().length, blocks: blocks().length };
+    },
     _outlineGap: OUTLINE_GAP,
     _outlineHysteresis: OUTLINE_HYSTERESIS,
     _activeOutlineLine: activeOutlineLine,

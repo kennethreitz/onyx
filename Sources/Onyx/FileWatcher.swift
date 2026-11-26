@@ -27,7 +27,7 @@ final class FileWatcher {
         let flags = UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
         stream = FSEventStreamCreate(nil, cb, &ctx, [root.path] as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.15, flags)
         if let stream {
-            FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
+            FSEventStreamSetDispatchQueue(stream, DispatchQueue(label: "onyx.fsEvents"))
             FSEventStreamStart(stream)
         }
     }

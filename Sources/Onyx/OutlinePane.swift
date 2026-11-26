@@ -127,10 +127,16 @@ struct OutlinePane: View {
             expanded: ws.outlineExpanded, heldOpen: ws.outlineHeldOpen,
             entered: ws.outlineHoldEntered, keepOpen: []
         )
-        if result.expand != ws.outlineExpanded { ws.outlineExpanded = result.expand }
-        if result.collapse != ws.outlineCollapsed { ws.outlineCollapsed = result.collapse }
-        if result.heldOpen != ws.outlineHeldOpen { ws.outlineHeldOpen = result.heldOpen }
-        if result.entered != ws.outlineHoldEntered { ws.outlineHoldEntered = result.entered }
+        // Scroll-driven follow must not animate: collapsing off-path branches
+        // with Motion.quick (or an inherited transaction) fights the highlight
+        // and makes the list jump while you scroll.
+        var t = Transaction(); t.disablesAnimations = true
+        withTransaction(t) {
+            if result.expand != ws.outlineExpanded { ws.outlineExpanded = result.expand }
+            if result.collapse != ws.outlineCollapsed { ws.outlineCollapsed = result.collapse }
+            if result.heldOpen != ws.outlineHeldOpen { ws.outlineHeldOpen = result.heldOpen }
+            if result.entered != ws.outlineHoldEntered { ws.outlineHoldEntered = result.entered }
+        }
     }
 
     func toggle(_ row: OutlineRow) {
