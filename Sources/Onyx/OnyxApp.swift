@@ -298,6 +298,7 @@ struct OnyxApp: App {
             }
             Divider()
             ShortcutMenus.button("files", title: ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }
+            ShortcutMenus.button("sidebaroutline") { ws.toggleSidebar(.outline) }
             ShortcutMenus.button("search") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }
             ShortcutMenus.button("recent") { ws.toggleSidebar(.recent) }
             ShortcutMenus.button("bookmarks") { ws.toggleSidebar(.bookmarks) }

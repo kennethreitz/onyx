@@ -77,6 +77,7 @@ struct SidebarView: View {
             Group {
                 switch ws.sidebarTab {
                 case .files: FileTreeView(ws: ws)
+                case .outline: OutlinePane(ws: ws)
                 case .search: SearchPanel(ws: ws)
                 case .recent: PathList(ws: ws, paths: ws.recent.filter { ws.snapshot?.notes[$0] != nil || ws.snapshot?.attachments[$0] != nil }, empty: "Nothing opened yet.", hint: "Notes you open land here, newest first.")
                 case .bookmarks: BookmarksPanel(ws: ws)

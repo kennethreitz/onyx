@@ -106,6 +106,7 @@ public enum CommandCatalog {
         cmd("mode", "Save and Read / Edit and Save", .view, [.command("\r")], "book"),
         cmd("focus", "Focus Mode", .view, [.command("f", control: true)], "arrow.up.left.and.arrow.down.right"),
         cmd("files", "Show Sidebar", .view, [.command("k")], "folder"),
+        cmd("sidebaroutline", "Outline in Sidebar", .view, [], "list.bullet.indent"),
         cmd("search", "Search Vault", .view, [.command("f", shift: true)], "magnifyingglass"),
         cmd("recent", "Recent Files", .view, [.command("r", shift: true)], "clock"),
         cmd("bookmarks", "Bookmarks", .view, [.command("b", shift: true)], "bookmark"),

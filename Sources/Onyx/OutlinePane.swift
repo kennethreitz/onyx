@@ -78,6 +78,8 @@ struct OutlinePane: View {
         .onChange(of: activeId) { applyFollow() }
         .onChange(of: ws.inspectorTab) { if ws.inspectorTab == .outline { ws.syncOutlineTop() } }
         .onChange(of: ws.inspectorVisible) { if ws.inspectorVisible { ws.syncOutlineTop() } }
+        .onChange(of: ws.sidebarTab) { if ws.sidebarTab == .outline { ws.syncOutlineTop() } }
+        .onChange(of: ws.sidebarVisible) { if ws.sidebarVisible, ws.sidebarTab == .outline { ws.syncOutlineTop() } }
         .onChange(of: ws.focusedPane) { ws.syncOutlineTop() }
     }
 

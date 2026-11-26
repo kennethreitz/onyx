@@ -87,6 +87,7 @@ Replace in Vault opens a preview of every match, grouped by note, with per-match
 | Save and Read / Edit and Save | <kbd>⌘↩</kbd> |
 | Focus Mode | <kbd>⌃⌘F</kbd> |
 | Show Sidebar | <kbd>⌘K</kbd> |
+| Outline in Sidebar | — |
 | Search Vault | <kbd>⇧⌘F</kbd> |
 | Recent Files | <kbd>⇧⌘R</kbd> |
 | Bookmarks | <kbd>⇧⌘B</kbd> |
@@ -170,7 +171,7 @@ Backlinks lists notes that link to the current one (click to open at that line) 
 - Move Line Up/Down, Duplicate Line, and Delete Line act on every line the selection touches.
 - Today’s Daily Note and Previous/Next Daily Note were already there. Previous/Next step between existing daily notes when one is open. Yesterday’s and Tomorrow’s always go by the calendar, and create the note if needed.
 - Jump to Heading… lists the open note’s headings in a palette.
-- Outline (<kbd>⌥⌘1</kbd>) opens the inspector Outline pane, which is both the first and the last inspector tab (the same pane). The scope menu there can widen the tree from this note to its folder, linked and `partOf` neighbors, or the whole vault. A leading H1 is the note's title row. Clicking a heading lands it a little below the visible top of the page; the current section highlights as you scroll, and off-path branches collapse.
+- Outline (<kbd>⌥⌘1</kbd>) opens the inspector Outline pane, which is both the first and the last inspector tab (the same pane). The left sidebar also has an Outline tab after Files (Command Palette ▸ Outline in Sidebar; the selected sidebar tab is remembered). All three show the same pane. The scope menu there can widen the tree from this note to its folder, linked and `partOf` neighbors, or the whole vault. A leading H1 is the note's title row. Clicking a heading lands it a little below the visible top of the page; the current section highlights as you scroll, and off-path branches collapse.
 - Folding (View ▸ Folding) folds a heading’s section or a list item’s nested items in the editor, and headings in the reader. It’s display only; the note text never changes. See [folding.md](folding.md).
 - Zoom In/Out change the editor and reader text sizes together, within the Settings ranges. Actual Size resets both.
 - Spellcheck is on by default; the toggle is also in Settings ▸ Editor.
