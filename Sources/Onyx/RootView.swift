@@ -141,33 +141,30 @@ struct RootView: View {
                     FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
                     FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
                 }
+                .fixedSize()
                 .opacity(footerHover ? 1 : 0.55)
                 .animation(.easeOut(duration: 0.2), value: footerHover)
                 Spacer(minLength: 8)
-                if ws.speech.isActive {
-                    SpeechBadge(speech: ws.speech).padding(.trailing, 6)
-                }
-                if ws.recorder.isActive {
-                    RecordingBadge(recorder: ws.recorder) { ws.stopRecording() }.padding(.trailing, 6)
-                }
-                // Always in the layout, faded when idle, so a pulse doesn't shove the reading controls.
-                syncDot.padding(.trailing, 6)
-                if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.padding(.trailing, 6) }
-                if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.padding(.trailing, 6) }
-                if ws.currentPath != nil {
-                    let counts = countText
-                    // Reserve the hover (full) width so " · N characters · N backlinks" doesn't
-                    // slide pause and stop out from under the pointer.
-                    ZStack(alignment: .trailing) {
-                        Text(counts.full)
-                            .hidden()
-                            .accessibilityHidden(true)
-                        Text(footerHover ? counts.full : counts.short)
-                            .foregroundStyle(Color.faint)
+                // Status cluster: badges and counts stay together on the right, with even spacing.
+                // Counts shrink first (words, then backlinks, then characters) so a tight window
+                // doesn't leave a reserved gap or clip the reading controls.
+                HStack(spacing: 6) {
+                    if ws.speech.isActive {
+                        SpeechBadge(speech: ws.speech).fixedSize()
                     }
-                    .font(.system(size: 11).monospacedDigit())
-                    .padding(.trailing, 8)
+                    if ws.recorder.isActive {
+                        RecordingBadge(recorder: ws.recorder) { ws.stopRecording() }.fixedSize()
+                    }
+                    // Always in the layout, faded when idle, so a pulse doesn't shove the reading controls.
+                    syncDot
+                    if let s = ws.obsidianSync { SyncBadge(sync: s) { ws.show(.syncLog) }.fixedSize() }
+                    if let g = ws.git { GitBadge(git: g, openSourceControl: { ws.toggleSidebar(.git) }) { ws.show(.syncLog) }.fixedSize() }
+                    if let counts = footerCounts {
+                        FooterCountLabel(counts: counts)
+                            .frame(minWidth: 0)
+                    }
                 }
+                .padding(.trailing, 4)
                 FooterButton(symbol: "sidebar.right", help: "Inspector (⌥⌘I)", on: ws.inspectorVisible) { ws.toggleInspector() }
                     .opacity(footerHover ? 1 : 0.55)
                     .animation(.easeOut(duration: 0.2), value: footerHover)
@@ -190,21 +187,15 @@ struct RootView: View {
         }
     }
 
-    /// Short form at rest ("691 words"); full form on hover. The footer always
-    /// lays out `full` so the reading controls stay put when the extra stats appear.
-    var countText: (short: String, full: String) {
-        if ws.isFile, let p = ws.currentPath {   // an attachment: its kind and the notes that link here
-            let c = ws.snapshot?.backlinks[p]?.count ?? 0
-            let s = AttachmentKind.of(p).label + (c > 0 ? " · \(c) backlink\(c == 1 ? "" : "s")" : "")
-            return (s, s)
+    var footerCounts: FooterCounts? {
+        guard let p = ws.currentPath else { return nil }
+        let links = ws.snapshot?.backlinks[p]?.count ?? 0
+        if ws.isFile {
+            return FooterCounts(words: 0, characters: 0, backlinks: links,
+                                kind: .attachment(label: AttachmentKind.of(p).label))
         }
-        let words = NoteParser.countWords(ws.settledText)
-        let short = "\(words.formatted()) words"
-        var full = short + " · \(ws.settledText.count.formatted()) characters"
-        if let n = ws.currentPath, let c = ws.snapshot?.backlinks[n]?.count, c > 0 {
-            full += " · \(c) backlinks"
-        }
-        return (short, full)
+        return FooterCounts(words: NoteParser.countWords(ws.settledText),
+                            characters: ws.settledText.count, backlinks: links)
     }
 
     var toastLayer: some View {
@@ -698,6 +689,44 @@ struct RootView: View {
             if nearTop != showLights { withAnimation(.easeOut(duration: 0.18)) { showLights = nearTop } }
             return e
         }
+    }
+}
+
+/// Word, character, and backlink counts in the footer. `ViewThatFits` picks the
+/// longest label that fits; a click cycles auto-fit → words → characters → backlinks.
+/// The tooltip always shows the full detail, so shrinking the bar doesn't hide it.
+struct FooterCountLabel: View {
+    let counts: FooterCounts
+    @State private var cycle: FooterCounts.Cycle = .auto
+
+    var body: some View {
+        Button { cycle = counts.next(cycle) } label: {
+            let labels = counts.labels(cycle: cycle)
+            ViewThatFits(in: .horizontal) {
+                ForEach(Array(labels.enumerated()), id: \.offset) { _, text in
+                    Text(text)
+                        .lineLimit(1)
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(Color.faint)
+                        .fixedSize()
+                }
+                // Last resort: the shortest label, willing to truncate if the bar is extremely tight.
+                if let shortest = labels.last {
+                    Text(shortest)
+                        .lineLimit(1)
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundStyle(Color.faint)
+                        .minimumScaleFactor(0.85)
+                }
+            }
+            .frame(height: 20)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(counts.tooltip)
+        .accessibilityLabel(counts.tooltip)
+        .accessibilityHint("Cycles words, characters, and backlinks")
+        .accessibilityAddTraits(.isButton)
     }
 }
 
