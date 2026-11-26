@@ -185,8 +185,8 @@ struct OnyxApp: App {
                 switch s {
                 case "sidebar": ws.toggleSidebar(.files)
                 case "search": ws.searchQuery = "tarot"; ws.toggleSidebar(.search)
-                case "inspector": ws.toggleInspector(.backlinks)
-                case "outline": ws.toggleInspector(.outline)
+                case "inspector": ws.toggleInspector()
+                case "outline": ws.toggleInspector()
                 case "switcher": ws.show(.switcher)
                 case "palette": ws.show(.palette)
                 case "graph": ws.graphAtlas = false; ws.show(.graph)
@@ -298,7 +298,6 @@ struct OnyxApp: App {
             }
             Divider()
             ShortcutMenus.button("files", title: ws.sidebarVisible ? "Hide Sidebar" : "Show Sidebar") { ws.toggleDockedSidebar(.files) }
-            ShortcutMenus.button("sidebaroutline") { ws.toggleSidebar(.outline) }
             ShortcutMenus.button("search") { ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() }; ws.focusSearch += 1 }
             ShortcutMenus.button("recent") { ws.toggleSidebar(.recent) }
             ShortcutMenus.button("bookmarks") { ws.toggleSidebar(.bookmarks) }
@@ -307,9 +306,9 @@ struct OnyxApp: App {
             ShortcutMenus.button("notehistory") { ws.showNoteHistory() }
             Divider()
             ShortcutMenus.button("inspector") { ws.toggleInspector() }
-            ShortcutMenus.button("outline") { ws.toggleInspector(.outline) }
-            ShortcutMenus.button("backlinks") { ws.toggleInspector(.backlinks) }
-            ShortcutMenus.button("props") { ws.toggleInspector(.properties) }
+            ShortcutMenus.button("outline") { ws.toggleInspector() }
+            ShortcutMenus.button("backlinks") { ws.toggleSidebar(.links) }
+            ShortcutMenus.button("props") { ws.toggleNoteProperties() }
             ShortcutMenus.button("layout") { ws.toggleWorkspaceLayout() }
             Divider()
             ShortcutMenus.button("sidenotes", title: ws.sidenotes ? "Footnotes at End" : "Footnotes as Sidenotes") { ws.sidenotes.toggle() }
@@ -350,6 +349,7 @@ struct OnyxApp: App {
         CommandMenu("Note") {
             ShortcutMenus.button("bookmark", title: ws.currentPath.map { ws.isBookmarked($0) } == true ? "Remove Bookmark" : "Bookmark") { ws.toggleBookmark() }
             ShortcutMenus.button("copy") { ws.copyWikilink() }
+            ShortcutMenus.button("props") { ws.toggleNoteProperties() }
             // Adjacent on purpose: ObsidianOptionMenu makes Open in Obsidian a hidden Option-alternate of Reveal in Finder.
             ShortcutMenus.button("finder") { ws.revealInFinder() }
             ShortcutMenus.button("obsidian") { ws.openInObsidian() }

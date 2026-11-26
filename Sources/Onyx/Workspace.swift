@@ -6,29 +6,25 @@ import OnyxCore
 enum ViewMode: String { case read, edit }
 enum Overlay: Equatable { case none, switcher, palette, graph, moveTo, syncLog, headings, merge, extract, versionHistory, findReplace }
 enum SidebarTab: String, CaseIterable, Identifiable {
-    case files, outline, search, recent, bookmarks, tags, git
+    case files, search, recent, bookmarks, tags, links, git
     var id: String { rawValue }
     var symbol: String {
         switch self {
         case .files: return "folder"
-        case .outline: return "list.bullet.indent"
         case .search: return "magnifyingglass"
         case .recent: return "clock"
         case .bookmarks: return "bookmark"
         case .tags: return "number"
+        case .links: return "link"
         case .git: return "arrow.triangle.branch"
         }
     }
     var title: String { rawValue.capitalized }
-}
-enum InspectorTab: String, CaseIterable, Identifiable {
-    case outline, backlinks, properties
-    var id: String { rawValue }
-    var symbol: String {
-        switch self { case .outline: return "list.bullet.indent"; case .backlinks: return "arrow.uturn.backward"; case .properties: return "tablecells" }
+    /// A stored Outline tab (from the short-lived left-sidebar Outline) maps to Files.
+    static func resolved(_ raw: String?) -> SidebarTab {
+        if raw == "outline" { return .files }
+        return SidebarTab(rawValue: raw ?? "") ?? .files
     }
-    /// Outline stays first (where it has always been) and is also the last tab.
-    static var barTabs: [InspectorTab] { [.outline, .backlinks, .properties, .outline] }
 }
 enum GitPanelSection: String, CaseIterable, Identifiable {
     case status, history
@@ -120,7 +116,12 @@ final class Workspace {
     var holdHints = false
     @ObservationIgnored var commandHold = CommandHold()
     @ObservationIgnored private var commandHoldTimer: DispatchWorkItem?
-    var sidebarTab: SidebarTab = SidebarTab(rawValue: UserDefaults.standard.string(forKey: "onyx.sidebarTab") ?? "") ?? .files {
+    var sidebarTab: SidebarTab = {
+        let raw = UserDefaults.standard.string(forKey: "onyx.sidebarTab")
+        let tab = SidebarTab.resolved(raw)
+        if raw == "outline" { UserDefaults.standard.set(tab.rawValue, forKey: "onyx.sidebarTab") }
+        return tab
+    }() {
         didSet { if sidebarTab != oldValue { UserDefaults.standard.set(sidebarTab.rawValue, forKey: "onyx.sidebarTab") } }
     }
     // Split panes. Empty = one pane. The focused pane's note lives in currentPath/text/mode;
@@ -154,9 +155,7 @@ final class Workspace {
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
     /// The inspector is always docked. Older unpinned state is treated as pinned; `onyx.inspectorOpen` now means visibility only.
     var inspectorPinned = true
-    var inspectorTab: InspectorTab = InspectorTab(rawValue: UserDefaults.standard.string(forKey: "onyx.inspectorTab") ?? "") ?? .outline {
-        didSet { if inspectorTab != oldValue { UserDefaults.standard.set(inspectorTab.rawValue, forKey: "onyx.inspectorTab") } }
-    }
+    var notePropertiesOpen = false
     /// How far the Outline pane looks. Remembered across launches.
     var outlineScope: OutlineScope = OutlineScope(rawValue: UserDefaults.standard.string(forKey: "onyx.outlineScope") ?? "") ?? .note {
         didSet { if outlineScope != oldValue { UserDefaults.standard.set(outlineScope.rawValue, forKey: "onyx.outlineScope") } }
@@ -1653,7 +1652,6 @@ final class Workspace {
             if sidebarVisible { focusMode = false }
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
-        if sidebarVisible, sidebarTab == .outline { syncOutlineTop() }
     }
     /// Open the git sidebar on this note's version history (does not hide a sidebar that's already open).
     func showNoteHistory() {
@@ -1691,15 +1689,19 @@ final class Workspace {
     private static let versionDate: DateFormatter = {
         let f = DateFormatter(); f.dateStyle = .medium; f.timeStyle = .short; return f
     }()
-    /// ⌥⌘I and the footer button: show the inspector docked, or put it away. Remembered across launches.
-    func toggleInspector(_ tab: InspectorTab? = nil) {
+    /// ⌥⌘I / ⌥⌘1 and the footer button: show or hide the outline sidebar. Always docked; remembered across launches.
+    func toggleInspector() {
         withAnimation(Motion.layout) {
-            if let tab, inspectorVisible, inspectorTab != tab { inspectorTab = tab; return }
-            if let tab { inspectorTab = tab }
             if inspectorVisible { hideInspector(animated: false) }
             else { if focusMode { toggleFocusMode() }; inspectorVisible = true; inspectorPinned = true; persistInspector() }
         }
-        if inspectorVisible, inspectorTab == .outline { syncOutlineTop() }
+        if inspectorVisible { syncOutlineTop() }
+    }
+    func toggleNoteProperties() {
+        guard currentPath != nil else { return }
+        if notePropertiesOpen { notePropertiesOpen = false; return }
+        if focusMode { toggleFocusMode() }
+        notePropertiesOpen = true
     }
     func hideInspector(animated: Bool = true) {
         let body = { self.inspectorVisible = false }
@@ -1822,7 +1824,6 @@ final class Workspace {
             if sidebarVisible { focusMode = false }
         }
         UserDefaults.standard.set(sidebarVisible, forKey: "onyx.sidebarOpen")
-        if sidebarVisible, sidebarTab == .outline { syncOutlineTop() }
     }
 
     private var preFocus: (Bool, Bool, Bool, Bool)?
@@ -2182,10 +2183,8 @@ extension Workspace {
         }
     }
     /// Outline auto-select uses the heading-top spy, not the 48px reading anchor in `reportTop`.
-    /// True when an Outline pane is showing, in the left sidebar or the right inspector (or both).
-    var outlineVisible: Bool {
-        (sidebarVisible && sidebarTab == .outline) || (inspectorVisible && inspectorTab == .outline)
-    }
+    /// True when the outline sidebar is showing.
+    var outlineVisible: Bool { inspectorVisible }
     func reportOutline(_ pane: UUID?, _ line: Double) {
         guard !outlineLock, isFocusedPane(pane) else { return }
         guard outlineVisible else { return }

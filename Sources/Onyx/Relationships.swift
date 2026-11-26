@@ -1,7 +1,7 @@
 import SwiftUI
 import OnyxCore
 
-/// The inspector's relationship rows, above the backlinks: Part of, Parts (a collapsible tree),
+/// The Links pane's relationship rows, above the backlinks: Part of, Parts (a collapsible tree),
 /// Siblings (folded), Related, then any other link-valued field grouped by key, both directions.
 struct RelationshipsSection: View {
     @Bindable var ws: Workspace

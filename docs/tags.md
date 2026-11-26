@@ -28,6 +28,6 @@ Right-click a tag ▸ **Rename…**. The new name applies to the tag and everyth
 ## In notes
 
 - **Completion.** Type `#` in a note and a list offers your tags by path segment: `#pro` offers `#projects`, `#projects/` offers its children, `#projects/ac` the children starting with `ac`. Deeper tags whose segment matches come after the top-level ones. <kbd>↓</kbd>/<kbd>↑</kbd> highlight, <kbd>↩</kbd>/<kbd>⇥</kbd> take the highlighted row (nothing is taken unless you highlight it or the top row matches exactly), <kbd>Esc</kbd> closes it. Taking a parent that only exists through its children writes `#parent/` and keeps the list open for the next segment; a finished tag gets a space after it. The same completion works in a frontmatter `tags:` list, without the `#`.
-- **Clicking tags.** Click a tag in the reader, <kbd>⌘</kbd>-click one in the editor, or click a tag chip in the inspector's Properties tab, and the Tags pane opens on it, with its parents expanded and its notes listed.
+- **Clicking tags.** Click a tag in the reader, <kbd>⌘</kbd>-click one in the editor, or click a tag chip in the Properties popover, and the Tags pane opens on it, with its parents expanded and its notes listed.
 
 The parsing, tree, counts, filtering, completion, and rename logic live in OnyxCore (`Sources/OnyxCore/Tags.swift`) with unit tests (`swift test --filter TagsTests`). On a 2,600-note vault the tree builds in about 3 ms, and a rename preview of a tag on 1,000 notes takes under 100 ms, off the main thread.

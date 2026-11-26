@@ -5,12 +5,12 @@
 | <kbd>⌘O</kbd> | Quick switcher: find or create a note (<kbd>⌘↩</kbd> opens in a split, <kbd>⇧↩</kbd> creates) |
 | <kbd>⌘P</kbd> · <kbd>⇧⌘P</kbd> | Command palette |
 | <kbd>⇧⌘O</kbd> | Open vault… |
-| <kbd>⌘K</kbd> | Show or hide the sidebar (always docked; the selected tab is remembered, defaulting to Files) |
+| <kbd>⌘K</kbd> | Show or hide the left sidebar (always docked; the selected tab is remembered, defaulting to Files) |
 | <kbd>⇧⌘F</kbd> | Search the vault |
 | <kbd>⌥⇧⌘F</kbd> | Replace in the vault: preview matches, replace selected or all, undo the last replace |
 | <kbd>⌘I</kbd> | Toggle italic (`*…*`, or unwrap `*` / `_`). With no selection, inserts `**` with the caret in between |
-| <kbd>⌥⌘I</kbd> | Show or hide the inspector (always docked; outline, backlinks, properties; Outline is also the last tab) |
-| <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Inspector Outline (this note, folder, linked & partOf, or whole vault) · backlinks · properties. The left sidebar also has an Outline tab after Files (Command Palette ▸ Outline in Sidebar; no default shortcut) |
+| <kbd>⌥⌘I</kbd> | Show or hide the outline sidebar (always docked, outline only) |
+| <kbd>⌥⌘1</kbd> · <kbd>⌥⌘2</kbd> · <kbd>⌥⌘3</kbd> | Outline sidebar (same as <kbd>⌥⌘I</kbd>) · Links in the left sidebar (backlinks and unlinked mentions) · Properties popover on the note’s title bar (also Note ▸ Properties) |
 | <kbd>⌘G</kbd> · <kbd>⇧⌘G</kbd> · <kbd>⌥⌘G</kbd> | Focus graph overlay · atlas overlay · graph in a pane. <kbd>⌘G</kbd> or the title-bar button again closes the overlay; <kbd>⇧⌘G</kbd> closes the atlas if it is already showing. In the atlas, double-click a folder to fill the view; double-click empty space or <kbd>Esc</kbd> fits all, and <kbd>Esc</kbd> closes the overlay when the whole vault is already in view |
 | <kbd>⌘F</kbd> · <kbd>⌥⌘F</kbd> | Find in the note (editor or reader) · find and replace (editor). While the bar is open, <kbd>⌘G</kbd>/<kbd>⇧⌘G</kbd> or <kbd>↩</kbd>/<kbd>⇧↩</kbd> go to the next/previous match, and <kbd>Esc</kbd> closes it |
 | <kbd>⌘↩</kbd> · <kbd>⌘E</kbd> | Read ⇄ edit, and save |
@@ -34,7 +34,7 @@
 | <kbd>⌃⌘F</kbd> | Focus mode: just the text |
 | <kbd>⌥⌘←</kbd> · <kbd>⌥⌘→</kbd> | Fold / unfold the section at the caret ([folding](folding.md)) |
 | <kbd>⌥⇧⌘←</kbd> · <kbd>⌥⇧⌘→</kbd> | Fold all headings and lists / unfold all |
-| <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + inspector) |
+| <kbd>⌥⌘0</kbd> | Three-pane workspace (sidebar + page + outline) |
 | <kbd>⌘,</kbd> | Settings |
 | <kbd>⌘B</kbd> · <kbd>⌘I</kbd> · <kbd>⌘/</kbd> · <kbd>⌘L</kbd> | Toggle bold · toggle italic · toggle `%%comment%%` · cycle checkbox (`- [ ]` → `- [x]`). The rest of the Format menu (headings, lists, move line, …) is unbound by default; see [Commands](commands.md) |
 | <kbd>⌘=</kbd> · <kbd>⌘-</kbd> · <kbd>⌘0</kbd> | Zoom text in · out · actual size (editor and reader together) |
