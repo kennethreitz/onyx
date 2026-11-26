@@ -123,8 +123,13 @@ enum ReadingChrome {
     static let titleFade: CGFloat = 46
     /// Breathing room below the visible top (just under the fade) when jumping to a heading.
     static let outlineGap: CGFloat = 20
+    /// A heading at or before visibleTop + offset + this slop is active.
+    static let outlineHysteresis: CGFloat = 2
     static func outlineOffset(focusMode: Bool) -> CGFloat {
         (focusMode ? 0 : titleFade) + outlineGap
+    }
+    static func outlineThreshold(visibleTop: CGFloat, focusMode: Bool) -> CGFloat {
+        visibleTop + outlineOffset(focusMode: focusMode) + outlineHysteresis
     }
 }
 

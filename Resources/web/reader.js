@@ -233,6 +233,7 @@
   // air (16–24px). The fade lives in Swift, so the inset is set from there and scaled
   // for pinch-zoom; scroll-spy uses the same offset.
   const OUTLINE_GAP = 20;
+  const OUTLINE_HYSTERESIS = 2;
   let chromeInsetPt = 0;
   function viewScale() { return (window.visualViewport && window.visualViewport.scale) || 1; }
   function cssChromeInset() { return chromeInsetPt / viewScale(); }
@@ -265,10 +266,20 @@
   function headingEls() {
     return [...page.querySelectorAll('h1,h2,h3,h4,h5,h6')].filter(isOutlineHeading);
   }
-  // Last heading whose border-box top is at or above offset+1 (1px hysteresis).
-  // `items` is [{top, line}, ...] in document order. Returns 0 when none have reached the line (title).
-  function activeOutlineLine(items, offset) {
-    const threshold = offset + 1;
+  // Last heading whose top is at or before visibleTop + offset + 2px.
+  // `items` is [{top, line}, ...] in document order, `top` already the margin-box
+  // (border-box top minus margin-top) so a heading sitting at the top of the view
+  // with its 2em margin still visible counts, instead of lagging one section behind.
+  // Returns 0 when none have reached the line (title).
+  function headingSpyTop(borderTop, marginTop) {
+    return borderTop - (marginTop || 0);
+  }
+  function headingElSpyTop(h) {
+    const mt = parseFloat(getComputedStyle(h).marginTop);
+    return headingSpyTop(h.getBoundingClientRect().top, Number.isFinite(mt) ? mt : 0);
+  }
+  function activeOutlineLine(items, offset, visibleTop) {
+    const threshold = (visibleTop || 0) + offset + OUTLINE_HYSTERESIS;
     let line = 0;
     for (const it of items) {
       if (it.top <= threshold) line = it.line;
@@ -281,7 +292,10 @@
   }
   function readOutlineLine() {
     const off = outlineOffset();
-    return activeOutlineLine(headingEls().map(h => ({ top: h.getBoundingClientRect().top, line: h.dataset.line != null ? +h.dataset.line : 0 })), off);
+    return activeOutlineLine(headingEls().map(h => ({
+      top: headingElSpyTop(h),
+      line: h.dataset.line != null ? +h.dataset.line : 0
+    })), off, 0);
   }
   let outlineJump = 0;
   function postOutline() {
@@ -1346,8 +1360,10 @@
     },
     reportOutline() { postOutline(); },
     _outlineGap: OUTLINE_GAP,
+    _outlineHysteresis: OUTLINE_HYSTERESIS,
     _activeOutlineLine: activeOutlineLine,
     _headingScrollY: headingScrollY,
+    _headingSpyTop: headingSpyTop,
     _outlineOffset: outlineOffset,
     _isOutlineHeading: isOutlineHeading,
   };

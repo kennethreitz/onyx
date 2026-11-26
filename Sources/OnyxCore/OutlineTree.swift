@@ -95,6 +95,23 @@ public enum OutlineTree {
         return headings
     }
 
+    /// Margin-box top used by scroll-spy (border-box minus the heading's top margin).
+    public static func headingSpyTop(borderTop: Double, marginTop: Double) -> Double {
+        borderTop - marginTop
+    }
+
+    /// Last heading whose top is at or before `visibleTop + offset + hysteresis`.
+    /// `tops` are margin-box tops in the same coordinates as `visibleTop`, in document order.
+    /// Returns nil when none have reached the line (the title row).
+    public static func activeIndex(tops: [Double], visibleTop: Double, offset: Double, hysteresis: Double = 2) -> Int? {
+        let threshold = visibleTop + offset + hysteresis
+        var best: Int? = nil
+        for (i, top) in tops.enumerated() {
+            if top <= threshold { best = i } else { break }
+        }
+        return best
+    }
+
     /// Last heading whose source line is at or above `line` (0-based, as in `Heading.line`).
     public static func headingIndex(at line: Double, in headings: [Heading]) -> Int? {
         let n = Int(floor(line))

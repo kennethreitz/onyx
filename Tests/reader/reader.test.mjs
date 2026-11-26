@@ -672,10 +672,12 @@ test('outline heading scroll lands below the chrome inset with a gap, and spy us
   assert.equal(O._outlineOffset(), 66);
   O.setChromeInset(0);
   assert.equal(O._outlineOffset(), 20);
-  // After landing, heading top is 66. Spy threshold is offset+1 = 67.
-  // The heading stays active; a next heading at 68 is not.
-  assert.equal(O._activeOutlineLine([{top: 66, line: 10}, {top: 68, line: 20}], 66), 10);
-  // Subpixel just past the landing: still selected (1px hysteresis).
+  // After landing, heading top is 66. Spy threshold is offset+2 = 68.
+  // The heading stays active; a next heading past the slop is not.
+  assert.equal(O._outlineHysteresis, 2);
+  assert.equal(O._activeOutlineLine([{top: 66, line: 10}, {top: 69, line: 20}], 66), 10);
+  // A heading at offset+2 still counts; subpixel just past the landing stays selected.
+  assert.equal(O._activeOutlineLine([{top: 68, line: 10}, {top: 90, line: 20}], 66), 10);
   assert.equal(O._activeOutlineLine([{top: 66.5, line: 10}, {top: 90, line: 20}], 66), 10);
   // After a correct landing (heading top = 66), the 48px reading anchor
   // has not reached the heading yet and would fall back to the title.
@@ -732,4 +734,37 @@ test('scroll-spy walking a long note picks the last outline heading at or above 
   assert.equal(O._activeOutlineLine(at(960 - offset), offset), 52);
   assert.equal(O._activeOutlineLine(at(1210 - offset), offset), 66);
   assert.equal(O._activeOutlineLine(at(1210 - offset + 400), offset), 66);
+});
+
+test('a heading at the top of the view followed by a tall table is active, not the previous section', () => {
+  const O = ctx.window.Onyx;
+  const offset = 66; // fade 46 + gap 20
+  const margin = 40;  // h2 margin-top: 2em, about this in the reader
+  // Connection Map shape: The Network, then Strongest Pairs, then a tall table
+  // (Bridge Pages is far below). Strongest Pairs' text sits just under the fade
+  // (border-box top 86) so the heading looks like it is at the top of the view.
+  // Using the border-box against offset+1 (86 <= 67) would keep The Network.
+  const network = { top: O._headingSpyTop(-180, margin), line: 89 };
+  const pairs = { top: O._headingSpyTop(86, margin), line: 115 };
+  const bridge = { top: O._headingSpyTop(900, margin), line: 140 };
+  assert.equal(O._headingSpyTop(86, margin), 46);
+  assert.equal(O._activeOutlineLine([network, pairs, bridge], offset), 115);
+  // A heading already at the top of the view (border-box at 0) must count.
+  assert.equal(O._activeOutlineLine([
+    { top: O._headingSpyTop(-200, margin), line: 89 },
+    { top: O._headingSpyTop(0, margin), line: 115 },
+    { top: O._headingSpyTop(900, margin), line: 140 },
+  ], offset), 115);
+  // Border-box just below the fade, still at the top of the readable view.
+  assert.equal(O._activeOutlineLine([
+    { top: O._headingSpyTop(-200, margin), line: 89 },
+    { top: O._headingSpyTop(50, margin), line: 115 },
+    { top: O._headingSpyTop(900, margin), line: 140 },
+  ], offset), 115);
+  // Not yet: the heading's margin-box is still below the landing line.
+  assert.equal(O._activeOutlineLine([
+    { top: O._headingSpyTop(-180, margin), line: 89 },
+    { top: O._headingSpyTop(200, margin), line: 115 },
+    { top: O._headingSpyTop(900, margin), line: 140 },
+  ], offset), 89);
 });

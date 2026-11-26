@@ -456,4 +456,36 @@ final class OutlineTreeTests: XCTestCase {
         XCTAssertEqual(OutlineTree.activeId(path: "Y.md", line: 2, headings: hs2),
                        roots2[0].children[1].id)
     }
+
+    /// Connection Map shape: a heading at the top of the view, followed by a tall table.
+    /// Scroll-spy must highlight that heading, not the one before it. A heading already
+    /// at the top of the view counts; the comparison uses the margin-box and 2px of slop.
+    func testScrollSpyHeadingAtTheTopWithATallTableIsNotThePreviousSection() {
+        let offset = 66.0  // title fade 46 + landing gap 20
+        let margin = 40.0  // reader h2 margin-top (2em)
+        let network = OutlineTree.headingSpyTop(borderTop: -180, marginTop: margin)
+        let pairs = OutlineTree.headingSpyTop(borderTop: 86, marginTop: margin)   // text just under the fade
+        let bridge = OutlineTree.headingSpyTop(borderTop: 900, marginTop: margin) // table fills the page
+        XCTAssertEqual(pairs, 46)
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [network, pairs, bridge], visibleTop: 0, offset: offset), 1)
+
+        // Border-box at the very top of the view must count.
+        let atTop = OutlineTree.headingSpyTop(borderTop: 0, marginTop: margin)
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [network, atTop, bridge], visibleTop: 0, offset: offset), 1)
+
+        // Border-box just below the fade, still visually at the top.
+        let underFade = OutlineTree.headingSpyTop(borderTop: 50, marginTop: margin)
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [network, underFade, bridge], visibleTop: 0, offset: offset), 1)
+
+        // At the landing line, plus the 2px slop; one pixel further is the next heading only if it reaches the line.
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [66, 69], visibleTop: 0, offset: offset), 0)
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [66, 68], visibleTop: 0, offset: offset), 1)
+
+        // Not yet reached: stay on the previous section.
+        let stillBelow = OutlineTree.headingSpyTop(borderTop: 200, marginTop: margin)
+        XCTAssertEqual(OutlineTree.activeIndex(tops: [network, stillBelow, bridge], visibleTop: 0, offset: offset), 0)
+
+        // None have reached the line: the title (nil → note title row).
+        XCTAssertNil(OutlineTree.activeIndex(tops: [80, 200], visibleTop: 0, offset: offset))
+    }
 }
