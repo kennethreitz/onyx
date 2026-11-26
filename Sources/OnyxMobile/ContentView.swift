@@ -21,10 +21,15 @@ struct ContentView: View {
                 .toolbar { toolbar }
                 .refreshable { vault.scan() }
         } detail: {
-            if let note = vault.selectedNote, let snap = vault.snapshot, let root = vault.root {
+            if vault.showGraph, vault.root != nil, vault.snapshot != nil {
+                GraphScreen(store: vault.graphStore)
+                    .navigationTitle(vault.graphAtlas ? "Atlas" : "Graph")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { graphToolbar }
+            } else if let note = vault.selectedNote, let snap = vault.snapshot, let root = vault.root {
                 ReaderScreen(note: note, snapshot: snap, vaultRoot: root, dark: scheme == .dark,
                              typesetRevision: vault.typesetRevision, jumpLine: vault.jumpLine, jumpToken: vault.jumpToken,
-                             onPullToCommand: { vault.showCommandPalette = true })
+                             onPullToOpen: { vault.showQuickOpen = true })
                     .navigationTitle(note.name)
                     .navigationBarTitleDisplayMode(.inline)
                     .id(note.path)
@@ -83,6 +88,10 @@ struct ContentView: View {
             CommandPaletteScreen()
                 .environmentObject(vault)
         }
+        .sheet(isPresented: $vault.showQuickOpen) {
+            QuickOpenScreen()
+                .environmentObject(vault)
+        }
         .sheet(isPresented: $connectingSync) {
             NavigationStack { SyncConnectScreen().environmentObject(vault) }
         }
@@ -116,14 +125,7 @@ struct ContentView: View {
     @ViewBuilder
     private var sidebar: some View {
         VStack(spacing: 0) {
-            Picker("Library", selection: $vault.libraryTab) {
-                ForEach(MobileVault.LibraryTab.allCases) { tab in
-                    Label(tab.title, systemImage: tab.symbol).tag(tab)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            libraryPicker
             Group {
                 if vault.root == nil {
                     ContentUnavailableView {
@@ -150,6 +152,7 @@ struct ContentView: View {
                         } else {
                             notesList
                         }
+                    case .graph: GraphSidebar()
                     case .bookmarks: BookmarksScreen()
                     case .tags: TagsScreen()
                     case .outline: OutlineScreen()
@@ -266,12 +269,17 @@ struct ContentView: View {
             Button("Command Palette", systemImage: "command") { vault.showCommandPalette = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
+            Button("Graph", systemImage: "point.3.connected.trianglepath.dotted") { vault.openGraph(atlas: false) }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button(vault.isBookmarked(note.path) ? "Remove Bookmark" : "Bookmark",
                        systemImage: vault.isBookmarked(note.path) ? "bookmark.slash" : "bookmark") {
                     _ = vault.toggleBookmark(note.path)
                 }
                 .disabled(!vault.canWrite || vault.bookmarksLocked)
+                Button("Graph", systemImage: "point.3.connected.trianglepath.dotted") { vault.openGraph(atlas: false) }
+                Button("Atlas", systemImage: "globe") { vault.openGraph(atlas: true) }
                 Button("Backlinks", systemImage: "arrow.uturn.backward") { vault.showBacklinks = true }
                 Button("Outline", systemImage: "list.bullet.indent") { vault.libraryTab = .outline }
                 Button("Version History", systemImage: "clock.arrow.circlepath") { vault.showHistory = true }
@@ -282,8 +290,54 @@ struct ContentView: View {
             }
         }
     }
-}
 
+    private var libraryPicker: some View {
+        HStack(spacing: 0) {
+            ForEach(MobileVault.LibraryTab.allCases) { tab in
+                Button {
+                    selectLibraryTab(tab)
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: tab.symbol)
+                            .font(.system(size: 16, weight: vault.libraryTab == tab ? .semibold : .regular))
+                        Text(tab.title)
+                            .font(.system(size: 9, weight: vault.libraryTab == tab ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.65)
+                    }
+                    .foregroundStyle(vault.libraryTab == tab ? Color.primary : Color.secondary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tab.title)
+                .accessibilityAddTraits(vault.libraryTab == tab ? [.isSelected] : [])
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+    }
+
+    private func selectLibraryTab(_ tab: MobileVault.LibraryTab) {
+        if tab == .graph {
+            vault.openGraph(atlas: vault.graphAtlas)
+        } else {
+            if vault.libraryTab == .graph { vault.showGraph = false }
+            vault.libraryTab = tab
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var graphToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button("Close") { vault.closeGraph() }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Command Palette", systemImage: "command") { vault.showCommandPalette = true }
+        }
+    }
+}
 
 private struct NotesSearch: ViewModifier {
     @Binding var text: String

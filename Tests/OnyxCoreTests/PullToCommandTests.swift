@@ -17,4 +17,9 @@ final class PullToCommandTests: XCTestCase {
         XCTAssertEqual(PullToCommand.hintOpacity(offsetY: -PullToCommand.threshold), 1, accuracy: 0.0001)
         XCTAssertEqual(PullToCommand.hintOpacity(offsetY: -200), 1)
     }
+
+    func testHintCopyIsForQuickOpen() {
+        XCTAssertEqual(PullToCommand.pullingHint, "Open a note")
+        XCTAssertEqual(PullToCommand.releaseHint, "Release to open a note")
+    }
 }

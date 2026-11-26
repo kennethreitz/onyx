@@ -156,6 +156,10 @@ final class MobileVault: ObservableObject {
         persistTreeExpanded = true
         prefersDetail = false
         showCommandPalette = false
+        showQuickOpen = false
+        showGraph = false
+        graphAtlas = false
+        graphStore.invalidate()
         bookmarkStore = BookmarkStore()
         bookmarksLocked = false
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
@@ -191,6 +195,13 @@ final class MobileVault: ObservableObject {
     @Published var showHistory = false
     @Published var showBacklinks = false
     @Published var showCommandPalette = false
+    /// Quick-open note switcher (search + recent / matching notes), opened by pulling down on a note.
+    @Published var showQuickOpen = false
+    /// The focus graph or atlas is showing in the detail column.
+    @Published var showGraph = false
+    /// When true, the graph detail shows the whole-vault atlas instead of the focus graph.
+    @Published var graphAtlas = false
+    let graphStore = MobileGraphStore()
     /// When true, a compact NavigationSplitView (iPhone) shows the note, not the sidebar.
     @Published var prefersDetail = false
     @Published var typesetRevision = 0
@@ -284,17 +295,22 @@ extension MobileVault {
         if TreeReveal.shouldExpandAncestors(alreadyOpen: already, reveal: revealInTree) {
             self.revealInTree(path)
         }
+        if showGraph {
+            showGraph = false
+            if libraryTab == .graph { libraryTab = .notes }
+        }
         if libraryTab == .find || libraryTab == .bookmarks { libraryTab = .notes }   // the Tags tab stays put, so back returns to the tag
     }
 
     // MARK: - Navigation extras
 
     enum LibraryTab: String, CaseIterable, Identifiable {
-        case notes, bookmarks, tags, outline, find
+        case notes, graph, bookmarks, tags, outline, find
         var id: String { rawValue }
         var title: String {
             switch self {
             case .notes: "Files"
+            case .graph: "Graph"
             case .bookmarks: "Bookmarks"
             case .tags: "Tags"
             case .outline: "Outline"
@@ -304,6 +320,7 @@ extension MobileVault {
         var symbol: String {
             switch self {
             case .notes: "folder"
+            case .graph: "point.3.connected.trianglepath.dotted"
             case .bookmarks: "bookmark"
             case .tags: "number"
             case .outline: "list.bullet.indent"
@@ -396,6 +413,8 @@ extension MobileVault {
             if let s = item.url, let u = URL(string: s) {
                 NotificationCenter.default.post(name: .onyxOpenURL, object: u)
             }
+        case "graph":
+            openGraph(atlas: true)
         default:
             error = "“\(item.displayTitle)” is a \(item.type) bookmark, which the iOS app can’t open yet."
         }

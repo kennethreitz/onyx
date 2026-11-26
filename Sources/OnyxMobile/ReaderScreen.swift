@@ -74,7 +74,8 @@ struct ReaderScreen: UIViewRepresentable {
     var jumpLine: Int? = nil
     var jumpToken: Int = 0
     /// Fired when the user overscrolls past the top of the note and lets go, like pull-to-search.
-    var onPullToCommand: (() -> Void)? = nil
+    /// The host should open the quick-open note switcher, not the command palette.
+    var onPullToOpen: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -91,7 +92,7 @@ struct ReaderScreen: UIViewRepresentable {
         wv.scrollView.alwaysBounceVertical = true
         context.coordinator.webView = wv
         context.coordinator.handler = handler
-        context.coordinator.onPullToCommand = onPullToCommand
+        context.coordinator.onPullToOpen = onPullToOpen
         context.coordinator.installPullToCommand(on: wv.scrollView)
         wv.load(URLRequest(url: URL(string: "onyx://app/web/reader.html")!))
         return wv
@@ -101,7 +102,7 @@ struct ReaderScreen: UIViewRepresentable {
         let c = context.coordinator
         c.handler?.vaultRoot = vaultRoot
         c.snapshot = snapshot
-        c.onPullToCommand = onPullToCommand
+        c.onPullToOpen = onPullToOpen
         let typeset = TypesetSettings.options()
         let changed = c.path != note.path || c.text != note.content || c.dark != dark
             || c.typesetRevision != typesetRevision || c.jumpToken != jumpToken
@@ -130,7 +131,7 @@ struct ReaderScreen: UIViewRepresentable {
         var pendingLine: Int? = nil
         var typesetRevision = -1
         var jumpToken = -1
-        var onPullToCommand: (() -> Void)?
+        var onPullToOpen: (() -> Void)?
         private var pullHint: UILabel?
         private var pullInstalled = false
 
@@ -140,7 +141,7 @@ struct ReaderScreen: UIViewRepresentable {
             scrollView.alwaysBounceVertical = true
             scrollView.panGestureRecognizer.addTarget(self, action: #selector(handlePull))
             let hint = UILabel()
-            hint.text = "Command Palette"
+            hint.text = PullToCommand.pullingHint
             hint.font = UIFont.preferredFont(forTextStyle: .subheadline)
             hint.textAlignment = .center
             hint.textColor = .secondaryLabel
@@ -159,16 +160,16 @@ struct ReaderScreen: UIViewRepresentable {
                 hint.alpha = CGFloat(PullToCommand.hintOpacity(offsetY: y))
                 if PullToCommand.shouldOpen(offsetY: y) {
                     hint.textColor = .label
-                    hint.text = "Release for Command Palette"
+                    hint.text = PullToCommand.releaseHint
                 } else {
                     hint.textColor = .secondaryLabel
-                    hint.text = "Command Palette"
+                    hint.text = PullToCommand.pullingHint
                 }
             }
             if gesture.state == .ended || gesture.state == .cancelled {
                 pullHint?.alpha = 0
                 if PullToCommand.shouldOpen(offsetY: y) {
-                    onPullToCommand?()
+                    onPullToOpen?()
                 }
             }
         }

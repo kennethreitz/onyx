@@ -72,7 +72,12 @@ extension MobileVault {
         return notes + commands
     }
 
-    private func paletteNotes(query: String) -> [MobilePaletteItem] {
+    /// Recent notes when `query` is empty, otherwise vault search hits — the same list as quick-open.
+    func quickOpenItems(query: String) -> [MobilePaletteItem] {
+        paletteNotes(query: query.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    func paletteNotes(query: String) -> [MobilePaletteItem] {
         guard let snap = snapshot else { return [] }
         func item(_ n: NoteRecord) -> MobilePaletteItem {
             MobilePaletteItem(id: "note:\(n.path)", title: n.name, subtitle: n.folder, symbol: "doc.text") { [weak self] in
@@ -95,25 +100,38 @@ extension MobileVault {
             items.append(MobilePaletteItem(id: "daily", title: "Open today’s daily note", symbol: "calendar") { [weak self] in self?.openDaily() })
         }
         items.append(MobilePaletteItem(id: "files", title: "Files", symbol: "folder") { [weak self] in
+            self?.showGraph = false
             self?.libraryTab = .notes
             self?.prefersDetail = false
         })
         items.append(MobilePaletteItem(id: "bookmarks", title: "Bookmarks", symbol: "bookmark") { [weak self] in
+            self?.showGraph = false
             self?.libraryTab = .bookmarks
             self?.prefersDetail = false
         })
         items.append(MobilePaletteItem(id: "tags", title: "Tags", symbol: "number") { [weak self] in
+            self?.showGraph = false
             self?.libraryTab = .tags
             self?.prefersDetail = false
         })
         items.append(MobilePaletteItem(id: "outline", title: "Outline", symbol: "list.bullet.indent") { [weak self] in
+            self?.showGraph = false
             self?.libraryTab = .outline
             self?.prefersDetail = false
         })
         items.append(MobilePaletteItem(id: "find", title: "Find in vault", symbol: "magnifyingglass") { [weak self] in
+            self?.showGraph = false
             self?.libraryTab = .find
             self?.prefersDetail = false
         })
+        if root != nil, snapshot != nil {
+            items.append(MobilePaletteItem(id: "graph", title: "Graph: focus on this note", symbol: "point.3.connected.trianglepath.dotted") { [weak self] in
+                self?.openGraph(atlas: false)
+            })
+            items.append(MobilePaletteItem(id: "atlas", title: "Graph: atlas of the vault", symbol: "globe") { [weak self] in
+                self?.openGraph(atlas: true)
+            })
+        }
         if selectedNote != nil {
             items.append(MobilePaletteItem(id: "backlinks", title: "Backlinks", symbol: "arrow.uturn.backward") { [weak self] in self?.showBacklinks = true })
             items.append(MobilePaletteItem(id: "notehistory", title: "Version history", symbol: "clock.arrow.circlepath") { [weak self] in self?.showHistory = true })
