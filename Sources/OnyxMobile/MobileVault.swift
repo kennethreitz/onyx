@@ -154,6 +154,8 @@ final class MobileVault: ObservableObject {
         treeExpanded = []
         fileTreePrompt = nil
         persistTreeExpanded = true
+        prefersDetail = false
+        showCommandPalette = false
         bookmarkStore = BookmarkStore()
         bookmarksLocked = false
         UserDefaults.standard.removeObject(forKey: Self.bookmarkKey)
@@ -188,6 +190,9 @@ final class MobileVault: ObservableObject {
     @Published var showReadingSettings = false
     @Published var showHistory = false
     @Published var showBacklinks = false
+    @Published var showCommandPalette = false
+    /// When true, a compact NavigationSplitView (iPhone) shows the note, not the sidebar.
+    @Published var prefersDetail = false
     @Published var typesetRevision = 0
     // Tags tab (TagsScreen.swift)
     @Published var tagSelected: String?
@@ -275,6 +280,7 @@ extension MobileVault {
         selectedPath = path
         jumpLine = line
         jumpToken += 1
+        prefersDetail = true
         if TreeReveal.shouldExpandAncestors(alreadyOpen: already, reveal: revealInTree) {
             self.revealInTree(path)
         }

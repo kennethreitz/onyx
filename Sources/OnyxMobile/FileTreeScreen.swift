@@ -8,7 +8,7 @@ struct FileTreeScreen: View {
     var body: some View {
         let rows = vault.visibleTreeRows()
         ScrollViewReader { proxy in
-            List {
+            List(selection: $vault.selectedPath) {
                 if rows.isEmpty {
                     ContentUnavailableView("Empty vault", systemImage: "folder",
                                            description: Text("Create a note or a folder to get started."))
@@ -16,6 +16,7 @@ struct FileTreeScreen: View {
                     ForEach(rows) { row in
                         FileTreeRowView(row: row)
                             .id(row.node.path)
+                            .tag(row.node.isNote ? Optional(row.node.path) : nil)
                             .listRowInsets(EdgeInsets(top: 2, leading: 8, bottom: 2, trailing: 8))
                     }
                 }
@@ -51,36 +52,41 @@ private struct FileTreeRowView: View {
         HStack(spacing: 4) {
             Color.clear.frame(width: CGFloat(row.depth) * 16)
             if node.isFolder {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.15)) { vault.toggleFolder(node.path) }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 11, weight: .semibold))
-                        .rotationEffect(.degrees(isOpen ? 90 : 0))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 22, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isOpen ? "Collapse \(node.displayName)" : "Expand \(node.displayName)")
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .rotationEffect(.degrees(isOpen ? 90 : 0))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 28)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        withAnimation(.easeInOut(duration: 0.15)) { vault.toggleFolder(node.path) }
+                    }
+                    .accessibilityLabel(isOpen ? "Collapse \(node.displayName)" : "Expand \(node.displayName)")
+                    .accessibilityAddTraits(.isButton)
             } else {
                 Color.clear.frame(width: 22, height: 28)
             }
-            Image(systemName: icon)
-                .font(.system(size: 15))
-                .foregroundStyle(node.isFolder ? Color.accentColor : Color.secondary)
-                .frame(width: 20)
-            Text(node.displayName)
-                .font(.body.weight(node.isFolder ? .medium : .regular))
-                .underline(node.folderNote != nil, color: Color.secondary.opacity(0.5))
-                .foregroundStyle(node.isNote || node.isFolder ? Color.primary : Color.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer(minLength: 0)
+            Button {
+                activate()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: icon)
+                        .font(.system(size: 15))
+                        .foregroundStyle(node.isFolder ? Color.accentColor : Color.secondary)
+                        .frame(width: 20)
+                    Text(node.displayName)
+                        .font(.body.weight(node.isFolder ? .medium : .regular))
+                        .underline(node.folderNote != nil, color: Color.secondary.opacity(0.5))
+                        .foregroundStyle(node.isNote || node.isFolder ? Color.primary : Color.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
         }
         .padding(.vertical, 2)
-        .contentShape(Rectangle())
-        .onTapGesture { activate() }
         .listRowBackground(
             RoundedRectangle(cornerRadius: 8)
                 .fill(isCurrent ? Color.accentColor.opacity(0.15) : Color.clear)

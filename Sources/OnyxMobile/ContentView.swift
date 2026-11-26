@@ -11,7 +11,10 @@ struct ContentView: View {
     @State private var managingSync = false
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(preferredCompactColumn: Binding(
+            get: { vault.prefersDetail ? NavigationSplitViewColumn.detail : .sidebar },
+            set: { vault.prefersDetail = ($0 == .detail) }
+        )) {
             sidebar
                 .navigationTitle(vault.libraryTab.title)
                 .modifier(NotesSearch(text: $vault.query, enabled: vault.libraryTab == .notes))
@@ -20,7 +23,8 @@ struct ContentView: View {
         } detail: {
             if let note = vault.selectedNote, let snap = vault.snapshot, let root = vault.root {
                 ReaderScreen(note: note, snapshot: snap, vaultRoot: root, dark: scheme == .dark,
-                             typesetRevision: vault.typesetRevision, jumpLine: vault.jumpLine, jumpToken: vault.jumpToken)
+                             typesetRevision: vault.typesetRevision, jumpLine: vault.jumpLine, jumpToken: vault.jumpToken,
+                             onPullToCommand: { vault.showCommandPalette = true })
                     .navigationTitle(note.name)
                     .navigationBarTitleDisplayMode(.inline)
                     .id(note.path)
@@ -75,6 +79,10 @@ struct ContentView: View {
             Text(vault.error ?? "")
         }
         .modifier(FileTreePrompts())
+        .sheet(isPresented: $vault.showCommandPalette) {
+            CommandPaletteScreen()
+                .environmentObject(vault)
+        }
         .sheet(isPresented: $connectingSync) {
             NavigationStack { SyncConnectScreen().environmentObject(vault) }
         }
@@ -254,6 +262,9 @@ struct ContentView: View {
 
     @ToolbarContentBuilder
     private func noteToolbar(_ note: NoteRecord) -> some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button("Command Palette", systemImage: "command") { vault.showCommandPalette = true }
+        }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button(vault.isBookmarked(note.path) ? "Remove Bookmark" : "Bookmark",

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import WebKit
 import UniformTypeIdentifiers
 import OnyxCore
@@ -72,6 +73,8 @@ struct ReaderScreen: UIViewRepresentable {
     var typesetRevision: Int = 0
     var jumpLine: Int? = nil
     var jumpToken: Int = 0
+    /// Fired when the user overscrolls past the top of the note and lets go, like pull-to-search.
+    var onPullToCommand: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -85,8 +88,11 @@ struct ReaderScreen: UIViewRepresentable {
         wv.backgroundColor = .clear
         wv.scrollView.backgroundColor = .clear
         wv.navigationDelegate = context.coordinator
+        wv.scrollView.alwaysBounceVertical = true
         context.coordinator.webView = wv
         context.coordinator.handler = handler
+        context.coordinator.onPullToCommand = onPullToCommand
+        context.coordinator.installPullToCommand(on: wv.scrollView)
         wv.load(URLRequest(url: URL(string: "onyx://app/web/reader.html")!))
         return wv
     }
@@ -95,6 +101,7 @@ struct ReaderScreen: UIViewRepresentable {
         let c = context.coordinator
         c.handler?.vaultRoot = vaultRoot
         c.snapshot = snapshot
+        c.onPullToCommand = onPullToCommand
         let typeset = TypesetSettings.options()
         let changed = c.path != note.path || c.text != note.content || c.dark != dark
             || c.typesetRevision != typesetRevision || c.jumpToken != jumpToken
@@ -123,6 +130,48 @@ struct ReaderScreen: UIViewRepresentable {
         var pendingLine: Int? = nil
         var typesetRevision = -1
         var jumpToken = -1
+        var onPullToCommand: (() -> Void)?
+        private var pullHint: UILabel?
+        private var pullInstalled = false
+
+        func installPullToCommand(on scrollView: UIScrollView) {
+            guard !pullInstalled else { return }
+            pullInstalled = true
+            scrollView.alwaysBounceVertical = true
+            scrollView.panGestureRecognizer.addTarget(self, action: #selector(handlePull))
+            let hint = UILabel()
+            hint.text = "Command Palette"
+            hint.font = UIFont.preferredFont(forTextStyle: .subheadline)
+            hint.textAlignment = .center
+            hint.textColor = .secondaryLabel
+            hint.alpha = 0
+            hint.translatesAutoresizingMaskIntoConstraints = true
+            scrollView.addSubview(hint)
+            pullHint = hint
+        }
+
+        @objc func handlePull(_ gesture: UIPanGestureRecognizer) {
+            guard let scrollView = webView?.scrollView else { return }
+            let y = scrollView.contentOffset.y
+            let width = scrollView.bounds.width
+            if let hint = pullHint {
+                hint.frame = CGRect(x: 0, y: y + 16, width: max(width, 1), height: 28)
+                hint.alpha = CGFloat(PullToCommand.hintOpacity(offsetY: y))
+                if PullToCommand.shouldOpen(offsetY: y) {
+                    hint.textColor = .label
+                    hint.text = "Release for Command Palette"
+                } else {
+                    hint.textColor = .secondaryLabel
+                    hint.text = "Command Palette"
+                }
+            }
+            if gesture.state == .ended || gesture.state == .cancelled {
+                pullHint?.alpha = 0
+                if PullToCommand.shouldOpen(offsetY: y) {
+                    onPullToCommand?()
+                }
+            }
+        }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             ready = true
