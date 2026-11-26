@@ -488,4 +488,94 @@ final class OutlineTreeTests: XCTestCase {
         // None have reached the line: the title (nil → note title row).
         XCTAssertNil(OutlineTree.activeIndex(tops: [80, 200], visibleTop: 0, offset: offset))
     }
+
+    func testFolderIndexHeadingsThatNameSubfoldersOrChildNotesAreDropped() {
+        let snap = snapshot([
+            "Life/Sarah Stuff/Sarah Stuff.md": """
+            # Sarah Stuff
+            ## Sigh
+            ### Unique under Sigh
+            ## Sex Stuff
+            ## Journal
+            ## Loose thoughts
+            """,
+            "Life/Sarah Stuff/Sigh/Sigh.md": "# Sigh\n",
+            "Life/Sarah Stuff/Sex Stuff/Sex Stuff.md": "# Sex Stuff\n",
+            "Life/Sarah Stuff/Journal.md": "# Journal\n## Entry\n",
+        ])
+        let roots = OutlineTree.build(scope: .vault, currentPath: "Life/Sarah Stuff/Journal.md", snapshot: snap)
+        let sarah = roots.flatMap { $0.kind == .folder && $0.title == "Life" ? $0.children : [$0] }
+            .first { $0.title == "Sarah Stuff" }
+            ?? roots.first { $0.title == "Sarah Stuff" }
+        XCTAssertNotNil(sarah)
+        XCTAssertEqual(sarah?.kind, .folder)
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let id = sarah!.id
+        let rows = OutlineTree.flatten(roots, expanded: [OutlineTree.folderId("Life"), id], headings: hs)
+        let under = rows.filter { $0.depth == (rows.first { $0.id == id }?.depth ?? 0) + 1 }
+        // Duplicate "Sigh" / "Sex Stuff" headings are gone; the folder rows remain.
+        // "Journal" matched the child note, so only the note row remains.
+        // "Loose thoughts" is unique and stays. "Unique under Sigh" is promoted.
+        XCTAssertEqual(under.filter { $0.kind == .heading }.map(\.title), ["Unique under Sigh", "Loose thoughts"])
+        XCTAssertEqual(under.filter { $0.kind == .folder }.map(\.title), ["Sex Stuff", "Sigh"])
+        XCTAssertEqual(under.filter { $0.kind == .note }.map(\.title), ["Journal"])
+        XCTAssertEqual(under.filter { $0.title == "Sigh" }.map(\.kind), [.folder])
+        XCTAssertEqual(under.filter { $0.title == "Sex Stuff" }.map(\.kind), [.folder])
+        XCTAssertEqual(under.filter { $0.title == "Journal" }.map(\.kind), [.note])
+    }
+
+    func testFolderIndexHeadingDuplicatesMatchInsensitivelyAndViaWikilinks() {
+        XCTAssertEqual(OutlineTree.normalizedLabel("  **Sex Stuff**  "), "sex stuff")
+        XCTAssertEqual(OutlineTree.normalizedLabel("[[Sigh]]"), "sigh")
+        XCTAssertEqual(OutlineTree.normalizedLabel("[[Sex Stuff|The sex folder]]"), "sex stuff")
+        XCTAssertEqual(OutlineTree.normalizedLabel("[Sigh](Sigh.md)"), "sigh")
+
+        let snap = snapshot([
+            "Life/Sarah Stuff/Sarah Stuff.md": """
+            # Sarah Stuff
+            ##   SIGH
+            ## [[Sex Stuff]]
+            ## [[Life/Sarah Stuff/Sex Stuff]]
+            ## [[Journal.md]]
+            ## Keep me
+            """,
+            "Life/Sarah Stuff/Sigh/Sigh.md": "# Sigh\n",
+            "Life/Sarah Stuff/Sex Stuff/Sex Stuff.md": "# Sex Stuff\n",
+            "Life/Sarah Stuff/Journal.md": "just a file\n",
+        ])
+        let roots = OutlineTree.build(scope: .vault, currentPath: "Life/Sarah Stuff/Journal.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let rows = OutlineTree.flatten(roots, expanded: [OutlineTree.folderId("Life"), OutlineTree.folderId("Life/Sarah Stuff")], headings: hs)
+        let sarah = rows.first { $0.id == OutlineTree.folderId("Life/Sarah Stuff") }!
+        let kids = rows.filter { $0.depth == sarah.depth + 1 }
+        XCTAssertEqual(kids.filter { $0.kind == .heading }.map(\.title), ["Keep me"])
+        XCTAssertTrue(kids.contains { $0.kind == .folder && $0.title == "Sigh" })
+        XCTAssertTrue(kids.contains { $0.kind == .folder && $0.title == "Sex Stuff" })
+        XCTAssertTrue(kids.contains { $0.kind == .note && $0.title == "Journal" })
+        // The path-form wikilink does not leave a second Sex Stuff heading.
+        XCTAssertEqual(kids.filter { $0.title == "Sex Stuff" }.count, 1)
+
+        // Folder scope uses the same merge.
+        let folder = OutlineTree.build(scope: .folder, currentPath: "Life/Sarah Stuff/Journal.md", snapshot: snap)
+        XCTAssertEqual(folder.first?.title, "Sarah Stuff")
+        let folderRows = OutlineTree.flatten(folder, expanded: [OutlineTree.folderId("Life/Sarah Stuff")], headings: hs)
+        let folderKids = folderRows.filter { $0.depth == 1 }
+        XCTAssertEqual(folderKids.filter { $0.kind == .heading }.map(\.title), ["Keep me"])
+        XCTAssertTrue(folderKids.contains { $0.kind == .folder && $0.title == "Sigh" })
+    }
+
+    func testFolderIndexHeadingMatchingAChildNoteFilenameOrTitleIsDropped() {
+        let snap = snapshot([
+            "A/A.md": "# A\n## Pretty Name\n## FileNote\n## Other\n",
+            "A/Pretty.md": "# Pretty Name\n",
+            "A/FileNote.md": "no heading here\n",
+        ])
+        let roots = OutlineTree.build(scope: .vault, currentPath: "A/Pretty.md", snapshot: snap)
+        let hs: (String) -> [Heading] = { snap.notes[$0]?.summary.headings ?? [] }
+        let rows = OutlineTree.flatten(roots, expanded: [OutlineTree.folderId("A")], headings: hs)
+        let kids = rows.filter { $0.depth == 1 }
+        XCTAssertEqual(kids.filter { $0.kind == .heading }.map(\.title), ["Other"])
+        XCTAssertTrue(kids.contains { $0.kind == .note && $0.title == "Pretty Name" })
+        XCTAssertTrue(kids.contains { $0.kind == .note && $0.title == "FileNote" })
+    }
 }

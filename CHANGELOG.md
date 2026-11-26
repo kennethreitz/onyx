@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking an Outline heading or title row while graph mode is open closes the graph first, then jumps to the target, with the same click-scroll hold.
 
 ### Changed
+- In the vault-wide and folder Outline, a heading in a folder's index note is omitted when it only names a sibling subfolder or child note (case-insensitive, ignoring extra whitespace and markdown or wikilink markup, including a `[[wikilink]]` to the subfolder or its index). The folder or note row is kept; unique headings stay ([docs](docs/navigation.md)).
 - The outline auto-collapses branches that are off the path of the current heading: only the ancestor chain and that heading's own children stay open. Top-level rows stay visible. A branch you expand by hand stays open until the path leaves it.
 - In folder, neighbors, and vault scopes, a leading H1 is the note's title row and is not listed again as a child. In This note, that H1 is the root of the tree. Clicking the title row opens the note or scrolls to the top.
 - The inspector keeps Outline as its first tab (<kbd>⌥⌘1</kbd>) and also shows the same Outline pane as the last tab, before the pin. The selected inspector tab is remembered.
