@@ -11,8 +11,6 @@ struct RootView: View {
     @AppStorage(Prefs.readerSize) private var readerSize = 19.0
     @AppStorage(Prefs.editorSize) private var editorSize = 14.0
     @AppStorage(Prefs.measure) private var measure = 41.0
-    @State private var rightEdgeHover = false
-    @State private var hoverSummonedInspector = false
     @State private var footerHover = false
     @State private var showLights = false
     @State private var keyMonitor: Any?
@@ -30,7 +28,7 @@ struct RootView: View {
     var sidebarWidth: CGFloat { CGFloat(min(max(sidebarW, Self.sidebarRange.lowerBound), Self.sidebarRange.upperBound)) }
     var inspectorWidth: CGFloat { CGFloat(min(max(inspectorW, Self.inspectorRange.lowerBound), Self.inspectorRange.upperBound)) }
     var leftInset: CGFloat { ws.sidebarVisible ? sidebarWidth : 0 }
-    var rightInset: CGFloat { ws.inspectorPinned && ws.inspectorVisible ? inspectorWidth : 0 }
+    var rightInset: CGFloat { ws.inspectorVisible ? inspectorWidth : 0 }
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -137,7 +135,7 @@ struct RootView: View {
                     FooterButton(symbol: "magnifyingglass", help: "Quick switcher (⌘O) · search (⇧⌘F)") { ws.show(.switcher) }
                     FooterButton(symbol: "circle.hexagongrid", help: "Graph (⌘G) · click again to close", on: ws.overlay == .graph) { ws.toggleGraph(atlas: false) }
                     FooterButton(symbol: "rectangle.split.2x1", help: "Split (⌘D) · stacked (⇧⌘D) · close pane (⌘W)", on: ws.isSplit) { ws.split(.vertical) }
-                    FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarVisible && ws.inspectorPinned && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
+                    FooterButton(symbol: "rectangle.split.3x1", help: "Three-pane workspace (⌥⌘0)", on: ws.sidebarVisible && ws.inspectorVisible) { ws.toggleWorkspaceLayout() }
                     FooterButton(symbol: ws.mode == .read ? "pencil" : "book", help: ws.mode == .read ? "Edit (⌘↩)" : "Save and read (⌘↩)") { ws.toggleMode() }
                     FooterButton(symbol: "arrow.up.left.and.arrow.down.right", help: "Focus mode (⌃⌘F)") { ws.toggleFocusMode() }
                 }
@@ -400,24 +398,16 @@ struct RootView: View {
             if ws.inspectorVisible {
                 InspectorView(ws: ws)
                     .frame(width: inspectorWidth)
-                    .padding(.top, ws.inspectorPinned ? 28 : 0)
-                    .panelChrome(pinned: ws.inspectorPinned)
+                    .padding(.top, 28)
+                    .panelChrome(pinned: true)
                     .overlay(alignment: .leading) {
                         ResizeHandle(width: $inspectorW, range: Self.inspectorRange, defaultWidth: Self.inspectorDefault, growsRight: false,
-                                     showLine: ws.inspectorPinned, dragging: $resizing).offset(x: -4.5)
-                    }
-                    .padding(ws.inspectorPinned ? 0 : 10)
-                    .padding(.top, ws.inspectorPinned ? 0 : 28)
-                    .onHover { inside in
-                        if !inside && hoverSummonedInspector && !ws.inspectorPinned {
-                            Task { try? await Task.sleep(nanoseconds: 450_000_000); if hoverSummonedInspector && !ws.inspectorPinned && !rightEdgeHover && !resizing { hoverSummonedInspector = false; if ws.inspectorVisible { ws.toggleInspector() } } }
-                        }
+                                     showLine: true, dragging: $resizing).offset(x: -4.5)
                     }
                     .transition(Motion.slide(.trailing))
             }
         }
         .frame(maxHeight: .infinity)
-        .onChange(of: ws.inspectorVisible) { if !ws.inspectorVisible { hoverSummonedInspector = false } }
     }
 
     /// A breath of ink when something outside Onyx (Obsidian Sync, git, a bot) changes the vault.

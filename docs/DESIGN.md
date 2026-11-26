@@ -33,10 +33,11 @@ The page is the interface; everything else is summoned, and Esc puts it away.
   scrollbar and draws a floating 3px thumb (draggable) from reader.js, so split panes meet at
   a bare hairline. `ONYX_SCROLL_TEST=<seconds>` scrolls everything in small steps that long
   after launch, for screenshots.
-- **Inspector** (outline, backlinks, properties): ⌥⌘I or the footer button only, docked,
-  remembered across launches (`onyx.inspectorOpen`). There is deliberately no right-edge
-  hover: a pointer parked at the window's right edge kept re-summoning it ("stuck").
-  ⌥⌘I is caught ahead of the editor so it works while typing. Esc puts it away too.
+- **Inspector** (outline, backlinks, properties) is always docked. ⌥⌘I or the footer
+  button shows or hides it; visibility is remembered (`onyx.inspectorOpen`). There is no
+  pin button, floating overlay, or right-edge peek (a pointer parked at the window's
+  right edge used to keep re-summoning it). ⌥⌘I is caught ahead of the editor so it
+  works while typing. Esc puts it away too.
 - **Title fade**: a paper-colored gradient sits behind the title path, so body text scrolls
   up into a soft fade instead of colliding with the path.
 - **Split panes**: a flat row (⌘D) or column (⇧⌘D) of up to four panes; a new split sets
@@ -87,7 +88,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌘P, ⇧⌘P | Command palette (⇧⌘P for VS Code hands) |
 | ⌘K | Show or hide the sidebar (always docked; from another tab, switches to Files) |
 | ⇧⌘F | Search the vault |
-| ⌥⌘I | Inspector |
+| ⌥⌘I | Show or hide the inspector (always docked) |
 | ⌘B / ⌘I | Toggle bold / italic |
 | ⌘G / ⇧⌘G | Focus graph / Atlas |
 | ⌘E, ⌘↩ | Read ⇄ edit; ⌘↩ also saves immediately |
@@ -101,7 +102,7 @@ rather than invent numbers; the page itself is typeset by the reader and editor 
 | ⌘N | New note (in the selected folder, or next to the open note). ⌘S names a still-Untitled file from its first heading |
 | ⇧⌘N | New folder |
 | ⌃⌘F | Focus mode |
-| Esc | Put away the topmost layer (overlay → floating panel → inspector → focus mode) |
+| Esc | Put away the topmost layer (overlay → inspector → focus mode) |
 
 ## Canvas
 

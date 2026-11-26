@@ -784,7 +784,7 @@ struct InspectorView: View {
     @State private var showUnlinked = false
     var body: some View {
         VStack(spacing: 0) {
-            PanelHeader(tabs: InspectorTab.barTabs, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned)
+            PanelHeader(tabs: InspectorTab.barTabs, selection: $ws.inspectorTab, symbol: \.symbol, label: { $0.rawValue.capitalized }, pinned: $ws.inspectorPinned, showsPin: false)
             Divider().overlay(Color.hairline)
             if ws.inspectorTab == .outline {
                 OutlinePane(ws: ws)
