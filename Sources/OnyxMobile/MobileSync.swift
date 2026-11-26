@@ -112,6 +112,7 @@ extension MobileVault {
         if let today = dailyPath, snapshot?.notes[today] != nil { selectedPath = today }
         if let p = selectedPath { revealInTree(p) }
         startSync()
+        applyPendingURI()
     }
 
     func startSync() {

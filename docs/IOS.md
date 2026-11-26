@@ -13,6 +13,7 @@ These are Foundation (plus simd, CryptoKit, JavaScriptCore, Observation) and alr
 - **Vault** — `VaultSnapshot.scan`, note records, folder tree, wikilink resolution, backlinks, unlinked mentions, `search`
 - **Parsing** — Markdown notes, frontmatter, inline fields, wikilinks, attachments, image sizes, tables
 - **Daily notes** — `DailyNotes` and `.obsidian/daily-notes.json` via `ObsidianConfig`
+- **Onyx URLs** — `OnyxURI` parses `onyx://` / `obsidian://` (`open`, `search`, `new`, `daily`); the iOS app registers `onyx://` and handles those links through `onOpenURL` ([docs](uri.md))
 - **Find, fuzzy, Quick Switcher scoring** — `FindText`, `Fuzzy`, `QuickMatch`
 - **Reader payload** — `ReaderPayload` builds the JSON the existing `Resources/web` page (`reader.html` / `reader.js` / `typeset.js`, KaTeX, Mermaid) consumes. Wikilinks, embeds, Dataview, and Bases HTML are resolved in Swift so JS never touches the disk
 - **Typesetting policy** — `TableLayout`, fold *logic* (`Folding`, not the AppKit layout manager)

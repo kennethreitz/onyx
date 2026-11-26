@@ -10,6 +10,7 @@ struct OnyxMobileApp: App {
             ContentView()
                 .environmentObject(vault)
                 .task { vault.restore() }
+                .onOpenURL { vault.handleURL($0) }
                 .onChange(of: scenePhase) { _, phase in
                     // Sync-only vaults sync while Onyx is in front, and get a short grace period when it leaves.
                     switch phase {

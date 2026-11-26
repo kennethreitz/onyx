@@ -67,3 +67,7 @@ Command Palette ▸ Copy Onyx URL copies an `onyx://open?…` link for the curre
 ## Links in notes
 
 An `obsidian://` or `onyx://` link clicked in a note is handled inside Onyx. Onyx does not register the `obsidian://` scheme, so a click outside the app still goes to Obsidian.
+
+## iOS
+
+The iOS app registers the same `onyx://` scheme and handles `open`, `search`, `new`, and `daily` through `onOpenURL`, including at launch. Vaults are resolved among the current folder and sync-only vaults in the app. The `obsidian://` scheme is not registered.

@@ -22,6 +22,8 @@ final class MobileVault: ObservableObject {
     @Published var query = ""
     @Published var error: String?
     @Published var isScanning = false
+    /// An `onyx://` link that arrived before the vault finished opening.
+    var pendingURI: URL?
 
     private var isAccessing = false
 
@@ -101,6 +103,7 @@ final class MobileVault: ObservableObject {
             selectedPath = snapshot?.sortedNotePaths.first
         }
         if let p = selectedPath { revealInTree(p) }
+        applyPendingURI()
     }
 
     func scan() {
