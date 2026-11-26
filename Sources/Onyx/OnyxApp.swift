@@ -8,14 +8,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Before windows come up or boot() restores session state: ask any
         // other packaged Onyx to quit and wait for it to finish saving.
         SingleInstanceHandover.takeOverIfNeeded()
-        // onyx://clip?url=… (the web clipper bookmarklet). Handled here rather than by SwiftUI,
+        // onyx:// links (open, search, new, daily, clip). Handled here rather than by SwiftUI,
         // which would open a new window for every URL.
         NSAppleEventManager.shared().setEventHandler(self, andSelector: #selector(handleGetURL(_:withReply:)),
                                                      forEventClass: AEEventClass(kInternetEventClass), andEventID: AEEventID(kAEGetURL))
     }
     @objc func handleGetURL(_ event: NSAppleEventDescriptor, withReply reply: NSAppleEventDescriptor) {
         guard let s = event.paramDescriptor(forKeyword: keyDirectObject)?.stringValue, let url = URL(string: s) else { return }
-        MainActor.assumeIsolated { WebClipper.shared.receive(url) }
+        MainActor.assumeIsolated { OnyxURIHandler.shared.receive(url) }
     }
     func applicationDidFinishLaunching(_ n: Notification) {
         NSApp.setActivationPolicy(.regular)
@@ -126,7 +126,15 @@ struct OnyxApp: App {
         if let sb = LaunchOptions.parse().sidebar { UserDefaults.standard.set(sb, forKey: "onyx.sidebarOpen") }
     }
 
-    static func remember(_ url: URL) { UserDefaults.standard.set(url.path, forKey: "onyx.vault") }
+    static func remember(_ url: URL) {
+        let path = url.path
+        UserDefaults.standard.set(path, forKey: "onyx.vault")
+        var recents = UserDefaults.standard.stringArray(forKey: OnyxURIHandler.recentVaultsKey) ?? []
+        recents.removeAll { $0 == path }
+        recents.insert(path, at: 0)
+        if recents.count > 20 { recents = Array(recents.prefix(20)) }
+        UserDefaults.standard.set(recents, forKey: OnyxURIHandler.recentVaultsKey)
+    }
 
     /// Without --vault: the last vault you opened, else ~/Notes if it exists. A remembered vault
     /// in /tmp (a test or demo copy) doesn't count, so the demo opens only when chosen with
@@ -166,10 +174,17 @@ struct OnyxApp: App {
         apply(appearance)
         TypeSelfTest.ws = ws
         WebClipper.shared.ws = ws
+        OnyxURIHandler.shared.ws = ws
         // Observers are installed once: closing and reopening the window
         // runs boot() again, but the vault (and Workspace) is already live.
         AppLifecycle.install(ws: ws)
         guard ws.root == nil else { return }
+        // A pending onyx:// URL that names a known vault wins over the last session.
+        if OnyxURIHandler.shared.consumeAtBoot(defaultVault: options.vault ?? OnyxApp.defaultVault()) {
+            if let m = options.mode { ws.mode = m }
+            if let sb = options.sidebar { ws.sidebarVisible = sb; ws.sidebarPinned = true }
+            return
+        }
         // --vault never overwrites the remembered vault (so test runs stay isolated).
         guard let url = options.vault ?? OnyxApp.defaultVault() else { return }
         guard FileManager.default.fileExists(atPath: url.path) else { return }
@@ -243,6 +258,8 @@ struct OnyxApp: App {
             ShortcutMenus.button("duplicate", disabled: ws.currentPath == nil || ws.isCanvas || ws.isBase || ws.isFile) { ws.duplicateCurrent() }
             Divider()
             ShortcutMenus.button("copypath", disabled: ws.currentPath == nil) { ws.copyFilePath() }
+            // Adjacent on purpose: ObsidianOptionMenu makes Copy Onyx URL a hidden Option-alternate of Copy File Path.
+            ShortcutMenus.button("copyurl", disabled: ws.currentPath == nil) { ws.copyOnyxURL() }
             ShortcutMenus.button("openexternal", disabled: ws.currentPath == nil) { ws.openInDefaultApp() }
             Divider()
             ShortcutMenus.button("clip", disabled: ws.root == nil) { ws.promptClip() }

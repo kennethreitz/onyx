@@ -85,6 +85,9 @@ A **template note** is any note in the vault (path with or without `.md`). Onyx 
 
 ## The onyx://clip URL
 
+`clip` is one action on the `onyx://` scheme; [Onyx URLs](uri.md) documents `open`, `search`, `new`, and `daily`.
+
+
 The bookmarklet opens `onyx://clip?…`, and anything else can too (Shortcuts, Alfred, Raycast, a script):
 
 ```sh

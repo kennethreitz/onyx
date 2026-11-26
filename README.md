@@ -71,6 +71,7 @@ make install ARCH=arm64 # one slice (arm64 or x86_64)
 - [Bases](docs/bases.md)
 - [Canvas and Kanban](docs/boards.md)
 - [Getting around](docs/navigation.md)
+- [Onyx URLs](docs/uri.md): `onyx://open`, `search`, `new`, `daily`, and Copy Onyx URL
 - [Attachments](docs/attachments.md): drag, drop, paste, the file viewers, and image sizes
 - [Web clipper](docs/web-clipper.md): the bookmarklet, Clip Web Page…, templates, and `onyx://clip`
 - [Sync](docs/sync.md)

@@ -163,8 +163,9 @@ extension Workspace {
         toast = "Duplicated as \(((dest as NSString).lastPathComponent as NSString).deletingPathExtension)"
     }
 
-    func copyFilePath() {
-        guard let p = currentPath, let root else { return }
+    func copyFilePath() { if let p = currentPath { copyFilePath(p) } }
+    func copyFilePath(_ p: String) {
+        guard let root else { return }
         let full = root.appendingPathComponent(p).path
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString(full, forType: .string)
         toast = "Copied path"

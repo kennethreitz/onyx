@@ -20,4 +20,20 @@ final class OptionRevealItemTests: XCTestCase {
         XCTAssertEqual(OptionRevealItem.treatment(previousTitle: "Copy Wikilink"), .optionOnly)
         XCTAssertEqual(OptionRevealItem.treatment(previousTitle: nil), .optionOnly)
     }
+
+    func testCopyOnyxURLIsAlternateOfCopyFilePath() {
+        let rule = OptionAlternate.rule(for: "Copy Onyx URL")
+        XCTAssertNotNil(rule)
+        XCTAssertTrue(rule!.isTarget("Copy Onyx URL"))
+        XCTAssertFalse(rule!.isTarget("Copy File Path"))
+        XCTAssertTrue(rule!.isSibling("Copy File Path"))
+        XCTAssertTrue(rule!.isSibling("Copy Wikilink"))
+        XCTAssertFalse(rule!.isSibling("Copy"))
+        XCTAssertEqual(rule!.treatment(previousTitle: "Copy File Path"), .alternate)
+        XCTAssertEqual(rule!.treatment(previousTitle: "Copy Wikilink"), .alternate)
+        XCTAssertEqual(rule!.treatment(previousTitle: "Reveal in Finder"), .optionOnly)
+        XCTAssertEqual(rule!.treatment(previousTitle: nil), .optionOnly)
+        // The Obsidian rule is unchanged, and does not claim this title.
+        XCTAssertFalse(OptionRevealItem.isTarget("Copy Onyx URL"))
+    }
 }

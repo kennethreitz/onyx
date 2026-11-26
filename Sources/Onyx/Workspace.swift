@@ -479,6 +479,10 @@ final class Workspace {
     }
 
     func openLink(_ target: String, from source: String? = nil) {
+        if let url = URL(string: target), OnyxURI.parse(url) != nil {
+            OnyxURIHandler.shared.receive(url)
+            return
+        }
         guard let snap = snapshot else { return }
         let link = NoteParser.makeLink(inner: target, embed: false, range: NSRange())
         if let p = snap.resolve(link.target, from: source ?? currentPath) {
@@ -2018,7 +2022,9 @@ final class Workspace {
             toggleSidebar(.search)
             focusSearch += 1
         case "url":
-            if let raw = item.url, let url = URL(string: raw) { NSWorkspace.shared.open(url) }
+            if let raw = item.url, let url = URL(string: raw) {
+                if OnyxURI.parse(url) != nil { OnyxURIHandler.shared.receive(url) } else { NSWorkspace.shared.open(url) }
+            }
         case "graph":
             graphAtlas = true
             if overlay != .graph { show(.graph) }
@@ -2125,6 +2131,13 @@ final class Workspace {
         guard let n = currentNote else { return }
         NSPasteboard.general.clearContents(); NSPasteboard.general.setString("[[\(n.name)]]", forType: .string)
         toast = "Copied [[\(n.name)]]"
+    }
+
+    func copyOnyxURL() { if let p = currentPath { copyOnyxURL(p) } }
+    func copyOnyxURL(_ p: String) {
+        guard let root, let u = OnyxURI.makeOpen(vault: root.lastPathComponent, file: p) else { return }
+        NSPasteboard.general.clearContents(); NSPasteboard.general.setString(u.absoluteString, forType: .string)
+        toast = "Copied Onyx URL"
     }
 }
 
