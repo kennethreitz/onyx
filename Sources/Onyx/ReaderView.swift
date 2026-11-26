@@ -17,8 +17,12 @@ final class OnyxSchemeHandler: NSObject, WKURLSchemeHandler {
         default: base = nil
         }
         guard let base else { return task.didFailWithError(URLError(.fileDoesNotExist)) }
-        let file = base.appendingPathComponent(String(rel.drop(while: { $0 == "/" }))).standardizedFileURL
-        guard file.path.hasPrefix(base.standardizedFileURL.path), let data = try? Data(contentsOf: file) else {
+        // Symlinks resolved and a trailing "/" on the root, so neither a link inside the folder nor a
+        // sibling sharing its name prefix (~/Notes vs ~/Notes-old) is served.
+        let root = base.resolvingSymlinksInPath().standardizedFileURL
+        let file = root.appendingPathComponent(String(rel.drop(while: { $0 == "/" }))).resolvingSymlinksInPath().standardizedFileURL
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard file.path.hasPrefix(prefix), let data = try? Data(contentsOf: file) else {
             return task.didFailWithError(URLError(.fileDoesNotExist))
         }
         let mime = UTType(filenameExtension: file.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
@@ -224,7 +228,9 @@ struct ReaderView: NSViewRepresentable {
         }
 
         func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            // Only the reader page itself, never an <iframe> a note embeds (which also sees the handler).
+            guard message.frameInfo.isMainFrame,
+                  let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
             if preview, !["open", "url", "tag"].contains(type) { return }   // a preview only navigates
             switch type {
             case "open":
@@ -265,7 +271,10 @@ struct ReaderView: NSViewRepresentable {
                     let title = ws.snapshot?.notes[target]?.name ?? ((target as NSString).lastPathComponent as NSString).deletingPathExtension
                     ws.linkUnlinkedMention(UnlinkedMention(source: source, line: 0, context: "", range: NSRange(location: loc, length: len), matched: matched, needle: title), title: title)
                 }
-            case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
+            case "url":   // the same schemes reader.js and the canvas allow; never file:// or other apps' schemes
+                if let s = body["url"] as? String, let u = URL(string: s), ["http", "https", "mailto", "obsidian"].contains(u.scheme?.lowercased() ?? "") {
+                    NSWorkspace.shared.open(u)
+                }
             case "tag":
                 if let t = body["tag"] as? String { ws.revealTag(t) }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }

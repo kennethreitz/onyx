@@ -106,7 +106,9 @@ struct CanvasView: NSViewRepresentable {
         }
 
         func userContentController(_ uc: WKUserContentController, didReceive message: WKScriptMessage) {
-            guard let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
+            // Only the canvas page itself, never an <iframe> a card embeds (which also sees the handler).
+            guard message.frameInfo.isMainFrame,
+                  let body = message.body as? [String: Any], let type = body["type"] as? String else { return }
             switch type {
             case "save":
                 // Only the focused pane's canvas is live; JS sends JSON.stringify(doc).
