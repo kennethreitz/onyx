@@ -768,3 +768,20 @@ test('a heading at the top of the view followed by a tall table is active, not t
     { top: O._headingSpyTop(900, margin), line: 140 },
   ], offset), 89);
 });
+
+test('scroll-spy cache helpers are exported and a miss then a hit agree', () => {
+  const O = window.Onyx;
+  assert.equal(typeof O._readOutlineLine, 'function');
+  assert.equal(typeof O._topLine, 'function');
+  assert.equal(typeof O._invalidateSpyCaches, 'function');
+  assert.equal(typeof O._benchSpy, 'function');
+  // Stub document: these return the empty-document answers and must agree
+  // before and after a cache fill so invalidation cannot change the result.
+  O._invalidateSpyCaches();
+  const a = O._readOutlineLine();
+  const b = O._readOutlineLine();
+  O._invalidateSpyCaches();
+  const c = O._readOutlineLine();
+  assert.equal(a, b);
+  assert.equal(b, c);
+});

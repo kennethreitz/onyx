@@ -578,4 +578,18 @@ final class OutlineTreeTests: XCTestCase {
         XCTAssertTrue(kids.contains { $0.kind == .note && $0.title == "Pretty Name" })
         XCTAssertTrue(kids.contains { $0.kind == .note && $0.title == "FileNote" })
     }
+    func testHeadingsMemoAgreesWithAFreshParse() {
+        let text = "# Title\n\n## One\n\n### Nested\n\n## Two\n"
+        var snap = VaultSnapshot(root: URL(fileURLWithPath: "/tmp/none"))
+        snap.notes["X.md"] = VaultSnapshot.makeRecord(rel: "X.md", content: text)
+        snap.rebuildDerived()
+        let a = OutlineTree.headings(for: "X.md", currentPath: "X.md", currentText: text, in: snap)
+        let b = OutlineTree.headings(for: "X.md", currentPath: "X.md", currentText: text, in: snap)
+        XCTAssertEqual(a, b)
+        XCTAssertEqual(a.map(\.text), NoteParser.parseHeadings(text).map(\.text))
+        let c = OutlineTree.headings(for: "X.md", currentPath: "X.md", currentText: text + "\n## Three\n", in: snap)
+        XCTAssertEqual(c.map(\.text), ["Title", "One", "Nested", "Two", "Three"])
+    }
+
+
 }
