@@ -26,7 +26,7 @@ enum InspectorTab: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self { case .outline: return "list.bullet.indent"; case .backlinks: return "arrow.uturn.backward"; case .properties: return "tablecells" }
     }
-    /// Outline stays first (where it has always been) and is also the last tab, before the pin.
+    /// Outline stays first (where it has always been) and is also the last tab.
     static var barTabs: [InspectorTab] { [.outline, .backlinks, .properties, .outline] }
 }
 enum GitPanelSection: String, CaseIterable, Identifiable {
@@ -149,7 +149,8 @@ final class Workspace {
     var selectedFolder: String? = nil    // folder chosen from the title path, highlighted in the tree
     var revealToken = 0                  // bump to scroll the tree to `selectedFolder`
     var inspectorVisible = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorVisible != oldValue { chromeLog("inspectorVisible=\(inspectorVisible)") } } }
-    var inspectorPinned = UserDefaults.standard.bool(forKey: "onyx.inspectorOpen") { didSet { if inspectorPinned != oldValue { chromeLog("inspectorPinned=\(inspectorPinned)") } } }
+    /// The inspector is always docked. Older unpinned state is treated as pinned; `onyx.inspectorOpen` now means visibility only.
+    var inspectorPinned = true
     var inspectorTab: InspectorTab = InspectorTab(rawValue: UserDefaults.standard.string(forKey: "onyx.inspectorTab") ?? "") ?? .outline {
         didSet { if inspectorTab != oldValue { UserDefaults.standard.set(inspectorTab.rawValue, forKey: "onyx.inspectorTab") } }
     }
@@ -1697,11 +1698,11 @@ final class Workspace {
         if inspectorVisible, inspectorTab == .outline { syncOutlineTop() }
     }
     func hideInspector(animated: Bool = true) {
-        let body = { self.inspectorVisible = false; self.inspectorPinned = false }
+        let body = { self.inspectorVisible = false }
         if animated { withAnimation(Motion.layout, body) } else { body() }
         persistInspector()
     }
-    func persistInspector() { UserDefaults.standard.set(inspectorVisible && inspectorPinned, forKey: "onyx.inspectorOpen") }
+    func persistInspector() { UserDefaults.standard.set(inspectorVisible, forKey: "onyx.inspectorOpen") }
     func show(_ o: Overlay) {
         withAnimation(Motion.overlay) { overlay = overlay == o ? .none : o }
     }
@@ -1825,9 +1826,9 @@ final class Workspace {
         withAnimation(Motion.layout) {
             if focusMode {
                 focusMode = false
-                if let p = preFocus { sidebarVisible = p.0; sidebarPinned = true; inspectorVisible = p.2; inspectorPinned = p.3 }
+                if let p = preFocus { sidebarVisible = p.0; sidebarPinned = true; inspectorVisible = p.2; inspectorPinned = true }
             } else {
-                preFocus = (sidebarVisible, true, inspectorVisible, inspectorPinned)
+                preFocus = (sidebarVisible, true, inspectorVisible, true)
                 focusMode = true
                 sidebarVisible = false; inspectorVisible = false; overlay = .none
             }
@@ -1893,10 +1894,10 @@ final class Workspace {
     }
     func toggleWorkspaceLayout() {
         withAnimation(Motion.layout) {
-            let on = !(sidebarVisible && inspectorPinned && inspectorVisible)
+            let on = !(sidebarVisible && inspectorVisible)
             sidebarVisible = on
             sidebarPinned = true
-            inspectorPinned = on
+            inspectorPinned = true
             inspectorVisible = on
             if on { focusMode = false }
         }
