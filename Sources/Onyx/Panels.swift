@@ -573,6 +573,10 @@ struct FileMenu: View {
         Button("Rename…") { DispatchQueue.main.async { ws.confirmRename(path) } }
         Button("Move to…") { ws.beginMove(path) }
         Divider()
+        Button("Copy File Path") { ws.copyFilePath(path) }
+        // Adjacent on purpose: ObsidianOptionMenu makes Copy Onyx URL a hidden Option-alternate of Copy File Path.
+        Button("Copy Onyx URL") { ws.copyOnyxURL(path) }
+        Divider()
         // Adjacent on purpose: Open in Obsidian is a hidden Option-alternate of Reveal in Finder.
         Button("Reveal in Finder") { ws.revealInFinder(path) }
         if let note { Button("Open in Obsidian") { ws.openInObsidian(note) } }

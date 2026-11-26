@@ -1,11 +1,11 @@
 import AppKit
 import OnyxCore
 
-/// Keeps "Open in Obsidian" off menus unless Option is held. In NSMenus it becomes
-/// a hidden alternate of the preceding Reveal in Finder (or Open in Default App)
-/// item, so the two swap while the menu is open. With no such sibling, the item
-/// is hidden and shown from flagsChanged / menu open. The command palette is
-/// left alone.
+/// Keeps Option-hold alternates ("Open in Obsidian", "Copy Onyx URL") off menus unless
+/// Option is held. In NSMenus a target becomes a hidden alternate of the preceding sibling
+/// (Reveal in Finder / Open in Default App, or Copy File Path / Copy Wikilink), so the two
+/// swap while the menu is open. With no such sibling, the item is hidden and shown from
+/// flagsChanged / menu open. The command palette is left alone.
 enum ObsidianOptionMenu {
     private static var installed = false
     private static var observers: [NSObjectProtocol] = []
@@ -34,9 +34,9 @@ enum ObsidianOptionMenu {
         let items = menu.items
         for (i, item) in items.enumerated() {
             if recursive, let sub = item.submenu { patch(sub, recursive: true) }
-            guard OptionRevealItem.isTarget(item.title) else { continue }
+            guard let rule = OptionAlternate.rule(for: item.title) else { continue }
             let previous = i > 0 ? items[i - 1].title : nil
-            switch OptionRevealItem.treatment(previousTitle: previous) {
+            switch rule.treatment(previousTitle: previous) {
             case .alternate:
                 // Same keyEquivalent as the sibling would collide with Reveal in
                 // Finder's ⌥⇧⌘R; an empty equivalent with an Option mask is enough
@@ -59,9 +59,9 @@ enum ObsidianOptionMenu {
             guard let menu else { return }
             for (i, item) in menu.items.enumerated() {
                 walk(item.submenu)
-                guard OptionRevealItem.isTarget(item.title) else { continue }
+                guard let rule = OptionAlternate.rule(for: item.title) else { continue }
                 let previous = i > 0 ? menu.items[i - 1].title : nil
-                if OptionRevealItem.treatment(previousTitle: previous) == .optionOnly {
+                if rule.treatment(previousTitle: previous) == .optionOnly {
                     item.isHidden = !optionDown
                 }
             }

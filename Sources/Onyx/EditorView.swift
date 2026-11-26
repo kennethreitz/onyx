@@ -184,11 +184,14 @@ final class OnyxTextView: NSTextView {
         for l in NoteParser.parseWikiLinks(string, in: lr) where NSLocationInRange(idx, l.range) || NSMaxRange(l.range) == idx {
             return l.target + (l.heading.map { "#" + $0 } ?? "")
         }
+        let line = ns.substring(with: lr)
+        let lineOff = idx - lr.location
+        if let u = OnyxURI.url(in: line, at: max(0, lineOff)) { return u.absoluteString }
         if let m = MarkdownHighlighter.url.matches(in: string, range: lr).first(where: { NSLocationInRange(idx, $0.range) }), let u = URL(string: ns.substring(with: m.range)) {
             NSWorkspace.shared.open(u); return nil
         }
         // [text](file.pdf) / ![](img.png): local Markdown links follow like wikilinks
-        if let t = MarkdownLinkHit.target(in: ns.substring(with: lr), at: idx - lr.location) { return t }
+        if let t = MarkdownLinkHit.target(in: line, at: lineOff) { return t }
         return nil
     }
 

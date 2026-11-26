@@ -217,7 +217,8 @@ struct ReaderView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if let u = action.request.url, action.navigationType == .linkActivated {
-                if u.scheme == "http" || u.scheme == "https" || u.scheme == "mailto" || u.scheme == "obsidian" { NSWorkspace.shared.open(u) }
+                if OnyxURI.parse(u) != nil { OnyxURIHandler.shared.receive(u) }
+                else if u.scheme == "http" || u.scheme == "https" || u.scheme == "mailto" { NSWorkspace.shared.open(u) }
                 return decisionHandler(.cancel)
             }
             decisionHandler(.allow)
@@ -265,7 +266,10 @@ struct ReaderView: NSViewRepresentable {
                     let title = ws.snapshot?.notes[target]?.name ?? ((target as NSString).lastPathComponent as NSString).deletingPathExtension
                     ws.linkUnlinkedMention(UnlinkedMention(source: source, line: 0, context: "", range: NSRange(location: loc, length: len), matched: matched, needle: title), title: title)
                 }
-            case "url": if let s = body["url"] as? String, let u = URL(string: s) { NSWorkspace.shared.open(u) }
+            case "url":
+                if let s = body["url"] as? String, let u = URL(string: s) {
+                    if OnyxURI.parse(u) != nil { OnyxURIHandler.shared.receive(u) } else { NSWorkspace.shared.open(u) }
+                }
             case "tag":
                 if let t = body["tag"] as? String { ws.revealTag(t) }
             case "task": if let i = body["index"] as? Int { ws.toggleTask(index: i) }

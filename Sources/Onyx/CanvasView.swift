@@ -99,7 +99,8 @@ struct CanvasView: NSViewRepresentable {
 
         func webView(_ webView: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
             if let u = action.request.url, action.navigationType == .linkActivated {
-                if ["http", "https", "mailto", "obsidian"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
+                if OnyxURI.parse(u) != nil { OnyxURIHandler.shared.receive(u) }
+                else if ["http", "https", "mailto"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
                 return decisionHandler(.cancel)
             }
             decisionHandler(.allow)
@@ -128,7 +129,11 @@ struct CanvasView: NSViewRepresentable {
                     GraphPreviewController.shared.schedule(ws: ws, path: p, rect: rect, in: webView)
                 }
             case "previewEnd": GraphPreviewController.shared.leaveLink()
-            case "url": if let s = body["url"] as? String, let u = URL(string: s), ["http", "https", "mailto", "obsidian"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
+            case "url":
+                if let s = body["url"] as? String, let u = URL(string: s) {
+                    if OnyxURI.parse(u) != nil { OnyxURIHandler.shared.receive(u) }
+                    else if ["http", "https", "mailto"].contains(u.scheme ?? "") { NSWorkspace.shared.open(u) }
+                }
             case "tag":
                 if let t = body["tag"] as? String { ws.searchQuery = "tag:" + t; ws.sidebarTab = .search; if !ws.sidebarVisible { ws.toggleSidebar() } }
             case "search":   // the "Add note…" picker, through the ⌘O matcher

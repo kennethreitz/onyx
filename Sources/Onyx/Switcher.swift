@@ -326,6 +326,7 @@ enum PaletteCommands {
             item("revealtree") { ws.revealInSidebar() },
             item("duplicate") { ws.duplicateCurrent() },
             item("copypath") { ws.copyFilePath() },
+            item("copyurl") { ws.copyOnyxURL() },
             item("openexternal") { ws.openInDefaultApp() },
             item("clip") { DispatchQueue.main.async { ws.promptClip() } },
             item("zoomin") { ws.zoom(1) },
